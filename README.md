@@ -47,3 +47,64 @@ This README outlines the tech stack, goals, structure, and setup steps.
 ---
 
 ## Directory Structure
+root/
+apps/
+web/            # Next.js frontend
+api/            # Fastify backend
+packages/
+ui/             # Shared components
+config/         # Shared config (tsconfig, eslint, etc)
+lib/            # Shared business logic
+infra/
+cdk/ or terraform/
+docker/           # Docker configs
+.github/workflows/
+
+---
+
+## Initial Setup
+
+### 1. Install dependencies
+pnpm install
+
+### 2. Start local dev
+docker-compose up --build
+
+This runs:
+	•	Next.js app
+	•	Fastify API
+	•	PostgreSQL
+
+### 3. Run database migrations
+pnpm prisma migrate dev
+
+### 4. Lint
+pnpm lint
+
+## Core Principles
+	•	Keep the codebase lean
+	•	Strong type-safety end-to-end
+	•	All boundaries use Zod validation
+	•	Shared logic kept in clean packages
+	•	Reproducible deployments via Docker
+
+---
+
+## Environment Variables
+
+.env and .env.* files are ignored, except *.env.example.
+
+Production secrets come from AWS Secrets Manager.
+
+---
+
+## CI/CD
+
+Recommended pipeline steps:
+	1.	Install
+	2.	Lint
+	3.	Test
+	4.	Build
+	5.	Deploy to AWS (ECS/EKS)
+
+  
