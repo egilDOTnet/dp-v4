@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./apps/api
+    container_name: api
+    command: sh -c 'echo "Waiting for package.json..."; while [ ! -f package.json ]; do sleep 2; done; echo "package.json found! Installing dependencies..." && pnpm install && exec pnpm dev'
+    restart: unless-stopped
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+    networks:
+      - appnet
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "http://localhost:3001/health", "-O", "-"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: ./apps/web
+    container_name: web
+    command: sh -c 'echo "Waiting for package.json..."; while [ ! -f package.json ]; do sleep 2; done; echo "package.json found! Installing dependencies..." && pnpm install && exec pnpm dev'
+    restart: unless-stopped
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    networks:
+      - appnet
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "http://localhost:3000", "-O", "-"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+
+networks:
+  appnet:
+    driver: bridge
+
