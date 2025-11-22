@@ -47,6 +47,7 @@ This README outlines the tech stack, goals, structure, and setup steps.
 ---
 
 ## Directory Structure
+```
 root/
 apps/
 web/            # Next.js frontend
@@ -59,6 +60,7 @@ infra/
 cdk/ or terraform/
 docker/           # Docker configs
 .github/workflows/
+```
 
 ---
 
