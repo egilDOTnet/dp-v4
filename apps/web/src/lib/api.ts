@@ -10,13 +10,19 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
+  const headers: HeadersInit = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
+  };
+
+  // Only set Content-Type if there's a body
+  if (options.body) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {

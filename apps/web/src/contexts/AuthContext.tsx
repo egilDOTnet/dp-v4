@@ -48,12 +48,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(userData);
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setUser(null);
-    api.auth.logout().catch(() => {
-      // Ignore errors on logout
-    });
+  const logout = async () => {
+    // Call API first while token is still available
+    try {
+      await api.auth.logout();
+    } catch (error) {
+      // Ignore errors on logout - we'll clear local state anyway
+    } finally {
+      // Always clear local state
+      localStorage.removeItem("token");
+      setUser(null);
+    }
   };
 
   return (
