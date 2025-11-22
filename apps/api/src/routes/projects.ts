@@ -59,6 +59,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                     id: true,
                     email: true,
                     name: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
@@ -78,6 +80,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                     id: true,
                     email: true,
                     name: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
@@ -97,11 +101,19 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           tenantId: p.tenantId,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
-          members: "members" in p && p.members ? p.members.map((m: any) => ({
-            id: m.user.id,
-            email: m.user.email,
-            name: m.user.name,
-          })) : [],
+          members: "members" in p && p.members ? p.members.map((m: any) => {
+            const user = m.user as { id: string; email: string; name: string | null; firstName: string | null; lastName: string | null };
+            const displayName = user.firstName && user.lastName
+              ? `${user.firstName} ${user.lastName}`
+              : user.firstName || user.lastName || user.name || null;
+            return {
+              id: user.id,
+              email: user.email,
+              name: displayName,
+              firstName: user.firstName,
+              lastName: user.lastName,
+            };
+          }) : [],
         }))
       );
     }
@@ -165,11 +177,19 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         tenantId: project.tenantId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
-        members: project.members.map((m) => ({
-          id: m.user.id,
-          email: m.user.email,
-          name: m.user.name,
-        })),
+        members: project.members.map((m) => {
+          const user = m.user as typeof m.user & { firstName: string | null; lastName: string | null };
+          const displayName = user.firstName && user.lastName
+            ? `${user.firstName} ${user.lastName}`
+            : user.firstName || user.lastName || user.name || null;
+          return {
+            id: user.id,
+            email: user.email,
+            name: displayName,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          };
+        }),
       });
     }
   );
@@ -243,11 +263,19 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         tenantId: project.tenantId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
-        members: project.members.map((m) => ({
-          id: m.user.id,
-          email: m.user.email,
-          name: m.user.name,
-        })),
+        members: project.members.map((m) => {
+          const user = m.user as typeof m.user & { firstName: string | null; lastName: string | null };
+          const displayName = user.firstName && user.lastName
+            ? `${user.firstName} ${user.lastName}`
+            : user.firstName || user.lastName || user.name || null;
+          return {
+            id: user.id,
+            email: user.email,
+            name: displayName,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          };
+        }),
       });
     }
   );

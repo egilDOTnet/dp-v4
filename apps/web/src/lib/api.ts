@@ -73,7 +73,7 @@ export const api = {
   },
   users: {
     getProfile: () => apiRequest<User>("/api/users/profile"),
-    updateProfile: (data: { name?: string; companyName?: string }) =>
+    updateProfile: (data: { firstName?: string; lastName?: string; companyName?: string }) =>
       apiRequest<User>("/api/users/profile", {
         method: "PUT",
         body: JSON.stringify(data),
@@ -105,6 +105,8 @@ export interface User {
   id: string;
   email: string;
   name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   role: string;
   tenantId: string | null;
   companyName?: string;
@@ -123,6 +125,8 @@ export interface Project {
     id: string;
     email: string;
     name: string | null;
+    firstName: string | null;
+    lastName: string | null;
   }>;
 }
 

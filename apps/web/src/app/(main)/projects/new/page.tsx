@@ -15,7 +15,7 @@ export default function NewProjectPage() {
     endDate: "",
   });
   const [memberIds, setMemberIds] = useState<string[]>([]);
-  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; email: string; name: string | null }>>([]);
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; email: string; name: string | null; firstName: string | null; lastName: string | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -133,7 +133,12 @@ export default function NewProjectPage() {
                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <span className="text-sm">
-                    {user.name || user.email} {user.email !== user.name && `(${user.email})`}
+                    {(() => {
+                      const displayName = user.firstName && user.lastName
+                        ? `${user.firstName} ${user.lastName}`
+                        : user.firstName || user.lastName || user.name || user.email;
+                      return displayName !== user.email ? `${displayName} (${user.email})` : displayName;
+                    })()}
                   </span>
                 </label>
               ))}

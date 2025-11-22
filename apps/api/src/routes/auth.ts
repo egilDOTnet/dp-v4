@@ -18,6 +18,38 @@ interface SetPasswordBody {
   password: string;
 }
 
+// Helper function to derive name from email
+// Example: "john.moltz@example.com" -> { firstName: "John", lastName: "Moltz", name: "John Moltz" }
+// Example: "john@example.com" -> { firstName: "John", lastName: null, name: "John" }
+function deriveNameFromEmail(email: string): { firstName: string; lastName: string | null; name: string } {
+  const localPart = email.split("@")[0];
+  
+  // If there's a dot, split into first and last name
+  const dotIndex = localPart.indexOf(".");
+  if (dotIndex !== -1) {
+    const firstName = localPart.substring(0, dotIndex);
+    const lastName = localPart.substring(dotIndex + 1);
+    
+    // Capitalize first letter of each part
+    const capitalizedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+    const capitalizedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1).toLowerCase();
+    
+    return {
+      firstName: capitalizedFirstName,
+      lastName: capitalizedLastName,
+      name: `${capitalizedFirstName} ${capitalizedLastName}`,
+    };
+  }
+  
+  // No dot, just capitalize the first letter
+  const capitalized = localPart.charAt(0).toUpperCase() + localPart.slice(1).toLowerCase();
+  return {
+    firstName: capitalized,
+    lastName: null,
+    name: capitalized,
+  };
+}
+
 // Store magic links in memory (in production, use Redis or database)
 const magicLinks = new Map<string, { email: string; expiresAt: number }>();
 
@@ -82,12 +114,20 @@ export default async function authRoutes(fastify: FastifyInstance) {
         role: user.role,
       });
 
+      // Compute name from firstName and lastName for backward compatibility
+      const userWithNames = user as typeof user & { firstName: string | null; lastName: string | null };
+      const displayName = userWithNames.firstName && userWithNames.lastName
+        ? `${userWithNames.firstName} ${userWithNames.lastName}`
+        : userWithNames.firstName || userWithNames.lastName || user.name || null;
+
       return reply.send({
         token,
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
+          name: displayName,
+          firstName: userWithNames.firstName,
+          lastName: userWithNames.lastName,
           role: user.role,
           tenantId: user.tenantId,
           companyName: user.tenant?.name,
@@ -246,13 +286,19 @@ export default async function authRoutes(fastify: FastifyInstance) {
             },
           });
 
+          // Derive name from email
+          const nameData = deriveNameFromEmail(decoded.email);
+
           user = await db.user.create({
             data: {
               email: decoded.email,
+              name: nameData.name,
+              firstName: nameData.firstName,
+              lastName: nameData.lastName,
               passwordHash,
               tenantId: tenant.id,
               role: "CompanyAdministrator", // First user is company admin
-            },
+            } as any,
             include: { tenant: true },
           });
         } else {
@@ -268,6 +314,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
         magicLinks.delete(token);
 
         // Generate auth token
+        if (!user) {
+          return reply.status(400).send({ error: "Invalid token" });
+        }
         const authToken = fastify.jwt.sign({
           userId: user.id,
           email: user.email,
@@ -275,12 +324,23 @@ export default async function authRoutes(fastify: FastifyInstance) {
           role: user.role,
         });
 
+        // Compute name from firstName and lastName for backward compatibility
+        if (!user) {
+          return reply.status(400).send({ error: "Invalid token" });
+        }
+        const userWithNames = user as typeof user & { firstName: string | null; lastName: string | null };
+        const displayName = userWithNames.firstName && userWithNames.lastName
+          ? `${userWithNames.firstName} ${userWithNames.lastName}`
+          : userWithNames.firstName || userWithNames.lastName || user.name || null;
+
         return reply.send({
           token: authToken,
           user: {
             id: user.id,
             email: user.email,
-            name: user.name,
+            name: displayName,
+            firstName: userWithNames.firstName,
+            lastName: userWithNames.lastName,
             role: user.role,
             tenantId: user.tenantId,
             companyName: user.tenant?.name,
@@ -310,10 +370,18 @@ export default async function authRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "User not found" });
       }
 
+      // Compute name from firstName and lastName for backward compatibility
+      const userWithNames = user as typeof user & { firstName: string | null; lastName: string | null };
+      const displayName = userWithNames.firstName && userWithNames.lastName
+        ? `${userWithNames.firstName} ${userWithNames.lastName}`
+        : userWithNames.firstName || userWithNames.lastName || user.name || null;
+
       return reply.send({
         id: user.id,
         email: user.email,
-        name: user.name,
+        name: displayName,
+        firstName: userWithNames.firstName,
+        lastName: userWithNames.lastName,
         role: user.role,
         tenantId: user.tenantId,
         companyName: user.tenant?.name,

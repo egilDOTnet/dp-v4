@@ -50,13 +50,14 @@ export function requireRole(allowedRoles: string[]) {
   };
 }
 
-export function requireTenant(
+export async function requireTenant(
   request: FastifyRequest,
   reply: FastifyReply
-): void {
+): Promise<void> {
   const user = request.user as JWTPayload | undefined;
   if (!user?.tenantId) {
     reply.status(403).send({ error: "Tenant required" });
+    return;
   }
 }
 

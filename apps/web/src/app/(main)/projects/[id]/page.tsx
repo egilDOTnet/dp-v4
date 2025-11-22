@@ -77,11 +77,16 @@ export default function ProjectDetailPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Members</label>
             <ul className="space-y-1">
-              {project.members.map((member) => (
-                <li key={member.id} className="text-gray-900">
-                  {member.name || member.email}
-                </li>
-              ))}
+              {project.members.map((member) => {
+                const displayName = member.firstName && member.lastName
+                  ? `${member.firstName} ${member.lastName}`
+                  : member.firstName || member.lastName || member.name || member.email;
+                return (
+                  <li key={member.id} className="text-gray-900">
+                    {displayName}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

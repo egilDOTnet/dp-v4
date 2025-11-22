@@ -23,8 +23,8 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users    User[]
-  projects Project[]
+  users     User[]
+  projects  Project[]
   templates Template[]
 
   @@index([name])
@@ -34,13 +34,15 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String?
+  firstName    String?
+  lastName     String?
   passwordHash String?
   tenantId     String?
   role         Role     @default(User)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  tenant        Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   projectMembers ProjectMember[]
 
   @@index([email])
@@ -48,17 +50,17 @@ model User {
 }
 
 model Project {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
   type      String?
   startDate DateTime?
   endDate   DateTime?
   tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  members  ProjectMember[]
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members ProjectMember[]
 
   @@index([tenantId])
 }
@@ -91,4 +93,3 @@ model Template {
   @@index([isGlobal])
   @@index([tenantId])
 }
-

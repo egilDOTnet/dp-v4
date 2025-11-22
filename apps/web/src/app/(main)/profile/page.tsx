@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, User } from "@/lib/api";
 
 export default function ProfilePage() {
+  const router = useRouter();
   const { user: authUser, refreshUser } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -21,7 +23,8 @@ export default function ProfilePage() {
       .getProfile()
       .then((data) => {
         setUser(data);
-        setName(data.name || "");
+        setFirstName(data.firstName || "");
+        setLastName(data.lastName || "");
         setCompanyName(data.companyName || "");
       })
       .catch((err) => {
@@ -41,18 +44,61 @@ export default function ProfilePage() {
     setError("");
 
     try {
-      const updated = await api.users.updateProfile({
-        name: name || undefined,
-        companyName: isAdmin ? companyName || undefined : undefined,
-      });
+      const updateData: { firstName?: string; lastName?: string; companyName?: string } = {};
+      
+      // Only send fields that have changed
+      if (firstName !== (user?.firstName || "")) {
+        updateData.firstName = firstName;
+      }
+      if (lastName !== (user?.lastName || "")) {
+        updateData.lastName = lastName;
+      }
+      
+      // Only include companyName if user is admin and it has changed
+      if (isAdmin && companyName !== (user?.companyName || "")) {
+        updateData.companyName = companyName || undefined;
+      }
+
+      // If nothing changed, just return early
+      if (Object.keys(updateData).length === 0) {
+        setSaving(false);
+        return;
+      }
+
+      const updated = await api.users.updateProfile(updateData);
       setUser(updated);
-      setEditing(false);
+      setFirstName(updated.firstName || "");
+      setLastName(updated.lastName || "");
+      if (updated.companyName) {
+        setCompanyName(updated.companyName);
+      }
       await refreshUser();
+      
+      // Redirect to dashboard after successful save
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "Failed to update profile");
+      // Revert to original values on error
+      if (user) {
+        setFirstName(user.firstName || "");
+        setLastName(user.lastName || "");
+        setCompanyName(user.companyName || "");
+      }
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCancel = () => {
+    if (user) {
+      setFirstName(user.firstName || "");
+      setLastName(user.lastName || "");
+      setCompanyName(user.companyName || "");
+    }
+    setError("");
+    
+    // Redirect to dashboard
+    router.push("/dashboard");
   };
 
   if (loading) {
@@ -83,42 +129,39 @@ export default function ProfilePage() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-          {editing ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              disabled={saving}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
             />
-          ) : (
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
             <input
               type="text"
-              value={user.name || ""}
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              disabled={saving}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
             />
-          )}
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-          {editing && isAdmin ? (
-            <input
-              type="text"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          ) : (
-            <input
-              type="text"
-              value={user.companyName || ""}
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-            />
-          )}
+          <input
+            type="text"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            disabled={!isAdmin || saving}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:bg-gray-50"
+          />
         </div>
 
         <div>
@@ -134,38 +177,22 @@ export default function ProfilePage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex gap-2 pt-4">
-          {editing ? (
-            <>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-              <button
-                onClick={() => {
-                  setEditing(false);
-                  setName(user.name || "");
-                  setCompanyName(user.companyName || "");
-                  setError("");
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setEditing(true)}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
-            >
-              Edit
-            </button>
-          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={saving}
+            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
   );
 }
-

@@ -23,7 +23,8 @@ export const createProjectSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  name: z.string().min(1).optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   companyName: z.string().min(1).optional(),
 });
 

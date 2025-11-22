@@ -14,6 +14,29 @@ export function Header() {
     router.push("/login");
   };
 
+  // Get display name from firstName/lastName or fallback to name or email
+  const getDisplayName = () => {
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    }
+    if (user?.firstName) {
+      return user.firstName;
+    }
+    if (user?.lastName) {
+      return user.lastName;
+    }
+    return user?.name || user?.email || "";
+  };
+
+  // Get initial for avatar
+  const getInitial = () => {
+    const displayName = getDisplayName();
+    if (displayName) {
+      return displayName[0].toUpperCase();
+    }
+    return user?.email?.[0]?.toUpperCase() || "?";
+  };
+
   return (
     <header className="border-b bg-white shadow-sm">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -25,9 +48,9 @@ export function Header() {
               className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100"
             >
               <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium">
-                {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                {getInitial()}
               </div>
-              <span className="hidden sm:block">{user.name || user.email}</span>
+              <span className="hidden sm:block">{getDisplayName()}</span>
             </button>
             {showMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border py-1 z-10">
