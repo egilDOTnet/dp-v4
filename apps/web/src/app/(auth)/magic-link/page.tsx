@@ -107,6 +107,7 @@ function MagicLinkContent() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
+            autoFocus
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Enter password (min 8 characters)"
           />

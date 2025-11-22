@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "password" | "magic-link">("email");
   const [magicLink, setMagicLink] = useState("");
+  const [userExists, setUserExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -21,29 +22,39 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Try to login with password first
-      if (password) {
+      // If password is provided, try to login
+      if (password && step === "password") {
         try {
           const result = await api.auth.login(email, password);
           login(result.token, result.user);
           router.push("/dashboard");
           return;
         } catch (err: any) {
-          if (err.message.includes("Password not set")) {
-            // User needs magic link
-            setStep("magic-link");
-            await requestMagicLink();
-            return;
-          }
-          throw err;
+          setError(err.message || "Invalid credentials");
+          setLoading(false);
+          return;
         }
       }
 
-      // Check if user exists by requesting magic link
+      // Check user status first
+      const userStatus = await api.auth.checkUser(email);
+      setUserExists(userStatus.exists);
+
+      // If user exists and has password, show password field
+      if (userStatus.exists && userStatus.hasPassword) {
+        setStep("password");
+        setLoading(false);
+        return;
+      }
+
+      // User doesn't exist or has no password - request magic link
       await requestMagicLink();
+      // requestMagicLink handles its own loading state
     } catch (err: any) {
-      setError(err.message || "An error occurred");
-    } finally {
+      // Only set error if we haven't already handled it in requestMagicLink
+      if (step !== "magic-link") {
+        setError(err.message || "An error occurred");
+      }
       setLoading(false);
     }
   };
@@ -51,13 +62,29 @@ export default function LoginPage() {
   const requestMagicLink = async () => {
     try {
       const result = await api.auth.requestMagicLink(email);
+      
+      // In dev mode, always show magic link
       if (result.magicLink) {
         setMagicLink(result.magicLink);
         setStep("magic-link");
+        setLoading(false);
+        
+        // Also log to browser console in dev mode
+        console.log("🔗 Magic Link:", result.magicLink);
+        console.log("Token:", result.token);
       } else {
-        setError("Magic link sent to your email (check console in dev mode)");
+        setError("Magic link sent to your email");
+        setLoading(false);
       }
     } catch (err: any) {
+      // If error occurs, still try to show a helpful message in dev mode
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error requesting magic link:", err);
+        setError(err.message || "Failed to generate magic link. Check server console for details.");
+      } else {
+        setError(err.message || "Failed to request magic link");
+      }
+      setLoading(false);
       throw err;
     }
   };
@@ -83,6 +110,7 @@ export default function LoginPage() {
             setStep("email");
             setMagicLink("");
             setPassword("");
+            setUserExists(null);
           }}
           className="mt-4 text-sm text-primary-600 hover:underline"
         >
@@ -104,8 +132,16 @@ export default function LoginPage() {
             id="email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              // Reset user status when email changes
+              setUserExists(null);
+              if (step === "password") {
+                setStep("email");
+              }
+            }}
             required
+            autoFocus={step === "email"}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Enter your email"
           />
@@ -121,6 +157,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoFocus
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="Enter your password"
             />
@@ -134,15 +171,6 @@ export default function LoginPage() {
         >
           {loading ? "Loading..." : step === "password" ? "Login" : "Continue"}
         </button>
-        {step === "email" && (
-          <button
-            type="button"
-            onClick={() => setStep("password")}
-            className="w-full text-sm text-primary-600 hover:underline"
-          >
-            I have a password
-          </button>
-        )}
       </form>
     </div>
   );

@@ -29,13 +29,24 @@ export async function apiRequest<T>(
 
 export const api = {
   auth: {
+    checkUser: (email: string) =>
+      apiRequest<{ exists: boolean; hasPassword: boolean }>("/api/auth/check-user", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
     login: (email: string, password?: string) =>
       apiRequest<{ token: string; user: User }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
     requestMagicLink: (email: string) =>
-      apiRequest<{ message: string; magicLink?: string; token?: string }>(
+      apiRequest<{ 
+        message: string; 
+        magicLink?: string; 
+        token?: string;
+        userExists?: boolean;
+        hasPassword?: boolean;
+      }>(
         "/api/auth/magic-link",
         {
           method: "POST",
