@@ -79,6 +79,11 @@ export const api = {
         body: JSON.stringify(data),
       }),
     getCompanyUsers: () => apiRequest<User[]>("/api/users/company"),
+    create: (data: { email: string; firstName: string; lastName: string }) =>
+      apiRequest<User>("/api/users", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
   },
   projects: {
     list: () => apiRequest<Project[]>("/api/projects"),
@@ -93,6 +98,11 @@ export const api = {
       apiRequest<Project>("/api/projects", {
         method: "POST",
         body: JSON.stringify(data),
+      }),
+    addMembers: (id: string, memberIds: string[]) =>
+      apiRequest<Project>(`/api/projects/${id}/members`, {
+        method: "POST",
+        body: JSON.stringify({ memberIds }),
       }),
   },
   templates: {

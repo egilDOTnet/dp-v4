@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
@@ -8,45 +8,44 @@ import { api } from "@/lib/api";
 export default function NewProjectPage() {
   const { user } = useAuth();
   const router = useRouter();
+  
+  // Prepopulate start date with current date
+  const getCurrentDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
   const [formData, setFormData] = useState({
     name: "",
     type: "",
-    startDate: "",
+    startDate: getCurrentDate(),
     endDate: "",
   });
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; email: string; name: string | null; firstName: string | null; lastName: string | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Load company users for member selection
-  useEffect(() => {
-    if (user && (user.role === "CompanyAdministrator" || user.role === "GlobalAdministrator")) {
-      api.users
-        .getCompanyUsers()
-        .then((users) => {
-          setAvailableUsers(users);
-        })
-        .catch((err) => {
-          console.error("Failed to load users:", err);
-        });
-    }
-  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
+    if (!user) {
+      setError("User not found");
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Create project with current user as member
       const project = await api.projects.create({
         name: formData.name,
         type: formData.type || undefined,
         startDate: formData.startDate || undefined,
         endDate: formData.endDate || undefined,
-        memberIds: memberIds.length > 0 ? memberIds : undefined,
+        memberIds: [user.id], // Current user is automatically added
       });
-      router.push(`/projects/${project.id}`);
+      // Navigate to members page to add additional members
+      router.push(`/projects/${project.id}/members`);
     } catch (err: any) {
       setError(err.message || "Failed to create project");
     } finally {
@@ -113,38 +112,6 @@ export default function NewProjectPage() {
             />
           </div>
         </div>
-
-        {availableUsers.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Members</label>
-            <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 rounded-md p-2">
-              {availableUsers.map((user) => (
-                <label key={user.id} className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={memberIds.includes(user.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setMemberIds([...memberIds, user.id]);
-                      } else {
-                        setMemberIds(memberIds.filter((id) => id !== user.id));
-                      }
-                    }}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm">
-                    {(() => {
-                      const displayName = user.firstName && user.lastName
-                        ? `${user.firstName} ${user.lastName}`
-                        : user.firstName || user.lastName || user.name || user.email;
-                      return displayName !== user.email ? `${displayName} (${user.email})` : displayName;
-                    })()}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

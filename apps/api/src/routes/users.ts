@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
-import { updateProfileSchema } from "@dp/lib";
+import { updateProfileSchema, createUserSchema } from "@dp/lib";
 import { authenticate, requireRole, requireTenant, getUser } from "../middleware/auth";
 
 interface UpdateProfileBody {
@@ -199,6 +199,61 @@ export default async function userRoutes(fastify: FastifyInstance) {
       });
 
       return reply.send(users);
+    }
+  );
+
+  // Create new user
+  fastify.post<{ Body: { email: string; firstName: string; lastName: string } }>(
+    "/",
+    {
+      preHandler: [
+        authenticate,
+        requireTenant,
+        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+      ],
+    },
+    async (request: FastifyRequest<{ Body: { email: string; firstName: string; lastName: string } }>, reply: FastifyReply) => {
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      const body = createUserSchema.parse(request.body);
+
+      // Check if user already exists
+      const existingUser = await db.user.findUnique({
+        where: { email: body.email },
+      });
+
+      if (existingUser) {
+        return reply.status(400).send({ error: "User with this email already exists" });
+      }
+
+      // Create user in same tenant
+      const newUser = await db.user.create({
+        data: {
+          email: body.email,
+          firstName: body.firstName,
+          lastName: body.lastName,
+          tenantId: currentUser.tenantId,
+          role: "User", // Default role
+        },
+      });
+
+      // Compute name from firstName and lastName for backward compatibility
+      const displayName = newUser.firstName && newUser.lastName
+        ? `${newUser.firstName} ${newUser.lastName}`
+        : newUser.firstName || newUser.lastName || newUser.name || null;
+
+      return reply.status(201).send({
+        id: newUser.id,
+        email: newUser.email,
+        name: displayName,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        role: newUser.role,
+        tenantId: newUser.tenantId,
+      });
     }
   );
 }

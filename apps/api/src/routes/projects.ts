@@ -1,7 +1,15 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
-import { createProjectSchema } from "@dp/lib";
+import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
+
+// Email notification stub
+function notifyUserAddedToProject(userEmail: string, projectName: string) {
+  if (process.env.NODE_ENV === "development") {
+    console.log(`Email notification: User ${userEmail} added to project ${projectName}`);
+  }
+  // TODO: Implement actual email service integration
+}
 
 interface CreateProjectBody {
   name: string;
@@ -264,6 +272,122 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
         members: project.members.map((m) => {
+          const user = m.user as typeof m.user & { firstName: string | null; lastName: string | null };
+          const displayName = user.firstName && user.lastName
+            ? `${user.firstName} ${user.lastName}`
+            : user.firstName || user.lastName || user.name || null;
+          return {
+            id: user.id,
+            email: user.email,
+            name: displayName,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          };
+        }),
+      });
+    }
+  );
+
+  // Add members to project
+  fastify.post<{ Params: { id: string }; Body: { memberIds: string[] } }>(
+    "/:id/members",
+    {
+      preHandler: [
+        authenticate,
+        requireTenant,
+        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+      ],
+    },
+    async (request: FastifyRequest<{ Params: { id: string }; Body: { memberIds: string[] } }>, reply: FastifyReply) => {
+      const currentUser = getUser(request);
+      const projectId = request.params.id;
+
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      const body = addProjectMembersSchema.parse(request.body);
+
+      // Verify project exists and belongs to same tenant
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { members: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify all member IDs belong to the same tenant
+      const members = await db.user.findMany({
+        where: {
+          id: { in: body.memberIds },
+          tenantId: currentUser.tenantId,
+        },
+      });
+
+      if (members.length !== body.memberIds.length) {
+        return reply.status(400).send({ error: "Some members not found or belong to different tenant" });
+      }
+
+      // Get existing member IDs to avoid duplicates
+      const existingMemberIds = project.members.map((m) => m.userId);
+      const newMemberIds = body.memberIds.filter((id) => !existingMemberIds.includes(id));
+
+      // Add new members
+      if (newMemberIds.length > 0) {
+        await db.projectMember.createMany({
+          data: newMemberIds.map((userId) => ({
+            projectId,
+            userId,
+          })),
+        });
+
+        // Send email notifications for newly added members
+        const newMembers = members.filter((m) => newMemberIds.includes(m.id));
+        for (const member of newMembers) {
+          notifyUserAddedToProject(member.email, project.name);
+        }
+      }
+
+      // Return updated project with all members
+      const updatedProject = await db.project.findUnique({
+        where: { id: projectId },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!updatedProject) {
+        return reply.status(404).send({ error: "Project not found after update" });
+      }
+
+      return reply.send({
+        id: updatedProject.id,
+        name: updatedProject.name,
+        type: updatedProject.type,
+        startDate: updatedProject.startDate,
+        endDate: updatedProject.endDate,
+        tenantId: updatedProject.tenantId,
+        createdAt: updatedProject.createdAt,
+        updatedAt: updatedProject.updatedAt,
+        members: updatedProject.members.map((m) => {
           const user = m.user as typeof m.user & { firstName: string | null; lastName: string | null };
           const displayName = user.firstName && user.lastName
             ? `${user.firstName} ${user.lastName}`

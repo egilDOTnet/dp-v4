@@ -28,3 +28,13 @@ export const updateProfileSchema = z.object({
   companyName: z.string().min(1).optional(),
 });
 
+export const createUserSchema = z.object({
+  email: z.string().email(),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+});
+
+export const addProjectMembersSchema = z.object({
+  memberIds: z.array(z.string()).min(1),
+});
+
