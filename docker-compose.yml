@@ -21,11 +21,16 @@ services:
   api:
     build: ./apps/api
     container_name: api
-    command: sh -c 'echo "Waiting for package.json..."; while [ ! -f package.json ]; do sleep 2; done; echo "package.json found! Installing dependencies..." && pnpm install && exec pnpm dev'
+    command: sh -c 'echo "Waiting for workspace..."; while [ ! -f /workspace/package.json ]; do sleep 2; done; echo "Workspace found! Installing dependencies..." && cd /workspace && pnpm install && cd apps/api && exec pnpm dev'
     restart: unless-stopped
     volumes:
-      - ./apps/api:/app
-      - /app/node_modules
+      - .:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/api/node_modules
+      - /workspace/packages/config/node_modules
+      - /workspace/packages/db/node_modules
+      - /workspace/packages/lib/node_modules
+      - /workspace/packages/ui/node_modules
     ports:
       - "3001:3001"
     environment:
@@ -44,11 +49,16 @@ services:
   web:
     build: ./apps/web
     container_name: web
-    command: sh -c 'echo "Waiting for package.json..."; while [ ! -f package.json ]; do sleep 2; done; echo "package.json found! Installing dependencies..." && pnpm install && exec pnpm dev'
+    command: sh -c 'echo "Waiting for workspace..."; while [ ! -f /workspace/package.json ]; do sleep 2; done; echo "Workspace found! Installing dependencies..." && cd /workspace && pnpm install && cd apps/web && exec pnpm dev'
     restart: unless-stopped
     volumes:
-      - ./apps/web:/app
-      - /app/node_modules
+      - .:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/web/node_modules
+      - /workspace/packages/config/node_modules
+      - /workspace/packages/db/node_modules
+      - /workspace/packages/lib/node_modules
+      - /workspace/packages/ui/node_modules
     ports:
       - "3000:3000"
     environment:
