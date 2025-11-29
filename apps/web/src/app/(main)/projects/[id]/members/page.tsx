@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, User, Project } from "@/lib/api";
 
 export default function ProjectMembersPage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
+  const isEditMode = searchParams.get("edit") === "true";
 
   const [project, setProject] = useState<Project | null>(null);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
@@ -34,21 +37,57 @@ export default function ProjectMembersPage() {
     ])
       .then(([projectData, users]) => {
         setProject(projectData);
-        // Exclude current project members from available users
-        const projectMemberIds = projectData.members?.map((m) => m.id) || [];
-        setAvailableUsers(users.filter((u) => !projectMemberIds.includes(u.id)));
+        // In edit mode, pre-select current members
+        if (isEditMode && projectData.members) {
+          const currentMemberIds = projectData.members.map((m) => m.id);
+          setSelectedMemberIds(currentMemberIds);
+          // In edit mode, show all users (including current members) so they can be deselected
+          setAvailableUsers(users);
+        } else {
+          // In create mode, exclude current project members from available users
+          const projectMemberIds = projectData.members?.map((m) => m.id) || [];
+          setAvailableUsers(users.filter((u) => !projectMemberIds.includes(u.id)));
+        }
       })
       .catch((err) => {
         console.error("Failed to load data:", err);
         setError(err.message || "Failed to load data");
       });
-  }, [projectId]);
+  }, [projectId, isEditMode]);
 
   const handleToggleMember = (userId: string) => {
     if (selectedMemberIds.includes(userId)) {
+      // Check if we're trying to deselect the last admin
+      if (isEditMode && project) {
+        const allUsers = [...availableUsers, ...newMembers];
+        const userToDeselect = allUsers.find((u) => u.id === userId);
+        const isAdmin =
+          userToDeselect?.role === "CompanyAdministrator" ||
+          userToDeselect?.role === "GlobalAdministrator";
+
+        if (isAdmin) {
+          // Count how many admins would remain after deselection
+          const remainingAdmins = selectedMemberIds
+            .filter((id) => id !== userId)
+            .map((id) => allUsers.find((u) => u.id === id))
+            .filter(
+              (u) =>
+                u?.role === "CompanyAdministrator" || u?.role === "GlobalAdministrator"
+            );
+
+          if (remainingAdmins.length === 0) {
+            setError(
+              "Cannot remove the last company administrator from the project. A project must have at least one administrator."
+            );
+            return;
+          }
+        }
+      }
       setSelectedMemberIds(selectedMemberIds.filter((id) => id !== userId));
+      setError(""); // Clear error if validation passes
     } else {
       setSelectedMemberIds([...selectedMemberIds, userId]);
+      setError(""); // Clear error when adding members
     }
   };
 
@@ -80,23 +119,40 @@ export default function ProjectMembersPage() {
   };
 
   const handleFinish = async () => {
-    if (selectedMemberIds.length === 0) {
-      // No members to add, just navigate to project
-      router.push(`/projects/${projectId}`);
-      return;
-    }
-
     setSubmitting(true);
     setError("");
 
     try {
-      // Add all selected members to the project
-      await api.projects.addMembers(projectId, selectedMemberIds);
-      
+      if (isEditMode && project) {
+        // In edit mode, we need to sync the member list
+        const currentMemberIds = project.members?.map((m) => m.id) || [];
+        const membersToAdd = selectedMemberIds.filter((id) => !currentMemberIds.includes(id));
+        const membersToRemove = currentMemberIds.filter((id) => !selectedMemberIds.includes(id));
+
+        // Add new members
+        if (membersToAdd.length > 0) {
+          await api.projects.addMembers(projectId, membersToAdd);
+        }
+
+        // Remove members
+        if (membersToRemove.length > 0) {
+          await api.projects.removeMembers(projectId, membersToRemove);
+        }
+
+        // Reload project to get updated member list
+        const updatedProject = await api.projects.get(projectId);
+        setProject(updatedProject);
+      } else {
+        // Create mode - add selected members
+        if (selectedMemberIds.length > 0) {
+          await api.projects.addMembers(projectId, selectedMemberIds);
+        }
+      }
+
       // Navigate to project detail page
       router.push(`/projects/${projectId}`);
     } catch (err: any) {
-      setError(err.message || "Failed to add members");
+      setError(err.message || "Failed to update members");
       setSubmitting(false);
     }
   };
@@ -115,8 +171,31 @@ export default function ProjectMembersPage() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-3xl font-bold mb-2">Add Members to {project.name}</h1>
-      <p className="text-gray-600 mb-6">Select existing members or create new ones to add to the project.</p>
+      {/* Breadcrumb Navigation */}
+      <nav className="mb-4 text-sm text-gray-600">
+        <Link href="/dashboard" className="hover:text-primary-600">
+          Dashboard
+        </Link>
+        <span className="mx-2">/</span>
+        <Link href="/projects" className="hover:text-primary-600">
+          Projects
+        </Link>
+        <span className="mx-2">/</span>
+        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
+          {project.name}
+        </Link>
+        <span className="mx-2">/</span>
+        <span className="text-gray-900">Members</span>
+      </nav>
+
+      <h1 className="text-3xl font-bold mb-2">
+        {isEditMode ? "Edit Members" : "Add Members"} to {project.name}
+      </h1>
+      <p className="text-gray-600 mb-6">
+        {isEditMode
+          ? "Select or deselect members to update the project membership."
+          : "Select existing members or create new ones to add to the project."}
+      </p>
 
       <div className="space-y-6">
         {/* Existing Members List */}
@@ -234,15 +313,32 @@ export default function ProjectMembersPage() {
             disabled={submitting}
             className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
           >
-            {submitting ? "Adding Members..." : "Finish"}
+            {submitting
+              ? isEditMode
+                ? "Saving Changes..."
+                : "Adding Members..."
+              : isEditMode
+                ? "Save Changes"
+                : "Finish"}
           </button>
-          <button
-            type="button"
-            onClick={() => router.push(`/projects/${projectId}`)}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Skip
-          </button>
+          {!isEditMode && (
+            <button
+              type="button"
+              onClick={() => router.push(`/projects/${projectId}`)}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Skip
+            </button>
+          )}
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={() => router.push(`/projects/${projectId}`)}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
     </div>

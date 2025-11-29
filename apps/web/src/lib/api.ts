@@ -17,7 +17,7 @@ export async function apiRequest<T>(
 
   // Only set Content-Type if there's a body
   if (options.body) {
-    headers["Content-Type"] = "application/json";
+    (headers as Record<string, string>)["Content-Type"] = "application/json";
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -28,6 +28,11 @@ export async function apiRequest<T>(
   if (!response.ok) {
     const error: ApiError = await response.json();
     throw new Error(error.error || "Request failed");
+  }
+
+  // Handle 204 No Content responses (no body to parse)
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return response.json();
@@ -99,11 +104,70 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    update: (
+      id: string,
+      data: {
+        name?: string;
+        type?: string | null;
+        startDate?: string | null;
+        endDate?: string | null;
+      }
+    ) =>
+      apiRequest<Project>(`/api/projects/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      apiRequest<void>(`/api/projects/${id}`, {
+        method: "DELETE",
+      }),
     addMembers: (id: string, memberIds: string[]) =>
       apiRequest<Project>(`/api/projects/${id}/members`, {
         method: "POST",
         body: JSON.stringify({ memberIds }),
       }),
+    removeMembers: (id: string, memberIds: string[]) =>
+      apiRequest<Project>(`/api/projects/${id}/members`, {
+        method: "DELETE",
+        body: JSON.stringify({ memberIds }),
+      }),
+    phases: {
+      list: (projectId: string) => apiRequest<Phase[]>(`/api/projects/${projectId}/phases`),
+      getTasks: (projectId: string, phaseId: string) =>
+        apiRequest<Task[]>(`/api/projects/${projectId}/phases/${phaseId}/tasks`),
+      createTask: (
+        projectId: string,
+        phaseId: string,
+        data: {
+          name: string;
+          description?: string;
+          ownerId?: string;
+          order?: number;
+        }
+      ) =>
+        apiRequest<Task>(`/api/projects/${projectId}/phases/${phaseId}/tasks`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      updateTask: (
+        projectId: string,
+        phaseId: string,
+        taskId: string,
+        data: {
+          name?: string;
+          description?: string | null;
+          ownerId?: string | null;
+          startDate?: string | null;
+          plannedCompletionDate?: string | null;
+          actualCompletionDate?: string | null;
+          order?: number;
+        }
+      ) =>
+        apiRequest<Task>(`/api/projects/${projectId}/phases/${phaseId}/tasks/${taskId}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+    },
   },
   templates: {
     list: () => apiRequest<Template[]>("/api/templates"),
@@ -145,6 +209,39 @@ export interface Template {
   name: string;
   content: string | null;
   isGlobal: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Phase {
+  id: string;
+  projectId: string;
+  name: string;
+  order: number;
+  status: "not_started" | "ongoing" | "delayed" | "completed";
+  taskCount: number;
+  completedTaskCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Task {
+  id: string;
+  phaseId: string;
+  name: string;
+  description: string | null;
+  ownerId: string | null;
+  owner: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+  startDate: string | null;
+  plannedCompletionDate: string | null;
+  actualCompletionDate: string | null;
+  order: number;
   createdAt: string;
   updatedAt: string;
 }

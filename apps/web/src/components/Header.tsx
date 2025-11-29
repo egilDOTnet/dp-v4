@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -37,40 +38,78 @@ export function Header() {
     return user?.email?.[0]?.toUpperCase() || "?";
   };
 
+  const isAdmin =
+    user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
+
   return (
     <header className="border-b bg-white shadow-sm">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-primary-700">Dynamic Purchase</h1>
+        <Link
+          href="/dashboard"
+          className="text-xl font-bold text-primary-700 hover:text-primary-800 cursor-pointer"
+        >
+          Dynamic Purchase
+        </Link>
         {user && (
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100"
-            >
-              <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium">
-                {getInitial()}
-              </div>
-              <span className="hidden sm:block">{getDisplayName()}</span>
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border py-1 z-10">
-                <button
-                  onClick={() => {
-                    setShowMenu(false);
-                    router.push("/profile");
-                  }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                >
-                  Profile
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
-                >
-                  Logout
-                </button>
-              </div>
+          <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Link
+                href="/projects/new"
+                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 hidden sm:block"
+              >
+                Create Project
+              </Link>
             )}
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100"
+              >
+                <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium">
+                  {getInitial()}
+                </div>
+                <span className="hidden sm:block">{getDisplayName()}</span>
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border py-1 z-10">
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      router.push("/dashboard");
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  >
+                    Dashboard
+                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        router.push("/projects/new");
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 sm:hidden"
+                    >
+                      Create Project
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      router.push("/profile");
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                  >
+                    Profile
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-red-600"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
