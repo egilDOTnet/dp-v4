@@ -173,6 +173,113 @@ export const api = {
     list: () => apiRequest<Template[]>("/api/templates"),
     get: (id: string) => apiRequest<Template>(`/api/templates/${id}`),
   },
+  requirements: {
+    hierarchies: {
+      list: (projectId: string) =>
+        apiRequest<RequirementHierarchy[]>(
+          `/api/projects/${projectId}/requirements/hierarchies`
+        ),
+      create: (
+        projectId: string,
+        data: {
+          title: string;
+          description?: string;
+          parentId?: string | null;
+        }
+      ) =>
+        apiRequest<RequirementHierarchy>(
+          `/api/projects/${projectId}/requirements/hierarchies`,
+          {
+            method: "POST",
+            body: JSON.stringify(data),
+          }
+        ),
+      update: (
+        projectId: string,
+        id: string,
+        data: {
+          title?: string;
+          description?: string | null;
+        }
+      ) =>
+        apiRequest<RequirementHierarchy>(
+          `/api/projects/${projectId}/requirements/hierarchies/${id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, id: string) =>
+        apiRequest<void>(
+          `/api/projects/${projectId}/requirements/hierarchies/${id}`,
+          {
+            method: "DELETE",
+          }
+        ),
+    },
+    list: (projectId: string) =>
+      apiRequest<Requirement[]>(`/api/projects/${projectId}/requirements`),
+    create: (
+      projectId: string,
+      data: {
+        hierarchyId: string;
+        description: string;
+        type: "Information" | "Mandatory" | "Important" | "Wish";
+        status: "Approved" | "ForReview" | "New";
+      }
+    ) =>
+      apiRequest<Requirement>(`/api/projects/${projectId}/requirements`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (
+      projectId: string,
+      id: string,
+      data: {
+        description?: string;
+        type?: "Information" | "Mandatory" | "Important" | "Wish";
+        status?: "Approved" | "ForReview" | "New";
+      }
+    ) =>
+      apiRequest<Requirement>(`/api/projects/${projectId}/requirements/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (projectId: string, id: string) =>
+      apiRequest<void>(`/api/projects/${projectId}/requirements/${id}`, {
+        method: "DELETE",
+      }),
+    move: (
+      projectId: string,
+      id: string,
+      data: {
+        hierarchyId: string;
+        order?: number;
+      }
+    ) =>
+      apiRequest<Requirement>(
+        `/api/projects/${projectId}/requirements/${id}/move`,
+        {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }
+      ),
+    reorder: (
+      projectId: string,
+      data: {
+        requirementIds: string[];
+        hierarchyId: string;
+      }
+    ) =>
+      apiRequest<void>(`/api/projects/${projectId}/requirements/reorder`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    getHistory: (projectId: string, id: string) =>
+      apiRequest<RequirementHistory[]>(
+        `/api/projects/${projectId}/requirements/${id}/history`
+      ),
+  },
 };
 
 export interface User {
@@ -244,5 +351,68 @@ export interface Task {
   order: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RequirementHierarchy {
+  id: string;
+  projectId: string;
+  parentId: string | null;
+  number: string;
+  title: string;
+  description: string | null;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  parent?: RequirementHierarchy | null;
+  children?: RequirementHierarchy[];
+  _count?: {
+    requirements: number;
+  };
+}
+
+export interface Requirement {
+  id: string;
+  hierarchyId: string;
+  number: string;
+  description: string;
+  type: "Information" | "Mandatory" | "Important" | "Wish";
+  status: "Approved" | "ForReview" | "New";
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  createdById: string;
+  lastModifiedById: string;
+  hierarchy?: RequirementHierarchy;
+  createdBy?: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  lastModifiedBy?: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+}
+
+export interface RequirementHistory {
+  id: string;
+  requirementId: string;
+  description: string;
+  type: "Information" | "Mandatory" | "Important" | "Wish";
+  status: "Approved" | "ForReview" | "New";
+  modifiedById: string;
+  createdAt: string;
+  modifiedBy?: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
 }
 

@@ -34,6 +34,7 @@ model Project {
   Phase         Phase[]
   Tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ProjectMember ProjectMember[]
+  requirementHierarchies RequirementHierarchy[]
 
   @@index([tenantId])
 }
@@ -111,12 +112,86 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  tenant         Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  projectMembers ProjectMember[]
-  ownedTasks     Task[]
+  tenant                Tenant?                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectMembers        ProjectMember[]
+  ownedTasks            Task[]
+  createdRequirements   Requirement[]           @relation("RequirementCreator")
+  modifiedRequirements  Requirement[]            @relation("RequirementModifier")
+  requirementHistories  RequirementHistory[]
 
   @@index([email])
   @@index([tenantId])
+}
+
+model RequirementHierarchy {
+  id          String   @id @default(cuid())
+  projectId   String
+  parentId    String?
+  number      String
+  title       String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent      RequirementHierarchy? @relation("HierarchyParent", fields: [parentId], references: [id], onDelete: Cascade)
+  children    RequirementHierarchy[] @relation("HierarchyParent")
+  requirements Requirement[]
+
+  @@index([projectId])
+  @@index([parentId])
+  @@index([projectId, parentId, order])
+}
+
+model Requirement {
+  id              String              @id @default(cuid())
+  hierarchyId     String
+  number          String
+  description     String
+  type            RequirementType
+  status          RequirementStatus
+  order           Int
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdById     String
+  lastModifiedById String
+
+  hierarchy       RequirementHierarchy @relation(fields: [hierarchyId], references: [id], onDelete: Cascade)
+  createdBy       User                 @relation("RequirementCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lastModifiedBy  User                 @relation("RequirementModifier", fields: [lastModifiedById], references: [id], onDelete: Restrict)
+  history         RequirementHistory[]
+
+  @@index([hierarchyId])
+  @@index([hierarchyId, order])
+}
+
+model RequirementHistory {
+  id            String          @id @default(cuid())
+  requirementId String
+  description   String
+  type          RequirementType
+  status        RequirementStatus
+  modifiedById  String
+  createdAt     DateTime         @default(now())
+
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  modifiedBy    User        @relation(fields: [modifiedById], references: [id], onDelete: Restrict)
+
+  @@index([requirementId])
+}
+
+enum RequirementType {
+  Information
+  Mandatory
+  Important
+  Wish
+}
+
+enum RequirementStatus {
+  Approved
+  ForReview
+  New
 }
 
 enum Role {

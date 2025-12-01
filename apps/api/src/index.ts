@@ -5,6 +5,7 @@ import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import projectRoutes from "./routes/projects";
 import templateRoutes from "./routes/templates";
+import requirementRoutes from "./routes/requirements";
 import { errorHandler } from "./middleware/error-handler";
 
 const fastify = Fastify({
@@ -39,6 +40,7 @@ const start = async () => {
     await fastify.register(userRoutes, { prefix: "/api/users" });
     await fastify.register(projectRoutes, { prefix: "/api/projects" });
     await fastify.register(templateRoutes, { prefix: "/api/templates" });
+    await fastify.register(requirementRoutes, { prefix: "/api/projects" });
 
     const port = Number(process.env.PORT) || 3001;
     await fastify.listen({ port, host: "0.0.0.0" });
