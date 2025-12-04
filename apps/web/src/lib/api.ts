@@ -216,6 +216,20 @@ export const api = {
             method: "DELETE",
           }
         ),
+      reorder: (
+        projectId: string,
+        data: {
+          hierarchyIds: string[];
+          parentId?: string | null;
+        }
+      ) =>
+        apiRequest<void>(
+          `/api/projects/${projectId}/requirements/hierarchies/reorder`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
     },
     list: (projectId: string) =>
       apiRequest<Requirement[]>(`/api/projects/${projectId}/requirements`),
@@ -225,7 +239,7 @@ export const api = {
         hierarchyId: string;
         description: string;
         type: "Information" | "Mandatory" | "Important" | "Wish";
-        status: "Approved" | "ForReview" | "New";
+        status: "Approved" | "ForReview" | "New" | null;
       }
     ) =>
       apiRequest<Requirement>(`/api/projects/${projectId}/requirements`, {
@@ -238,7 +252,7 @@ export const api = {
       data: {
         description?: string;
         type?: "Information" | "Mandatory" | "Important" | "Wish";
-        status?: "Approved" | "ForReview" | "New";
+        status?: "Approved" | "ForReview" | "New" | null;
       }
     ) =>
       apiRequest<Requirement>(`/api/projects/${projectId}/requirements/${id}`, {
@@ -376,7 +390,7 @@ export interface Requirement {
   number: string;
   description: string;
   type: "Information" | "Mandatory" | "Important" | "Wish";
-  status: "Approved" | "ForReview" | "New";
+  status: "Approved" | "ForReview" | "New" | null;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -404,7 +418,7 @@ export interface RequirementHistory {
   requirementId: string;
   description: string;
   type: "Information" | "Mandatory" | "Important" | "Wish";
-  status: "Approved" | "ForReview" | "New";
+  status: "Approved" | "ForReview" | "New" | null;
   modifiedById: string;
   createdAt: string;
   modifiedBy?: {

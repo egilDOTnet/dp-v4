@@ -11,13 +11,12 @@
     "db:seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.0",
+    "@prisma/client": "^5.22.0",
     "bcrypt": "^5.1.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
-    "prisma": "^5.7.0",
-    "tsx": "^4.7.0"
+    "prisma": "^5.22.0",
+    "tsx": "^4.21.0"
   }
 }
-

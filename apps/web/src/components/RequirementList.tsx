@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Requirement, api } from "@/lib/api";
+import { Requirement, api, RequirementHistory } from "@/lib/api";
 import {
   DndContext,
   closestCenter,
@@ -10,7 +10,6 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  DragOverEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -26,6 +25,8 @@ interface RequirementListProps {
   hierarchyId: string;
   requirements: Requirement[];
   onRequirementUpdate: () => void;
+  createTrigger?: number;
+  selectedHierarchyId?: string | null;
 }
 
 interface SortableRequirementItemProps {
@@ -85,29 +86,41 @@ function SortableRequirementItem({
   );
 }
 
+interface RequirementFormData {
+  description: string;
+  type: Requirement["type"];
+  status: Requirement["status"];
+}
+
 export default function RequirementList({
   projectId,
   hierarchyId,
   requirements,
   onRequirementUpdate,
+  createTrigger,
+  selectedHierarchyId = null,
 }: RequirementListProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [newRequirement, setNewRequirement] = useState({
+  const [newRequirement, setNewRequirement] = useState<RequirementFormData>({
     description: "",
-    type: "Information" as Requirement["type"],
-    status: "New" as Requirement["status"],
+    type: "Information",
+    status: "New",
   });
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingData, setEditingData] = useState<{
-    description: string;
-    type: Requirement["type"];
-    status: Requirement["status"];
-  } | null>(null);
+  const [editingFields, setEditingFields] = useState<Record<string, Set<string>>>({});
+  const [formData, setFormData] = useState<Record<string, RequirementFormData>>({});
+  const [expandedRequirements, setExpandedRequirements] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showHistoryId, setShowHistoryId] = useState<string | null>(null);
-  const [history, setHistory] = useState<Record<string, any[]>>({});
+  const [history, setHistory] = useState<Record<string, RequirementHistory[]>>({});
+  const [saveTimeouts, setSaveTimeouts] = useState<Record<string, NodeJS.Timeout>>({});
+  const [newlyCreatedRequirementId, setNewlyCreatedRequirementId] = useState<string | null>(null);
+  const [isNewRequirementAnimating, setIsNewRequirementAnimating] = useState(false);
+  const [cancelingRequirementId, setCancelingRequirementId] = useState<string | null>(null);
+  const descriptionTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const newRequirementTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const requirementRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -122,6 +135,116 @@ export default function RequirementList({
 
   const sortedRequirements = [...requirements].sort((a, b) => a.order - b.order);
 
+  // Initialize form data for all requirements when they change
+  useEffect(() => {
+    requirements.forEach((requirement) => {
+      if (requirement && requirement.id && !formData[requirement.id]) {
+        setFormData((prev) => ({
+          ...prev,
+          [requirement.id]: {
+            description: requirement.description,
+            type: requirement.type,
+            status: requirement.status,
+          },
+        }));
+      }
+    });
+  }, [requirements]);
+
+  // Auto-focus description textarea when creating new requirement
+  useEffect(() => {
+    if (isCreatingNew && newRequirementTextareaRef.current) {
+      newRequirementTextareaRef.current.focus();
+    }
+  }, [isCreatingNew]);
+
+  // Handle external trigger to create new requirement
+  const prevCreateTriggerRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (createTrigger !== undefined && createTrigger !== prevCreateTriggerRef.current && !isCreatingNew) {
+      setIsCreatingNew(true);
+      setIsNewRequirementAnimating(false);
+      prevCreateTriggerRef.current = createTrigger;
+      // Trigger animation after element is in DOM
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsNewRequirementAnimating(true);
+          // Focus the textarea after animation starts
+          setTimeout(() => {
+            newRequirementTextareaRef.current?.focus();
+          }, 50);
+        });
+      });
+    }
+  }, [createTrigger, isCreatingNew]);
+
+  // Scroll to and animate newly created requirement when it appears in the list
+  useEffect(() => {
+    if (newlyCreatedRequirementId) {
+      // Wait for the requirement to be rendered in the DOM
+      const scrollTimeout = setTimeout(() => {
+        const requirementElement = requirementRefs.current[newlyCreatedRequirementId];
+        if (requirementElement) {
+          requirementElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 150);
+
+      // Remove the highlight after animation completes
+      const clearHighlightTimeout = setTimeout(() => {
+        setNewlyCreatedRequirementId(null);
+      }, 2000);
+
+      return () => {
+        clearTimeout(scrollTimeout);
+        clearTimeout(clearHighlightTimeout);
+      };
+    }
+  }, [newlyCreatedRequirementId, requirements]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(saveTimeouts).forEach((timeout) => {
+        if (timeout) clearTimeout(timeout);
+      });
+    };
+  }, []);
+
+  // Handle click outside to exit edit mode
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      
+      // Check if click is outside any requirement container
+      let clickedInsideRequirement = false;
+      Object.values(requirementRefs.current).forEach((ref) => {
+        if (ref && ref.contains(target)) {
+          clickedInsideRequirement = true;
+        }
+      });
+
+      // Also check if clicking on the create form
+      if (isCreatingNew) {
+        const newRequirementRef = requirementRefs.current["__new__"];
+        if (newRequirementRef && newRequirementRef.contains(target)) {
+          clickedInsideRequirement = true;
+        }
+      }
+
+      if (!clickedInsideRequirement) {
+        // Exit all edit modes
+        setEditingFields({});
+        setExpandedRequirements(new Set());
+        setShowHistoryId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isCreatingNew]);
+
   const handleCreate = async () => {
     if (!newRequirement.description.trim()) {
       setError("Description is required");
@@ -132,18 +255,21 @@ export default function RequirementList({
     setError("");
 
     try {
-      await api.requirements.create(projectId, {
+      const newRequirementData = await api.requirements.create(projectId, {
         hierarchyId,
         description: newRequirement.description.trim(),
-        type: newRequirement.type,
-        status: newRequirement.status,
+        type: newRequirement.type || "Information",
+        status: newRequirement.status || "New",
       });
       setNewRequirement({
         description: "",
         type: "Information",
         status: "New",
       });
+      setIsNewRequirementAnimating(false);
       setIsCreatingNew(false);
+      // Set the newly created requirement ID for animation
+      setNewlyCreatedRequirementId(newRequirementData.id);
       onRequirementUpdate();
     } catch (err: any) {
       setError(err.message || "Failed to create requirement");
@@ -152,29 +278,194 @@ export default function RequirementList({
     }
   };
 
-  const handleUpdate = async (id: string) => {
-    if (!editingData || !editingData.description.trim()) {
-      setError("Description is required");
-      return;
+  const handleFieldSave = async (
+    requirementId: string,
+    field: keyof RequirementFormData,
+    value: string | Requirement["type"] | Requirement["status"]
+  ) => {
+    const timeoutKey = `${requirementId}-${field}`;
+    if (saveTimeouts[timeoutKey]) {
+      clearTimeout(saveTimeouts[timeoutKey]);
+      delete saveTimeouts[timeoutKey];
     }
 
     setLoading(true);
     setError("");
 
     try {
-      await api.requirements.update(projectId, id, {
-        description: editingData.description.trim(),
-        type: editingData.type,
-        status: editingData.status,
+      const requirement = requirements.find((r) => r.id === requirementId);
+      if (!requirement) return;
+
+      const updatePayload: {
+        description?: string;
+        type?: Requirement["type"];
+        status?: Requirement["status"];
+      } = {};
+
+      if (field === "description") {
+        updatePayload.description = value as string;
+      } else if (field === "type") {
+        updatePayload.type = value as Requirement["type"];
+      } else if (field === "status") {
+        updatePayload.status = value as Requirement["status"];
+      }
+
+      await api.requirements.update(projectId, requirementId, updatePayload);
+
+      setEditingFields((prev) => {
+        const newFields = { ...prev };
+        if (newFields[requirementId]) {
+          const fields = new Set(newFields[requirementId]);
+          fields.delete(field);
+          if (fields.size === 0) {
+            delete newFields[requirementId];
+          } else {
+            newFields[requirementId] = fields;
+          }
+        }
+        return newFields;
       });
-      setEditingId(null);
-      setEditingData(null);
+
       onRequirementUpdate();
     } catch (err: any) {
       setError(err.message || "Failed to update requirement");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFieldBlur = (
+    requirementId: string,
+    field: keyof RequirementFormData,
+    _e: React.FocusEvent<HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const timeoutKey = `${requirementId}-${field}`;
+    
+    if (saveTimeouts[timeoutKey]) {
+      clearTimeout(saveTimeouts[timeoutKey]);
+    }
+
+    const delayedSaveTimeout = setTimeout(() => {
+      const activeElement = document.activeElement;
+      if (isWithinSameRequirement(requirementId, activeElement)) {
+        return;
+      }
+
+      const data = formData[requirementId];
+      if (!data) return;
+
+      const requirement = requirements.find((r) => r.id === requirementId);
+      if (!requirement) return;
+
+      let hasChanged = false;
+      if (field === "description" && data.description !== requirement.description) {
+        hasChanged = true;
+      } else if (field === "type" && data.type !== requirement.type) {
+        hasChanged = true;
+      } else if (field === "status" && data.status !== requirement.status) {
+        hasChanged = true;
+      }
+
+      if (hasChanged) {
+        handleFieldSave(requirementId, field, data[field]);
+      } else {
+        setEditingFields((prev) => {
+          const newFields = { ...prev };
+          if (newFields[requirementId]) {
+            const fields = new Set(newFields[requirementId]);
+            fields.delete(field);
+            if (fields.size === 0) {
+              delete newFields[requirementId];
+            } else {
+              newFields[requirementId] = fields;
+            }
+          }
+          return newFields;
+        });
+      }
+
+      // If no fields are being edited for this requirement, collapse it
+      const stillEditing = editingFields[requirementId]?.size > 0;
+      if (!stillEditing) {
+        setExpandedRequirements((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(requirementId);
+          return newSet;
+        });
+        setShowHistoryId((prev) => (prev === requirementId ? null : prev));
+      }
+    }, 150);
+
+    setSaveTimeouts((prev) => ({ ...prev, [timeoutKey]: delayedSaveTimeout }));
+  };
+
+  const isWithinSameRequirement = (requirementId: string, element: EventTarget | null): boolean => {
+    if (!element || !(element instanceof Node)) return false;
+    const requirementContainer = requirementRefs.current[requirementId];
+    if (!requirementContainer) return false;
+    return requirementContainer.contains(element);
+  };
+
+  const handleFieldFocus = (requirementId: string, field: keyof RequirementFormData) => {
+    const timeoutKey = `${requirementId}-${field}`;
+    if (saveTimeouts[timeoutKey]) {
+      clearTimeout(saveTimeouts[timeoutKey]);
+      delete saveTimeouts[timeoutKey];
+    }
+
+    const requirement = requirements.find((r) => r.id === requirementId);
+    if (!requirement || !formData[requirementId]) {
+      setFormData((prev) => ({
+        ...prev,
+        [requirementId]: {
+          description: requirement.description,
+          type: requirement.type,
+          status: requirement.status,
+        },
+      }));
+    }
+
+    setEditingFields((prev) => {
+      const newFields = { ...prev };
+      if (!newFields[requirementId]) {
+        newFields[requirementId] = new Set();
+      }
+      newFields[requirementId].add(field);
+      return newFields;
+    });
+
+    // Expand requirement when editing
+    setExpandedRequirements((prev) => new Set(prev).add(requirementId));
+  };
+
+  const updateFormField = (
+    requirementId: string,
+    field: keyof RequirementFormData,
+    value: string | Requirement["type"] | Requirement["status"]
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      [requirementId]: {
+        ...(prev[requirementId] || {
+          description: "",
+          type: "Information",
+          status: "New",
+        }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleRequirementClick = (requirementId: string) => {
+    setExpandedRequirements((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(requirementId)) {
+        newSet.delete(requirementId);
+      } else {
+        newSet.add(requirementId);
+      }
+      return newSet;
+    });
   };
 
   const handleDelete = async (id: string) => {
@@ -186,28 +477,20 @@ export default function RequirementList({
     setError("");
 
     try {
-      await api.requirements.delete(projectId, id);
-      onRequirementUpdate();
+      // Start fade-out animation
+      setCancelingRequirementId(id);
+      // Wait for animation to complete before deleting
+      setTimeout(async () => {
+        await api.requirements.delete(projectId, id);
+        setCancelingRequirementId(null);
+        onRequirementUpdate();
+        setLoading(false);
+      }, 300);
     } catch (err: any) {
       setError(err.message || "Failed to delete requirement");
-    } finally {
+      setCancelingRequirementId(null);
       setLoading(false);
     }
-  };
-
-  const startEdit = (requirement: Requirement) => {
-    setEditingId(requirement.id);
-    setEditingData({
-      description: requirement.description,
-      type: requirement.type,
-      status: requirement.status,
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditingData(null);
-    setError("");
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -261,6 +544,32 @@ export default function RequirementList({
     }
   };
 
+  const restoreFromHistory = (requirementId: string, historyEntry: RequirementHistory) => {
+    setFormData((prev) => ({
+      ...prev,
+      [requirementId]: {
+        description: historyEntry.description,
+        type: historyEntry.type,
+        status: historyEntry.status,
+      },
+    }));
+    setEditingFields((prev) => {
+      const newFields = { ...prev };
+      if (!newFields[requirementId]) {
+        newFields[requirementId] = new Set();
+      }
+      newFields[requirementId].add("description");
+      newFields[requirementId].add("type");
+      newFields[requirementId].add("status");
+      return newFields;
+    });
+    setExpandedRequirements((prev) => new Set(prev).add(requirementId));
+    // Save the restored values
+    handleFieldSave(requirementId, "description", historyEntry.description);
+    handleFieldSave(requirementId, "type", historyEntry.type);
+    handleFieldSave(requirementId, "status", historyEntry.status);
+  };
+
   const getTypeColor = (type: Requirement["type"]) => {
     switch (type) {
       case "Mandatory":
@@ -275,14 +584,33 @@ export default function RequirementList({
   };
 
   const getStatusColor = (status: Requirement["status"]) => {
+    if (status === null) {
+      return "bg-gray-50 text-gray-400";
+    }
     switch (status) {
       case "Approved":
         return "bg-green-100 text-green-800";
       case "ForReview":
         return "bg-yellow-100 text-yellow-800";
+      case "New":
+        return "bg-gray-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
+  };
+
+  // Filter history to exclude current version
+  const getFilteredHistory = (requirementId: string): RequirementHistory[] => {
+    const requirement = requirements.find((r) => r.id === requirementId);
+    if (!requirement || !history[requirementId]) return [];
+
+    return history[requirementId].filter((entry) => {
+      return (
+        entry.description !== requirement.description ||
+        entry.type !== requirement.type ||
+        entry.status !== requirement.status
+      );
+    });
   };
 
   return (
@@ -293,98 +621,7 @@ export default function RequirementList({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">
-          Requirements ({sortedRequirements.length})
-        </h3>
-        {!isCreatingNew && (
-          <button
-            onClick={() => setIsCreatingNew(true)}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
-          >
-            + Add Requirement
-          </button>
-        )}
-      </div>
 
-      {isCreatingNew && (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
-          <textarea
-            value={newRequirement.description}
-            onChange={(e) =>
-              setNewRequirement({ ...newRequirement, description: e.target.value })
-            }
-            placeholder="Requirement description"
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type
-              </label>
-              <select
-                value={newRequirement.type}
-                onChange={(e) =>
-                  setNewRequirement({
-                    ...newRequirement,
-                    type: e.target.value as Requirement["type"],
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="Information">Information</option>
-                <option value="Mandatory">Mandatory</option>
-                <option value="Important">Important</option>
-                <option value="Wish">Wish</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={newRequirement.status}
-                onChange={(e) =>
-                  setNewRequirement({
-                    ...newRequirement,
-                    status: e.target.value as Requirement["status"],
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="New">New</option>
-                <option value="ForReview">For Review</option>
-                <option value="Approved">Approved</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleCreate}
-              disabled={loading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-            >
-              Create
-            </button>
-            <button
-              onClick={() => {
-                setIsCreatingNew(false);
-                setNewRequirement({
-                  description: "",
-                  type: "Information",
-                  status: "New",
-                });
-                setError("");
-              }}
-              disabled={loading}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       <DndContext
         sensors={sensors}
@@ -397,208 +634,362 @@ export default function RequirementList({
           strategy={verticalListSortingStrategy}
         >
           <div className="space-y-2">
+            {/* New requirement inline editing */}
+            {isCreatingNew && (
+              <div
+                ref={(el) => {
+                  if (el) {
+                    requirementRefs.current["__new__"] = el;
+                  }
+                }}
+                className={`p-4 transition-all duration-300 ease-out ${
+                  isNewRequirementAnimating
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 -translate-y-4"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  {/* Left side: Number and Description */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="font-semibold text-primary-600 pt-0.5">New</span>
+                      <textarea
+                        ref={newRequirementTextareaRef}
+                        value={newRequirement.description}
+                        onChange={(e) =>
+                          setNewRequirement({ ...newRequirement, description: e.target.value })
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setIsCreatingNew(false);
+                            setNewRequirement({
+                              description: "",
+                              type: "Information",
+                              status: "New",
+                            });
+                            setError("");
+                          } else if (e.key === "Enter" && e.ctrlKey) {
+                            handleCreate();
+                          }
+                        }}
+                        placeholder="Requirement description"
+                        rows={2}
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right side: Status and Type */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <select
+                      value={newRequirement.type || ""}
+                      onChange={(e) =>
+                        setNewRequirement({
+                          ...newRequirement,
+                          type: e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]),
+                        })
+                      }
+                      className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">(Blank)</option>
+                      <option value="Information">Information</option>
+                      <option value="Mandatory">Mandatory</option>
+                      <option value="Important">Important</option>
+                      <option value="Wish">Wish</option>
+                    </select>
+                    <select
+                      value={newRequirement.status || ""}
+                      onChange={(e) =>
+                        setNewRequirement({
+                          ...newRequirement,
+                          status: e.target.value as Requirement["status"],
+                        })
+                      }
+                      className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="New">New</option>
+                      <option value="ForReview">For Review</option>
+                      <option value="Approved">Approved</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-between items-center">
+                  <button
+                    onClick={handleCreate}
+                    disabled={loading || !newRequirement.description.trim()}
+                    className="text-primary-600 hover:text-primary-700 underline disabled:opacity-50 text-sm"
+                  >
+                    Create
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsNewRequirementAnimating(false);
+                      // Wait for exit animation to complete before removing from DOM
+                      setTimeout(() => {
+                        setIsCreatingNew(false);
+                        setNewRequirement({
+                          description: "",
+                          type: "Information",
+                          status: "New",
+                        });
+                        setError("");
+                      }, 300);
+                    }}
+                    disabled={loading}
+                    className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             {sortedRequirements.map((requirement) => {
-              const isEditing = editingId === requirement.id;
+              const isExpanded = expandedRequirements.has(requirement.id);
+              const isEditingDescription = editingFields[requirement.id]?.has("description");
+              const isEditingType = editingFields[requirement.id]?.has("type");
+              const isEditingStatus = editingFields[requirement.id]?.has("status");
+              const isEditing = isEditingDescription || isEditingType || isEditingStatus;
               const isShowingHistory = showHistoryId === requirement.id;
+
+              const requirementFormData = formData[requirement.id] || {
+                description: requirement.description,
+                type: requirement.type,
+                status: requirement.status,
+              };
 
               return (
                 <SortableRequirementItem
                   key={requirement.id}
                   requirement={requirement}
                 >
-                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
-                    {isEditing ? (
-                      <div className="space-y-3">
-                        <textarea
-                          value={editingData?.description || ""}
-                          onChange={(e) =>
-                            setEditingData({
-                              ...editingData!,
-                              description: e.target.value,
-                            })
-                          }
-                          placeholder="Requirement description"
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Type
-                            </label>
-                            <select
-                              value={editingData?.type || "Information"}
+                  <div
+                    ref={(el) => {
+                      requirementRefs.current[requirement.id] = el;
+                    }}
+                    className={`p-4 transition-all duration-300 ease-out ${
+                      cancelingRequirementId === requirement.id
+                        ? "opacity-0 scale-95"
+                        : newlyCreatedRequirementId === requirement.id
+                        ? "border-primary-500 bg-primary-50 shadow-lg scale-105"
+                        : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Left side: Number and Description */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-2 mb-2">
+                          <span className={`font-medium pt-0.5 ${
+                            selectedHierarchyId === requirement.hierarchyId ? "text-primary-600" : "text-gray-900"
+                          }`}>
+                            {requirement.number.endsWith('.') ? requirement.number : `${requirement.number}.`}
+                          </span>
+                          {isEditingDescription ? (
+                            <textarea
+                              ref={(el) => {
+                                descriptionTextareaRefs.current[requirement.id] = el;
+                              }}
+                              value={requirementFormData.description}
                               onChange={(e) =>
-                                setEditingData({
-                                  ...editingData!,
-                                  type: e.target.value as Requirement["type"],
-                                })
+                                updateFormField(requirement.id, "description", e.target.value)
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              onFocus={() => handleFieldFocus(requirement.id, "description")}
+                              onBlur={(e) => handleFieldBlur(requirement.id, "description", e)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              placeholder="Requirement description"
+                              rows={2}
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              autoFocus
+                            />
+                          ) : (
+                            <p
+                              className="text-gray-900 cursor-pointer hover:text-primary-600 flex-1"
+                              onClick={() => {
+                                handleRequirementClick(requirement.id);
+                                handleFieldFocus(requirement.id, "description");
+                              }}
                             >
-                              <option value="Information">Information</option>
-                              <option value="Mandatory">Mandatory</option>
-                              <option value="Important">Important</option>
-                              <option value="Wish">Wish</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Status
-                            </label>
-                            <select
-                              value={editingData?.status || "New"}
-                              onChange={(e) =>
-                                setEditingData({
-                                  ...editingData!,
-                                  status: e.target.value as Requirement["status"],
-                                })
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            >
-                              <option value="New">New</option>
-                              <option value="ForReview">For Review</option>
-                              <option value="Approved">Approved</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleUpdate(requirement.id)}
-                            disabled={loading}
-                            className="px-3 py-1 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 text-sm"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            disabled={loading}
-                            className="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 text-sm"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-semibold text-primary-600">
-                                {requirement.number}
-                              </span>
-                              <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(
-                                  requirement.type
-                                )}`}
-                              >
-                                {requirement.type}
-                              </span>
-                              <span
-                                className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(
-                                  requirement.status
-                                )}`}
-                              >
-                                {requirement.status}
-                              </span>
-                            </div>
-                            <p className="text-gray-900">{requirement.description}</p>
-                          </div>
-                          <div className="flex gap-2 ml-4">
-                            <button
-                              onClick={() => startEdit(requirement)}
-                              className="text-sm text-gray-600 hover:text-gray-800"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(requirement.id)}
-                              disabled={loading}
-                              className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-xs text-gray-500 space-y-1">
-                          <div>
-                            Created: {new Date(requirement.createdAt).toLocaleDateString()}
-                            {requirement.createdBy &&
-                              ` by ${
-                                requirement.createdBy.firstName &&
-                                requirement.createdBy.lastName
-                                  ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
-                                  : requirement.createdBy.name ||
-                                    requirement.createdBy.email
-                              }`}
-                          </div>
-                          {requirement.updatedAt !== requirement.createdAt && (
-                            <div>
-                              Modified:{" "}
-                              {new Date(requirement.updatedAt).toLocaleDateString()}
-                              {requirement.lastModifiedBy &&
-                                ` by ${
-                                  requirement.lastModifiedBy.firstName &&
-                                  requirement.lastModifiedBy.lastName
-                                    ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
-                                    : requirement.lastModifiedBy.name ||
-                                      requirement.lastModifiedBy.email
-                                }`}
-                            </div>
+                              {requirement.description}
+                            </p>
                           )}
-                          <button
-                            onClick={() => loadHistory(requirement.id)}
-                            className="text-primary-600 hover:text-primary-700 underline"
-                          >
-                            {isShowingHistory ? "Hide" : "Show"} History
-                          </button>
                         </div>
-                        {isShowingHistory && history[requirement.id] && (
-                          <div className="mt-4 border-t border-gray-200 pt-4">
-                            <h4 className="font-medium mb-2">History</h4>
-                            <div className="space-y-2">
-                              {history[requirement.id].map((entry) => (
-                                <div
-                                  key={entry.id}
-                                  className="bg-gray-50 rounded p-3 text-sm"
-                                >
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span
-                                      className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
-                                        entry.type
-                                      )}`}
-                                    >
-                                      {entry.type}
-                                    </span>
-                                    <span
-                                      className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
-                                        entry.status
-                                      )}`}
-                                    >
-                                      {entry.status}
-                                    </span>
-                                    <span className="text-gray-500">
-                                      {new Date(entry.createdAt).toLocaleString()}
-                                    </span>
-                                    {entry.modifiedBy && (
-                                      <span className="text-gray-500">
-                                        by{" "}
-                                        {entry.modifiedBy.firstName &&
-                                        entry.modifiedBy.lastName
-                                          ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
-                                          : entry.modifiedBy.name ||
-                                            entry.modifiedBy.email}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-gray-700">{entry.description}</p>
+
+                        {/* Show timestamps and history/delete only in edit mode */}
+                        {isEditing && (
+                          <div className="mt-3 flex justify-between items-start text-xs text-gray-500">
+                            <div className="space-y-1">
+                              <div>
+                                Created: {new Date(requirement.createdAt).toLocaleDateString()}
+                                {requirement.createdBy &&
+                                  ` by ${
+                                    requirement.createdBy.firstName &&
+                                    requirement.createdBy.lastName
+                                      ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
+                                      : requirement.createdBy.name ||
+                                        requirement.createdBy.email
+                                  }`}
+                              </div>
+                              <button
+                                onClick={() => loadHistory(requirement.id)}
+                                className="text-primary-600 hover:text-primary-700 underline"
+                              >
+                                {isShowingHistory ? "Hide" : "Show"} History
+                              </button>
+                            </div>
+                            <div className="space-y-1 text-right">
+                              {requirement.updatedAt !== requirement.createdAt && (
+                                <div>
+                                  Modified:{" "}
+                                  {new Date(requirement.updatedAt).toLocaleDateString()}
+                                  {requirement.lastModifiedBy &&
+                                    ` by ${
+                                      requirement.lastModifiedBy.firstName &&
+                                      requirement.lastModifiedBy.lastName
+                                        ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
+                                        : requirement.lastModifiedBy.name ||
+                                          requirement.lastModifiedBy.email
+                                    }`}
                                 </div>
-                              ))}
+                              )}
+                              <button
+                                onClick={() => handleDelete(requirement.id)}
+                                disabled={loading}
+                                className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* History display */}
+                        {isShowingHistory && isEditing && (
+                          <div className="mt-4 border-t border-gray-200 pt-4">
+                            <h4 className="font-medium mb-2 text-sm">History</h4>
+                            <div className="space-y-2">
+                              {getFilteredHistory(requirement.id).length === 0 ? (
+                                <p className="text-sm text-gray-500">No previous versions</p>
+                              ) : (
+                                getFilteredHistory(requirement.id).map((entry) => (
+                                  <div
+                                    key={entry.id}
+                                    className="bg-gray-50 rounded p-3 text-sm"
+                                  >
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
+                                          entry.type
+                                        )}`}
+                                      >
+                                        {entry.type}
+                                      </span>
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                                          entry.status
+                                        )}`}
+                                      >
+                                        {entry.status}
+                                      </span>
+                                      <span className="text-gray-500">
+                                        {new Date(entry.createdAt).toLocaleString()}
+                                      </span>
+                                      {entry.modifiedBy && (
+                                        <span className="text-gray-500">
+                                          by{" "}
+                                          {entry.modifiedBy.firstName &&
+                                          entry.modifiedBy.lastName
+                                            ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
+                                            : entry.modifiedBy.name ||
+                                              entry.modifiedBy.email}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-gray-700 mb-2">{entry.description}</p>
+                                    <button
+                                      onClick={() => restoreFromHistory(requirement.id, entry)}
+                                      className="text-xs text-primary-600 hover:text-primary-700 underline"
+                                    >
+                                      Restore
+                                    </button>
+                                  </div>
+                                ))
+                              )}
                             </div>
                           </div>
                         )}
                       </div>
-                    )}
+
+                      {/* Right side: Status and Type */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {isEditingType ? (
+                          <select
+                            value={requirementFormData.type || ""}
+                            onChange={(e) => {
+                              const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
+                              updateFormField(requirement.id, "type", newType);
+                              handleFieldSave(requirement.id, "type", newType);
+                            }}
+                            onFocus={() => handleFieldFocus(requirement.id, "type")}
+                            onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
+                            className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            autoFocus
+                          >
+                            <option value="">(Blank)</option>
+                            <option value="Information">Information</option>
+                            <option value="Mandatory">Mandatory</option>
+                            <option value="Important">Important</option>
+                            <option value="Wish">Wish</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
+                              requirementFormData.type
+                            )}`}
+                            onClick={() => {
+                              handleRequirementClick(requirement.id);
+                              handleFieldFocus(requirement.id, "type");
+                            }}
+                          >
+                            {requirementFormData.type}
+                          </span>
+                        )}
+                        {isEditingStatus ? (
+                          <select
+                            value={requirementFormData.status || ""}
+                            onChange={(e) => {
+                              const newStatus = e.target.value as Requirement["status"];
+                              updateFormField(requirement.id, "status", newStatus);
+                              handleFieldSave(requirement.id, "status", newStatus);
+                            }}
+                            onFocus={() => handleFieldFocus(requirement.id, "status")}
+                            onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
+                            className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            autoFocus
+                          >
+                            <option value="New">New</option>
+                            <option value="ForReview">For Review</option>
+                            <option value="Approved">Approved</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getStatusColor(
+                              requirementFormData.status
+                            )}`}
+                            onClick={() => {
+                              handleRequirementClick(requirement.id);
+                              handleFieldFocus(requirement.id, "status");
+                            }}
+                          >
+                            {requirementFormData.status || "New"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </SortableRequirementItem>
               );
@@ -615,6 +1006,3 @@ export default function RequirementList({
     </div>
   );
 }
-
-
-

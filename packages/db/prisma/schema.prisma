@@ -150,7 +150,7 @@ model Requirement {
   number          String
   description     String
   type            RequirementType
-  status          RequirementStatus
+  status          RequirementStatus?
   order           Int
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -171,7 +171,7 @@ model RequirementHistory {
   requirementId String
   description   String
   type          RequirementType
-  status        RequirementStatus
+  status        RequirementStatus?
   modifiedById  String
   createdAt     DateTime         @default(now())
 

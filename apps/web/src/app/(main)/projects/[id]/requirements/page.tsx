@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, RequirementHierarchy, Requirement } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
-import RequirementList from "@/components/RequirementList";
 
 export default function RequirementsPage() {
   const params = useParams();
@@ -17,6 +16,13 @@ export default function RequirementsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedHierarchyId, setSelectedHierarchyId] = useState<string | null>(null);
+  const [triggerCreateRequirement, setTriggerCreateRequirement] = useState(0);
+
+  // Get requirements for selected hierarchy
+  const selectedHierarchy = hierarchies.find((h) => h.id === selectedHierarchyId);
+  const hierarchyRequirements = selectedHierarchyId
+    ? requirements.filter((r) => r.hierarchyId === selectedHierarchyId)
+    : [];
 
   const loadData = async () => {
     try {
@@ -100,15 +106,6 @@ export default function RequirementsPage() {
     );
   }
 
-  // Organize hierarchies into Level 1 and Level 2
-  const level1Hierarchies = hierarchies.filter((h) => h.parentId === null);
-  const level2Hierarchies = hierarchies.filter((h) => h.parentId !== null);
-
-  // Get requirements for selected hierarchy
-  const selectedHierarchy = hierarchies.find((h) => h.id === selectedHierarchyId);
-  const hierarchyRequirements = selectedHierarchyId
-    ? requirements.filter((r) => r.hierarchyId === selectedHierarchyId)
-    : [];
 
   return (
     <div>
@@ -135,44 +132,21 @@ export default function RequirementsPage() {
       <div className="space-y-6">
         {/* Hierarchy Structure */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">Requirement Hierarchy</h2>
           <RequirementHierarchyComponent
             projectId={projectId}
             hierarchies={hierarchies}
+            requirements={requirements}
             selectedHierarchyId={selectedHierarchyId}
             onHierarchySelect={setSelectedHierarchyId}
             onHierarchyUpdate={handleHierarchyUpdate}
+            onRequirementUpdate={handleRequirementUpdate}
+            onAddRequirement={(hierarchyId) => {
+              setSelectedHierarchyId(hierarchyId);
+              setTriggerCreateRequirement((prev) => prev + 1);
+            }}
+            createTrigger={triggerCreateRequirement}
           />
         </div>
-
-        {/* Requirements List */}
-        {selectedHierarchy && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
-                {selectedHierarchy.number}. {selectedHierarchy.title}
-              </h2>
-              <button
-                onClick={() => setSelectedHierarchyId(null)}
-                className="text-sm text-gray-600 hover:text-gray-800 underline"
-              >
-                Back to hierarchy
-              </button>
-            </div>
-            <RequirementList
-              projectId={projectId}
-              hierarchyId={selectedHierarchyId!}
-              requirements={hierarchyRequirements}
-              onRequirementUpdate={handleRequirementUpdate}
-            />
-          </div>
-        )}
-
-        {!selectedHierarchy && (
-          <div className="bg-white rounded-lg shadow-md p-6 text-center text-gray-500">
-            <p>Select a hierarchy level to view and manage requirements</p>
-          </div>
-        )}
       </div>
     </div>
   );
