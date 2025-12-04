@@ -1,11 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { api, Project } from "@/lib/api";
 
 export default function RFPPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const [project, setProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+    if (projectId) {
+      api.projects.get(projectId)
+        .then(setProject)
+        .catch((err) => console.error("Failed to load project:", err));
+    }
+  }, [projectId]);
 
   return (
     <div>
@@ -19,7 +30,7 @@ export default function RFPPage() {
         </Link>
         <span className="mx-2">/</span>
         <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          Project
+          {project?.name || "Project"}
         </Link>
         <span className="mx-2">/</span>
         <span className="text-gray-900">RFP</span>

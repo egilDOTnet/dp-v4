@@ -25,8 +25,10 @@ interface RequirementListProps {
   hierarchyId: string;
   requirements: Requirement[];
   onRequirementUpdate: () => void;
-  createTrigger?: number;
+  shouldShowCreateForm?: boolean;
+  onCreateFormClose?: () => void;
   selectedHierarchyId?: string | null;
+  disableDragAndDrop?: boolean;
 }
 
 interface SortableRequirementItemProps {
@@ -56,12 +58,13 @@ function SortableRequirementItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative group">
+    <div ref={setNodeRef} style={style} className="relative group/requirement">
       {/* Drag handle */}
       <div
         {...attributes}
         {...listeners}
-        className="absolute -left-5 top-1/2 -translate-y-1/2 w-2.5 flex flex-col items-center justify-center gap-0.5 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:opacity-100"
+        className="absolute -left-5 top-0 w-2.5 flex flex-col items-center justify-center gap-0.5 cursor-grab active:cursor-grabbing opacity-0 group-hover/requirement:opacity-100 transition-opacity z-10 hover:opacity-100"
+        style={{ paddingTop: '0.25rem' }}
         title="Drag to reorder"
       >
         <div className="flex gap-0.5">
@@ -97,8 +100,10 @@ export default function RequirementList({
   hierarchyId,
   requirements,
   onRequirementUpdate,
-  createTrigger,
+  shouldShowCreateForm = false,
+  onCreateFormClose,
   selectedHierarchyId = null,
+  disableDragAndDrop = false,
 }: RequirementListProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newRequirement, setNewRequirement] = useState<RequirementFormData>({
@@ -159,12 +164,10 @@ export default function RequirementList({
   }, [isCreatingNew]);
 
   // Handle external trigger to create new requirement
-  const prevCreateTriggerRef = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (createTrigger !== undefined && createTrigger !== prevCreateTriggerRef.current && !isCreatingNew) {
+    if (shouldShowCreateForm && !isCreatingNew) {
       setIsCreatingNew(true);
       setIsNewRequirementAnimating(false);
-      prevCreateTriggerRef.current = createTrigger;
       // Trigger animation after element is in DOM
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -176,7 +179,7 @@ export default function RequirementList({
         });
       });
     }
-  }, [createTrigger, isCreatingNew]);
+  }, [shouldShowCreateForm]);
 
   // Scroll to and animate newly created requirement when it appears in the list
   useEffect(() => {
@@ -270,6 +273,10 @@ export default function RequirementList({
       setIsCreatingNew(false);
       // Set the newly created requirement ID for animation
       setNewlyCreatedRequirementId(newRequirementData.id);
+      // Close the create form
+      if (onCreateFormClose) {
+        onCreateFormClose();
+      }
       onRequirementUpdate();
     } catch (err: any) {
       setError(err.message || "Failed to create requirement");
@@ -414,7 +421,9 @@ export default function RequirementList({
     }
 
     const requirement = requirements.find((r) => r.id === requirementId);
-    if (!requirement || !formData[requirementId]) {
+    if (!requirement) return;
+    
+    if (!formData[requirementId]) {
       setFormData((prev) => ({
         ...prev,
         [requirementId]: {
@@ -623,17 +632,8 @@ export default function RequirementList({
 
 
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={(event) => setActiveDragId(event.active.id as string)}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={sortedRequirements.map((r) => r.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="space-y-2">
+      {disableDragAndDrop ? (
+        <div className="space-y-2">
             {/* New requirement inline editing */}
             {isCreatingNew && (
               <div
@@ -642,7 +642,7 @@ export default function RequirementList({
                     requirementRefs.current["__new__"] = el;
                   }
                 }}
-                className={`p-4 transition-all duration-300 ease-out ${
+                className={`transition-all duration-300 ease-out ${
                   isNewRequirementAnimating
                     ? "opacity-100 translate-y-0"
                     : "opacity-0 -translate-y-4"
@@ -651,14 +651,15 @@ export default function RequirementList({
                 <div className="flex items-start justify-between gap-4">
                   {/* Left side: Number and Description */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2 mb-2">
-                      <span className="font-semibold text-primary-600 pt-0.5">New</span>
+                    <div className="flex items-start mb-2">
+                      <span className="text-gray-700 flex-shrink-0 mr-2">New</span>
                       <textarea
                         ref={newRequirementTextareaRef}
                         value={newRequirement.description}
                         onChange={(e) =>
                           setNewRequirement({ ...newRequirement, description: e.target.value })
                         }
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                         onKeyDown={(e) => {
                           if (e.key === "Escape") {
                             setIsCreatingNew(false);
@@ -668,13 +669,16 @@ export default function RequirementList({
                               status: "New",
                             });
                             setError("");
+                            // Close the create form
+                            if (onCreateFormClose) {
+                              onCreateFormClose();
+                            }
                           } else if (e.key === "Enter" && e.ctrlKey) {
                             handleCreate();
                           }
                         }}
                         placeholder="Requirement description"
                         rows={2}
-                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                         autoFocus
                       />
                     </div>
@@ -734,6 +738,10 @@ export default function RequirementList({
                           status: "New",
                         });
                         setError("");
+                        // Close the create form
+                        if (onCreateFormClose) {
+                          onCreateFormClose();
+                        }
                       }, 300);
                     }}
                     disabled={loading}
@@ -745,7 +753,8 @@ export default function RequirementList({
               </div>
             )}
 
-            {sortedRequirements.map((requirement) => {
+          {sortedRequirements.map((requirement) => {
+              // Render without sortable wrapper when drag and drop is disabled
               const isExpanded = expandedRequirements.has(requirement.id);
               const isEditingDescription = editingFields[requirement.id]?.has("description");
               const isEditingType = editingFields[requirement.id]?.has("type");
@@ -760,31 +769,27 @@ export default function RequirementList({
               };
 
               return (
-                <SortableRequirementItem
+                <div
                   key={requirement.id}
-                  requirement={requirement}
+                  ref={(el) => {
+                    requirementRefs.current[requirement.id] = el;
+                  }}
+                  className={`transition-all duration-300 ease-out ${
+                    cancelingRequirementId === requirement.id
+                      ? "opacity-0 scale-95"
+                      : newlyCreatedRequirementId === requirement.id
+                      ? "border-primary-500 bg-primary-50 shadow-lg scale-105"
+                      : ""
+                  }`}
                 >
-                  <div
-                    ref={(el) => {
-                      requirementRefs.current[requirement.id] = el;
-                    }}
-                    className={`p-4 transition-all duration-300 ease-out ${
-                      cancelingRequirementId === requirement.id
-                        ? "opacity-0 scale-95"
-                        : newlyCreatedRequirementId === requirement.id
-                        ? "border-primary-500 bg-primary-50 shadow-lg scale-105"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      {/* Left side: Number and Description */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-2 mb-2">
-                          <span className={`font-medium pt-0.5 ${
-                            selectedHierarchyId === requirement.hierarchyId ? "text-primary-600" : "text-gray-900"
-                          }`}>
-                            {requirement.number.endsWith('.') ? requirement.number : `${requirement.number}.`}
-                          </span>
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left side: Number and Description */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start mb-2">
+                        <span className="flex-shrink-0 mr-2 text-gray-700">
+                          {requirement.number.endsWith('.') ? requirement.number : `${requirement.number}.`}
+                        </span>
+                        <div className="flex-1 min-w-0">
                           {isEditingDescription ? (
                             <textarea
                               ref={(el) => {
@@ -803,204 +808,596 @@ export default function RequirementList({
                               }}
                               placeholder="Requirement description"
                               rows={2}
-                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                               autoFocus
                             />
                           ) : (
-                            <p
-                              className="text-gray-900 cursor-pointer hover:text-primary-600 flex-1"
-                              onClick={() => {
-                                handleRequirementClick(requirement.id);
-                                handleFieldFocus(requirement.id, "description");
-                              }}
-                            >
+                            <p className="text-gray-900">
                               {requirement.description}
                             </p>
                           )}
                         </div>
+                      </div>
 
-                        {/* Show timestamps and history/delete only in edit mode */}
-                        {isEditing && (
-                          <div className="mt-3 flex justify-between items-start text-xs text-gray-500">
-                            <div className="space-y-1">
+                      {/* Show timestamps and history/delete only in edit mode */}
+                      {isEditing && (
+                        <div className="mt-3 flex justify-between items-start text-xs text-gray-500">
+                          <div className="space-y-1">
+                            <div>
+                              Created: {new Date(requirement.createdAt).toLocaleDateString()}
+                              {requirement.createdBy &&
+                                ` by ${
+                                  requirement.createdBy.firstName &&
+                                  requirement.createdBy.lastName
+                                    ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
+                                    : requirement.createdBy.name ||
+                                      requirement.createdBy.email
+                                }`}
+                            </div>
+                            <button
+                              onClick={() => loadHistory(requirement.id)}
+                              className="text-primary-600 hover:text-primary-700 underline"
+                            >
+                              {isShowingHistory ? "Hide" : "Show"} History
+                            </button>
+                          </div>
+                          <div className="space-y-1 text-right">
+                            {requirement.updatedAt !== requirement.createdAt && (
                               <div>
-                                Created: {new Date(requirement.createdAt).toLocaleDateString()}
-                                {requirement.createdBy &&
+                                Modified:{" "}
+                                {new Date(requirement.updatedAt).toLocaleDateString()}
+                                {requirement.lastModifiedBy &&
                                   ` by ${
-                                    requirement.createdBy.firstName &&
-                                    requirement.createdBy.lastName
-                                      ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
-                                      : requirement.createdBy.name ||
-                                        requirement.createdBy.email
+                                    requirement.lastModifiedBy.firstName &&
+                                    requirement.lastModifiedBy.lastName
+                                      ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
+                                      : requirement.lastModifiedBy.name ||
+                                        requirement.lastModifiedBy.email
                                   }`}
                               </div>
-                              <button
-                                onClick={() => loadHistory(requirement.id)}
-                                className="text-primary-600 hover:text-primary-700 underline"
-                              >
-                                {isShowingHistory ? "Hide" : "Show"} History
-                              </button>
-                            </div>
-                            <div className="space-y-1 text-right">
-                              {requirement.updatedAt !== requirement.createdAt && (
-                                <div>
-                                  Modified:{" "}
-                                  {new Date(requirement.updatedAt).toLocaleDateString()}
-                                  {requirement.lastModifiedBy &&
-                                    ` by ${
-                                      requirement.lastModifiedBy.firstName &&
-                                      requirement.lastModifiedBy.lastName
-                                        ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
-                                        : requirement.lastModifiedBy.name ||
-                                          requirement.lastModifiedBy.email
-                                    }`}
-                                </div>
-                              )}
-                              <button
-                                onClick={() => handleDelete(requirement.id)}
-                                disabled={loading}
-                                className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                            )}
+                            <button
+                              onClick={() => handleDelete(requirement.id)}
+                              disabled={loading}
+                              className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
+                            >
+                              Delete
+                            </button>
                           </div>
-                        )}
+                        </div>
+                      )}
 
-                        {/* History display */}
-                        {isShowingHistory && isEditing && (
-                          <div className="mt-4 border-t border-gray-200 pt-4">
-                            <h4 className="font-medium mb-2 text-sm">History</h4>
-                            <div className="space-y-2">
-                              {getFilteredHistory(requirement.id).length === 0 ? (
-                                <p className="text-sm text-gray-500">No previous versions</p>
-                              ) : (
-                                getFilteredHistory(requirement.id).map((entry) => (
-                                  <div
-                                    key={entry.id}
-                                    className="bg-gray-50 rounded p-3 text-sm"
-                                  >
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span
-                                        className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
-                                          entry.type
-                                        )}`}
-                                      >
-                                        {entry.type}
-                                      </span>
-                                      <span
-                                        className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
-                                          entry.status
-                                        )}`}
-                                      >
-                                        {entry.status}
-                                      </span>
-                                      <span className="text-gray-500">
-                                        {new Date(entry.createdAt).toLocaleString()}
-                                      </span>
-                                      {entry.modifiedBy && (
-                                        <span className="text-gray-500">
-                                          by{" "}
-                                          {entry.modifiedBy.firstName &&
-                                          entry.modifiedBy.lastName
-                                            ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
-                                            : entry.modifiedBy.name ||
-                                              entry.modifiedBy.email}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-gray-700 mb-2">{entry.description}</p>
-                                    <button
-                                      onClick={() => restoreFromHistory(requirement.id, entry)}
-                                      className="text-xs text-primary-600 hover:text-primary-700 underline"
+                      {/* History display */}
+                      {isShowingHistory && isEditing && (
+                        <div className="mt-4 border-t border-gray-200 pt-4">
+                          <h4 className="font-medium mb-2 text-sm">History</h4>
+                          <div className="space-y-2">
+                            {getFilteredHistory(requirement.id).length === 0 ? (
+                              <p className="text-sm text-gray-500">No previous versions</p>
+                            ) : (
+                              getFilteredHistory(requirement.id).map((entry) => (
+                                <div
+                                  key={entry.id}
+                                  className="bg-gray-50 rounded p-3 text-sm"
+                                >
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
+                                        entry.type
+                                      )}`}
                                     >
-                                      Restore
-                                    </button>
+                                      {entry.type}
+                                    </span>
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                                        entry.status
+                                      )}`}
+                                    >
+                                      {entry.status}
+                                    </span>
+                                    <span className="text-gray-500">
+                                      {new Date(entry.createdAt).toLocaleString()}
+                                    </span>
+                                    {entry.modifiedBy && (
+                                      <span className="text-gray-500">
+                                        by{" "}
+                                        {entry.modifiedBy.firstName &&
+                                        entry.modifiedBy.lastName
+                                          ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
+                                          : entry.modifiedBy.name ||
+                                            entry.modifiedBy.email}
+                                      </span>
+                                    )}
                                   </div>
-                                ))
-                              )}
-                            </div>
+                                  <p className="text-gray-700 mb-2">{entry.description}</p>
+                                  <button
+                                    onClick={() => restoreFromHistory(requirement.id, entry)}
+                                    className="text-xs text-primary-600 hover:text-primary-700 underline"
+                                  >
+                                    Restore
+                                  </button>
+                                </div>
+                              ))
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
+                    </div>
 
-                      {/* Right side: Status and Type */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {isEditingType ? (
-                          <select
-                            value={requirementFormData.type || ""}
-                            onChange={(e) => {
-                              const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
-                              updateFormField(requirement.id, "type", newType);
-                              handleFieldSave(requirement.id, "type", newType);
-                            }}
-                            onFocus={() => handleFieldFocus(requirement.id, "type")}
-                            onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
-                            className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            autoFocus
-                          >
-                            <option value="">(Blank)</option>
-                            <option value="Information">Information</option>
-                            <option value="Mandatory">Mandatory</option>
-                            <option value="Important">Important</option>
-                            <option value="Wish">Wish</option>
-                          </select>
-                        ) : (
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
-                              requirementFormData.type
-                            )}`}
-                            onClick={() => {
-                              handleRequirementClick(requirement.id);
+                    {/* Right side: Type, Status, and Edit button */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isEditingType ? (
+                        <select
+                          value={requirementFormData.type || ""}
+                          onChange={(e) => {
+                            const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
+                            updateFormField(requirement.id, "type", newType);
+                            handleFieldSave(requirement.id, "type", newType);
+                          }}
+                          onFocus={() => handleFieldFocus(requirement.id, "type")}
+                          onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
+                          className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          autoFocus
+                        >
+                          <option value="">(Blank)</option>
+                          <option value="Information">Information</option>
+                          <option value="Mandatory">Mandatory</option>
+                          <option value="Important">Important</option>
+                          <option value="Wish">Wish</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getTypeColor(
+                            requirementFormData.type
+                          )}`}
+                          onClick={() => {
+                            if (isEditing) {
                               handleFieldFocus(requirement.id, "type");
-                            }}
-                          >
-                            {requirementFormData.type}
-                          </span>
-                        )}
-                        {isEditingStatus ? (
-                          <select
-                            value={requirementFormData.status || ""}
-                            onChange={(e) => {
-                              const newStatus = e.target.value as Requirement["status"];
-                              updateFormField(requirement.id, "status", newStatus);
-                              handleFieldSave(requirement.id, "status", newStatus);
-                            }}
-                            onFocus={() => handleFieldFocus(requirement.id, "status")}
-                            onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
-                            className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            autoFocus
-                          >
-                            <option value="New">New</option>
-                            <option value="ForReview">For Review</option>
-                            <option value="Approved">Approved</option>
-                          </select>
-                        ) : (
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getStatusColor(
-                              requirementFormData.status
-                            )}`}
-                            onClick={() => {
-                              handleRequirementClick(requirement.id);
+                            }
+                          }}
+                        >
+                          {requirementFormData.type}
+                        </span>
+                      )}
+                      {isEditingStatus ? (
+                        <select
+                          value={requirementFormData.status || ""}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as Requirement["status"];
+                            updateFormField(requirement.id, "status", newStatus);
+                            handleFieldSave(requirement.id, "status", newStatus);
+                          }}
+                          onFocus={() => handleFieldFocus(requirement.id, "status")}
+                          onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
+                          className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          autoFocus
+                        >
+                          <option value="New">New</option>
+                          <option value="ForReview">For Review</option>
+                          <option value="Approved">Approved</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getStatusColor(
+                            requirementFormData.status
+                          )}`}
+                          onClick={() => {
+                            if (isEditing) {
                               handleFieldFocus(requirement.id, "status");
-                            }}
-                          >
-                            {requirementFormData.status || "New"}
-                          </span>
-                        )}
-                      </div>
+                            }
+                          }}
+                        >
+                          {requirementFormData.status || "New"}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          handleRequirementClick(requirement.id);
+                          handleFieldFocus(requirement.id, "description");
+                        }}
+                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors opacity-0 group-hover/requirement:opacity-100"
+                      >
+                        Edit
+                      </button>
                     </div>
                   </div>
-                </SortableRequirementItem>
+                </div>
               );
             })}
-          </div>
-        </SortableContext>
-      </DndContext>
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={(event) => setActiveDragId(event.active.id as string)}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={sortedRequirements.map((r) => r.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              {/* New requirement inline editing */}
+              {isCreatingNew && (
+                <div
+                  ref={(el) => {
+                    if (el) {
+                      requirementRefs.current["__new__"] = el;
+                    }
+                  }}
+                  className={`transition-all duration-300 ease-out ${
+                    isNewRequirementAnimating
+                      ? "opacity-100 translate-y-0"
+                      : "opacity-0 -translate-y-4"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left side: Number and Description */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start mb-2">
+                        <span className="text-gray-700 flex-shrink-0 mr-2">New</span>
+                        <textarea
+                          ref={newRequirementTextareaRef}
+                          value={newRequirement.description}
+                          onChange={(e) =>
+                            setNewRequirement({ ...newRequirement, description: e.target.value })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setIsCreatingNew(false);
+                              setNewRequirement({
+                                description: "",
+                                type: "Information",
+                                status: "New",
+                              });
+                              setError("");
+                              // Close the create form
+                              if (onCreateFormClose) {
+                                onCreateFormClose();
+                              }
+                            } else if (e.key === "Enter" && e.ctrlKey) {
+                              handleCreate();
+                            }
+                          }}
+                          placeholder="Requirement description"
+                          rows={2}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right side: Status and Type */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        value={newRequirement.type || ""}
+                        onChange={(e) =>
+                          setNewRequirement({
+                            ...newRequirement,
+                            type: e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]),
+                          })
+                        }
+                        className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="">(Blank)</option>
+                        <option value="Information">Information</option>
+                        <option value="Mandatory">Mandatory</option>
+                        <option value="Important">Important</option>
+                        <option value="Wish">Wish</option>
+                      </select>
+                      <select
+                        value={newRequirement.status || ""}
+                        onChange={(e) =>
+                          setNewRequirement({
+                            ...newRequirement,
+                            status: e.target.value as Requirement["status"],
+                          })
+                        }
+                        className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="New">New</option>
+                        <option value="ForReview">For Review</option>
+                        <option value="Approved">Approved</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex justify-between items-center">
+                    <button
+                      onClick={handleCreate}
+                      disabled={loading || !newRequirement.description.trim()}
+                      className="text-primary-600 hover:text-primary-700 underline disabled:opacity-50 text-sm"
+                    >
+                      Create
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsNewRequirementAnimating(false);
+                        // Wait for exit animation to complete before removing from DOM
+                        setTimeout(() => {
+                          setIsCreatingNew(false);
+                          setNewRequirement({
+                            description: "",
+                            type: "Information",
+                            status: "New",
+                          });
+                          setError("");
+                          // Close the create form
+                          if (onCreateFormClose) {
+                            onCreateFormClose();
+                          }
+                        }, 300);
+                      }}
+                      disabled={loading}
+                      className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {sortedRequirements.map((requirement) => {
+                const isExpanded = expandedRequirements.has(requirement.id);
+                const isEditingDescription = editingFields[requirement.id]?.has("description");
+                const isEditingType = editingFields[requirement.id]?.has("type");
+                const isEditingStatus = editingFields[requirement.id]?.has("status");
+                const isEditing = isEditingDescription || isEditingType || isEditingStatus;
+                const isShowingHistory = showHistoryId === requirement.id;
+
+                const requirementFormData = formData[requirement.id] || {
+                  description: requirement.description,
+                  type: requirement.type,
+                  status: requirement.status,
+                };
+
+                return (
+                  <SortableRequirementItem
+                    key={requirement.id}
+                    requirement={requirement}
+                  >
+                    <div
+                      ref={(el) => {
+                        requirementRefs.current[requirement.id] = el;
+                      }}
+                      className={`transition-all duration-300 ease-out ${
+                        cancelingRequirementId === requirement.id
+                          ? "opacity-0 scale-95"
+                          : newlyCreatedRequirementId === requirement.id
+                          ? "border-primary-500 bg-primary-50 shadow-lg scale-105"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left side: Number and Description */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start mb-2">
+                            <span className="flex-shrink-0 mr-2 text-gray-700">
+                              {requirement.number.endsWith('.') ? requirement.number : `${requirement.number}.`}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              {isEditingDescription ? (
+                                <textarea
+                                  ref={(el) => {
+                                    descriptionTextareaRefs.current[requirement.id] = el;
+                                  }}
+                                  value={requirementFormData.description}
+                                  onChange={(e) =>
+                                    updateFormField(requirement.id, "description", e.target.value)
+                                  }
+                                  onFocus={() => handleFieldFocus(requirement.id, "description")}
+                                  onBlur={(e) => handleFieldBlur(requirement.id, "description", e)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  placeholder="Requirement description"
+                                  rows={2}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                  autoFocus
+                                />
+                              ) : (
+                                <p className="text-gray-900">
+                                  {requirement.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Show timestamps and history/delete only in edit mode */}
+                          {isEditing && (
+                            <div className="mt-3 flex justify-between items-start text-xs text-gray-500">
+                              <div className="space-y-1">
+                                <div>
+                                  Created: {new Date(requirement.createdAt).toLocaleDateString()}
+                                  {requirement.createdBy &&
+                                    ` by ${
+                                      requirement.createdBy.firstName &&
+                                      requirement.createdBy.lastName
+                                        ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
+                                        : requirement.createdBy.name ||
+                                          requirement.createdBy.email
+                                    }`}
+                                </div>
+                                <button
+                                  onClick={() => loadHistory(requirement.id)}
+                                  className="text-primary-600 hover:text-primary-700 underline"
+                                >
+                                  {isShowingHistory ? "Hide" : "Show"} History
+                                </button>
+                              </div>
+                              <div className="space-y-1 text-right">
+                                {requirement.updatedAt !== requirement.createdAt && (
+                                  <div>
+                                    Modified:{" "}
+                                    {new Date(requirement.updatedAt).toLocaleDateString()}
+                                    {requirement.lastModifiedBy &&
+                                      ` by ${
+                                        requirement.lastModifiedBy.firstName &&
+                                        requirement.lastModifiedBy.lastName
+                                          ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
+                                          : requirement.lastModifiedBy.name ||
+                                            requirement.lastModifiedBy.email
+                                      }`}
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => handleDelete(requirement.id)}
+                                  disabled={loading}
+                                  className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* History display */}
+                          {isShowingHistory && isEditing && (
+                            <div className="mt-4 border-t border-gray-200 pt-4">
+                              <h4 className="font-medium mb-2 text-sm">History</h4>
+                              <div className="space-y-2">
+                                {getFilteredHistory(requirement.id).length === 0 ? (
+                                  <p className="text-sm text-gray-500">No previous versions</p>
+                                ) : (
+                                  getFilteredHistory(requirement.id).map((entry) => (
+                                    <div
+                                      key={entry.id}
+                                      className="bg-gray-50 rounded p-3 text-sm"
+                                    >
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
+                                            entry.type
+                                          )}`}
+                                        >
+                                          {entry.type}
+                                        </span>
+                                        <span
+                                          className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                                            entry.status
+                                          )}`}
+                                        >
+                                          {entry.status}
+                                        </span>
+                                        <span className="text-gray-500">
+                                          {new Date(entry.createdAt).toLocaleString()}
+                                        </span>
+                                        {entry.modifiedBy && (
+                                          <span className="text-gray-500">
+                                            by{" "}
+                                            {entry.modifiedBy.firstName &&
+                                            entry.modifiedBy.lastName
+                                              ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
+                                              : entry.modifiedBy.name ||
+                                                entry.modifiedBy.email}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-gray-700 mb-2">{entry.description}</p>
+                                      <button
+                                        onClick={() => restoreFromHistory(requirement.id, entry)}
+                                        className="text-xs text-primary-600 hover:text-primary-700 underline"
+                                      >
+                                        Restore
+                                      </button>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right side: Type, Status, and Edit button */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {isEditingType ? (
+                            <select
+                              value={requirementFormData.type || ""}
+                              onChange={(e) => {
+                                const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
+                                updateFormField(requirement.id, "type", newType);
+                                handleFieldSave(requirement.id, "type", newType);
+                              }}
+                              onFocus={() => handleFieldFocus(requirement.id, "type")}
+                              onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
+                              className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              autoFocus
+                            >
+                              <option value="">(Blank)</option>
+                              <option value="Information">Information</option>
+                              <option value="Mandatory">Mandatory</option>
+                              <option value="Important">Important</option>
+                              <option value="Wish">Wish</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getTypeColor(
+                                requirementFormData.type
+                              )}`}
+                              onClick={() => {
+                                if (isEditing) {
+                                  handleFieldFocus(requirement.id, "type");
+                                }
+                              }}
+                            >
+                              {requirementFormData.type}
+                            </span>
+                          )}
+                          {isEditingStatus ? (
+                            <select
+                              value={requirementFormData.status || ""}
+                              onChange={(e) => {
+                                const newStatus = e.target.value as Requirement["status"];
+                                updateFormField(requirement.id, "status", newStatus);
+                                handleFieldSave(requirement.id, "status", newStatus);
+                              }}
+                              onFocus={() => handleFieldFocus(requirement.id, "status")}
+                              onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
+                              className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              autoFocus
+                            >
+                              <option value="New">New</option>
+                              <option value="ForReview">For Review</option>
+                              <option value="Approved">Approved</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getStatusColor(
+                                requirementFormData.status
+                              )}`}
+                              onClick={() => {
+                                if (isEditing) {
+                                  handleFieldFocus(requirement.id, "status");
+                                }
+                              }}
+                            >
+                              {requirementFormData.status || "New"}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => {
+                              handleRequirementClick(requirement.id);
+                              handleFieldFocus(requirement.id, "description");
+                            }}
+                            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors opacity-0 group-hover/requirement:opacity-100"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </SortableRequirementItem>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
 
       {sortedRequirements.length === 0 && !isCreatingNew && (
         <div className="text-center py-8 text-gray-500">
-          <p>No requirements yet. Click "Add Requirement" to create one.</p>
+          <p>There are no requirements yet.</p>
         </div>
       )}
     </div>

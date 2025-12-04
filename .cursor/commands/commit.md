@@ -1,1 +1,1 @@
-Commit my changes to git, reference code changes to write a short but meaningful commit message.
+Commit my changes to git, reference code changes to write a short but meaningful commit message. Commit with full permissions to allow git to connect to the signing agent for 1Password.

@@ -4,19 +4,20 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, RequirementHierarchy, Requirement } from "@/lib/api";
+import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
 
 export default function RequirementsPage() {
   const params = useParams();
   const { user } = useAuth();
   const projectId = params.id as string;
+  const [project, setProject] = useState<Project | null>(null);
   const [hierarchies, setHierarchies] = useState<RequirementHierarchy[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedHierarchyId, setSelectedHierarchyId] = useState<string | null>(null);
-  const [triggerCreateRequirement, setTriggerCreateRequirement] = useState(0);
+  const [createForHierarchyId, setCreateForHierarchyId] = useState<string | null>(null);
 
   // Get requirements for selected hierarchy
   const selectedHierarchy = hierarchies.find((h) => h.id === selectedHierarchyId);
@@ -27,10 +28,12 @@ export default function RequirementsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [hierarchiesData, requirementsData] = await Promise.all([
+      const [projectData, hierarchiesData, requirementsData] = await Promise.all([
+        api.projects.get(projectId),
         api.requirements.hierarchies.list(projectId),
         api.requirements.list(projectId),
       ]);
+      setProject(projectData);
       setHierarchies(hierarchiesData);
       setRequirements(requirementsData);
       setError("");
@@ -55,6 +58,14 @@ export default function RequirementsPage() {
     loadData();
   };
 
+  const handleHierarchySelect = (id: string | null) => {
+    setSelectedHierarchyId(id);
+    // Clear the create form when collapsing or switching hierarchies
+    if (id !== createForHierarchyId) {
+      setCreateForHierarchyId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div>
@@ -68,7 +79,7 @@ export default function RequirementsPage() {
           </Link>
           <span className="mx-2">/</span>
           <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-            Project
+            {project?.name || "Project"}
           </Link>
           <span className="mx-2">/</span>
           <span className="text-gray-900">Requirements</span>
@@ -94,7 +105,7 @@ export default function RequirementsPage() {
           </Link>
           <span className="mx-2">/</span>
           <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-            Project
+            {project?.name || "Project"}
           </Link>
           <span className="mx-2">/</span>
           <span className="text-gray-900">Requirements</span>
@@ -119,7 +130,7 @@ export default function RequirementsPage() {
         </Link>
         <span className="mx-2">/</span>
         <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          Project
+          {project?.name || "Project"}
         </Link>
         <span className="mx-2">/</span>
         <span className="text-gray-900">Requirements</span>
@@ -137,14 +148,15 @@ export default function RequirementsPage() {
             hierarchies={hierarchies}
             requirements={requirements}
             selectedHierarchyId={selectedHierarchyId}
-            onHierarchySelect={setSelectedHierarchyId}
+            onHierarchySelect={handleHierarchySelect}
             onHierarchyUpdate={handleHierarchyUpdate}
             onRequirementUpdate={handleRequirementUpdate}
             onAddRequirement={(hierarchyId) => {
               setSelectedHierarchyId(hierarchyId);
-              setTriggerCreateRequirement((prev) => prev + 1);
+              setCreateForHierarchyId(hierarchyId);
             }}
-            createTrigger={triggerCreateRequirement}
+            createForHierarchyId={createForHierarchyId}
+            onCreateFormClose={() => setCreateForHierarchyId(null)}
           />
         </div>
       </div>
