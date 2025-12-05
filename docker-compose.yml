@@ -21,7 +21,7 @@ services:
   api:
     build: ./apps/api
     container_name: api
-    command: sh -c 'echo "Waiting for workspace..."; while [ ! -f /workspace/package.json ]; do sleep 2; done; echo "Workspace found! Installing dependencies..." && cd /workspace && pnpm install && cd apps/api && exec pnpm dev'
+    command: sh -c 'echo "Waiting for workspace..."; while [ ! -f /workspace/package.json ]; do sleep 2; done; echo "Workspace found! Installing dependencies..." && cd /workspace && pnpm install && echo "Generating Prisma client..." && cd packages/db && pnpm prisma generate && cd /workspace/apps/api && exec pnpm dev'
     restart: unless-stopped
     volumes:
       - .:/workspace

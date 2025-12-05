@@ -39,6 +39,15 @@ export async function apiRequest<T>(
 }
 
 export const api = {
+  vendors: {
+    search: (query: string) =>
+      apiRequest<{
+        results: BrregSearchResult[];
+        total: number;
+      }>(`/api/vendors/search?query=${encodeURIComponent(query)}`),
+    getBrregData: (orgNumber: string) =>
+      apiRequest<BrregCompanyDetails>(`/api/vendors/brreg/${orgNumber}`),
+  },
   auth: {
     checkUser: (email: string) =>
       apiRequest<{ exists: boolean; hasPassword: boolean }>("/api/auth/check-user", {
@@ -167,6 +176,94 @@ export const api = {
           method: "PUT",
           body: JSON.stringify(data),
         }),
+    },
+    vendors: {
+      list: (projectId: string) => apiRequest<ProjectVendor[]>(`/api/projects/${projectId}/vendors`),
+      create: (
+        projectId: string,
+        data: {
+          vendorId?: string;
+          name: string;
+          organizationNumber?: string;
+          emailDomain?: string;
+          additionalData?: any;
+          status?: VendorStatus;
+        }
+      ) =>
+        apiRequest<ProjectVendor>(`/api/projects/${projectId}/vendors`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (
+        projectId: string,
+        vendorId: string,
+        data: {
+          status: VendorStatus;
+        }
+      ) =>
+        apiRequest<ProjectVendor>(`/api/projects/${projectId}/vendors/${vendorId}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      updateDetails: (
+        projectId: string,
+        vendorId: string,
+        data: {
+          name?: string;
+          organizationNumber?: string;
+          emailDomain?: string;
+          additionalData?: any;
+        }
+      ) =>
+        apiRequest<ProjectVendor>(`/api/projects/${projectId}/vendors/${vendorId}/details`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      delete: (projectId: string, vendorId: string) =>
+        apiRequest<void>(`/api/projects/${projectId}/vendors/${vendorId}`, {
+          method: "DELETE",
+        }),
+      contacts: {
+        create: (
+          projectId: string,
+          vendorId: string,
+          data: {
+            firstName: string;
+            lastName: string;
+            email: string;
+            isMainContact?: boolean;
+          }
+        ) =>
+          apiRequest<VendorContactPerson>(
+            `/api/projects/${projectId}/vendors/${vendorId}/contacts`,
+            {
+              method: "POST",
+              body: JSON.stringify(data),
+            }
+          ),
+        update: (
+          projectId: string,
+          vendorId: string,
+          contactId: string,
+          data: {
+            firstName?: string;
+            lastName?: string;
+            email?: string;
+            isMainContact?: boolean;
+          }
+        ) =>
+          apiRequest<VendorContactPerson>(
+            `/api/projects/${projectId}/vendors/${vendorId}/contacts/${contactId}`,
+            {
+              method: "PUT",
+              body: JSON.stringify(data),
+            }
+          ),
+        delete: (projectId: string, vendorId: string, contactId: string) =>
+          apiRequest<void>(`/api/projects/${projectId}/vendors/${vendorId}/contacts/${contactId}`, {
+            method: "DELETE",
+          }),
+      },
     },
   },
   templates: {
@@ -428,5 +525,81 @@ export interface RequirementHistory {
     firstName: string | null;
     lastName: string | null;
   };
+}
+
+export type VendorStatus =
+  | "Pending"
+  | "RFI_Received"
+  | "RFI_Rejected"
+  | "RFI_Answered"
+  | "RFP_Received"
+  | "RFP_Answered"
+  | "RFP_Rejected"
+  | "Shortlisted"
+  | "Lost"
+  | "Won";
+
+export interface VendorContactPerson {
+  id: string;
+  vendorId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isMainContact: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Vendor {
+  id: string;
+  tenantId: string;
+  name: string;
+  organizationNumber: string | null;
+  emailDomain: string | null;
+  additionalData: any;
+  createdAt: string;
+  updatedAt: string;
+  contacts?: VendorContactPerson[];
+}
+
+export interface ProjectVendor {
+  id: string;
+  projectId: string;
+  vendorId: string;
+  status: VendorStatus;
+  createdAt: string;
+  updatedAt: string;
+  vendor: Vendor & {
+    contacts: VendorContactPerson[];
+  };
+}
+
+export interface BrregSearchResult {
+  organizationNumber: string;
+  name: string;
+  organizationForm: string | null;
+  address: {
+    street: string | null;
+    postalCode: string | null;
+    city: string | null;
+    municipality: string | null;
+  } | null;
+  website: string | null;
+  industry: string | null;
+}
+
+export interface BrregCompanyDetails {
+  organizationNumber: string;
+  name: string;
+  organizationForm: string | null;
+  address: {
+    street: string | null;
+    postalCode: string | null;
+    city: string | null;
+    municipality: string | null;
+  } | null;
+  website: string | null;
+  industry: string | null;
+  rawData: any;
 }
 

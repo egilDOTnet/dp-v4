@@ -35,6 +35,7 @@ model Project {
   Tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ProjectMember ProjectMember[]
   requirementHierarchies RequirementHierarchy[]
+  ProjectVendor ProjectVendor[]
 
   @@index([tenantId])
 }
@@ -96,6 +97,7 @@ model Tenant {
   Project   Project[]
   Template  Template[]
   User      User[]
+  Vendor    Vendor[]
 
   @@index([name])
 }
@@ -199,4 +201,67 @@ enum Role {
   CompanyAdministrator
   User
   Vendor
+}
+
+enum VendorStatus {
+  Pending
+  RFI_Received
+  RFI_Rejected
+  RFI_Answered
+  RFP_Received
+  RFP_Answered
+  RFP_Rejected
+  Shortlisted
+  Lost
+  Won
+}
+
+model Vendor {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  name               String
+  organizationNumber String?
+  emailDomain        String?
+  additionalData     Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ProjectVendor      ProjectVendor[]
+  VendorContactPerson VendorContactPerson[]
+
+  @@index([tenantId])
+  @@index([organizationNumber])
+}
+
+model ProjectVendor {
+  id        String       @id @default(cuid())
+  projectId String
+  vendorId  String
+  status    VendorStatus @default(Pending)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vendor    Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, vendorId])
+  @@index([projectId])
+  @@index([vendorId])
+}
+
+model VendorContactPerson {
+  id            String   @id @default(cuid())
+  vendorId      String
+  firstName     String
+  lastName      String
+  email         String
+  isMainContact Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([email])
 }

@@ -3,6 +3,55 @@ import { db } from "@dp/db";
 import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
 
+interface BrregEntity {
+  organisasjonsnummer: string;
+  navn: string;
+}
+
+// Helper function to lookup organization number in brreg.no and validate name
+async function validateBrregOrganizationNumber(
+  organizationNumber: string,
+  providedName: string
+): Promise<{ valid: boolean; brregName?: string; error?: string; notFound?: boolean }> {
+  try {
+    // Clean organization number - only digits
+    const cleanOrgNumber = organizationNumber.replace(/\D/g, "");
+    
+    // Must be exactly 9 digits
+    if (cleanOrgNumber.length !== 9) {
+      return { valid: false, error: "Organization number must be exactly 9 digits" };
+    }
+
+    const detailsUrl = `https://data.brreg.no/enhetsregisteret/api/enheter/${cleanOrgNumber}`;
+    const response = await fetch(detailsUrl);
+
+    if (response.status === 404) {
+      // Not found in brreg - should be removed/saved as empty
+      return { valid: false, notFound: true, error: "Organization number not found in brreg.no" };
+    }
+
+    if (!response.ok) {
+      return { valid: false, error: "Failed to verify organization number with brreg.no" };
+    }
+
+    const entity: BrregEntity = await response.json();
+    const brregName = entity.navn.trim();
+
+    // If found in brreg, the name must match exactly
+    if (providedName.trim() !== brregName) {
+      return {
+        valid: false,
+        brregName,
+        error: `Organization number found in brreg.no, but name must match. Expected: "${brregName}"`,
+      };
+    }
+
+    return { valid: true, brregName };
+  } catch (error: any) {
+    return { valid: false, error: "Error verifying organization number with brreg.no" };
+  }
+}
+
 // Email notification stub
 function notifyUserAddedToProject(userEmail: string, projectName: string) {
   if (process.env.NODE_ENV === "development") {
@@ -1410,6 +1459,1105 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       await db.project.delete({
         where: { id: projectId },
       });
+
+      return reply.status(204).send();
+    }
+  );
+
+  // Get all vendors for a project
+  fastify.get(
+    "/:id/vendors",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const projectId = request.params.id;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: getUser(request).userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Get all vendors for this project with contacts
+      try {
+        // Verify the model exists (helps catch Prisma client regeneration issues)
+        if (!db.projectVendor) {
+          request.log.error("Prisma client missing projectVendor model. Please restart the API server after running 'pnpm prisma generate'");
+          return reply.status(500).send({
+            error: "Database models not available",
+            message: "The Prisma client is missing the vendor models. Please restart the API server after running 'pnpm prisma generate' in the packages/db directory.",
+          });
+        }
+
+        const projectVendors = await db.projectVendor.findMany({
+          where: { projectId },
+          include: {
+            vendor: {
+              include: {
+                VendorContactPerson: {
+                  orderBy: [
+                    { isMainContact: "desc" },
+                    { createdAt: "asc" },
+                  ],
+                },
+              },
+            },
+          },
+          orderBy: {
+            vendor: {
+              name: "asc",
+            },
+          },
+        });
+
+        return reply.send(
+          projectVendors.map((pv) => {
+            const contacts = pv.vendor?.VendorContactPerson
+              ? pv.vendor.VendorContactPerson.map((contact) => ({
+                  id: contact.id,
+                  firstName: contact.firstName,
+                  lastName: contact.lastName,
+                  email: contact.email,
+                  isMainContact: contact.isMainContact,
+                  createdAt: contact.createdAt,
+                  updatedAt: contact.updatedAt,
+                }))
+              : [];
+
+            return {
+              id: pv.id,
+              projectId: pv.projectId,
+              vendorId: pv.vendorId,
+              status: pv.status,
+              createdAt: pv.createdAt,
+              updatedAt: pv.updatedAt,
+              vendor: {
+                id: pv.vendor.id,
+                name: pv.vendor.name,
+                organizationNumber: pv.vendor.organizationNumber,
+                emailDomain: pv.vendor.emailDomain,
+                additionalData: pv.vendor.additionalData || null,
+                contacts,
+              },
+            };
+          })
+        );
+      } catch (error: any) {
+        request.log.error("Error fetching vendors:", error);
+        return reply.status(500).send({
+          error: "Failed to fetch vendors",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  // Add/link vendor to project
+  fastify.post<{
+    Params: { id: string };
+    Body: {
+      vendorId?: string;
+      name: string;
+      organizationNumber?: string;
+      emailDomain?: string;
+      additionalData?: any;
+      status?: string;
+    };
+  }>(
+    "/:id/vendors",
+    { preHandler: [authenticate] },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: {
+          vendorId?: string;
+          name: string;
+          organizationNumber?: string;
+          emailDomain?: string;
+          additionalData?: any;
+          status?: string;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      let vendor;
+
+      // Check if linking existing vendor or creating new one
+      if (request.body.vendorId) {
+        // Link existing vendor
+        vendor = await db.vendor.findUnique({
+          where: { id: request.body.vendorId },
+        });
+
+        if (!vendor || vendor.tenantId !== currentUser.tenantId) {
+          return reply.status(404).send({ error: "Vendor not found" });
+        }
+      } else {
+        // Create new vendor
+        if (!request.body.name) {
+          return reply.status(400).send({ error: "Vendor name is required" });
+        }
+
+        // Clean and validate organization number format if provided
+        let cleanOrgNumber: string | null = null;
+        if (request.body.organizationNumber) {
+          cleanOrgNumber = request.body.organizationNumber.replace(/\D/g, "");
+          if (cleanOrgNumber.length !== 9) {
+            return reply.status(400).send({ error: "Invalid organization number format. Must be exactly 9 digits." });
+          }
+
+          // If organization number is provided, validate with brreg.no
+          const brregValidation = await validateBrregOrganizationNumber(
+            cleanOrgNumber,
+            request.body.name
+          );
+
+          if (!brregValidation.valid) {
+            // If not found in brreg, return error - don't save invalid org number
+            if (brregValidation.notFound) {
+              return reply.status(400).send({
+                error: "Organization number not found in brreg.no. Please enter a valid Norwegian organization number or remove it.",
+              });
+            } else {
+              return reply.status(400).send({
+                error: brregValidation.error || "Invalid organization number",
+                brregName: brregValidation.brregName,
+              });
+            }
+          }
+        }
+
+        // Check if vendor with same organization number already exists
+        if (cleanOrgNumber) {
+          const existingVendor = await db.vendor.findFirst({
+            where: {
+              tenantId: currentUser.tenantId,
+              organizationNumber: cleanOrgNumber,
+            },
+          });
+
+          if (existingVendor) {
+            vendor = existingVendor;
+          }
+        }
+
+        if (!vendor) {
+          vendor = await db.vendor.create({
+            data: {
+              tenantId: currentUser.tenantId,
+              name: request.body.name,
+              organizationNumber: cleanOrgNumber || null,
+              emailDomain: request.body.emailDomain || null,
+              additionalData: request.body.additionalData || null,
+            },
+          });
+        }
+      }
+
+      // Check if a vendor with the same name (case-insensitive) already exists in this project
+      // (excluding the current vendor to avoid false positives)
+      const existingProjectVendors = await db.projectVendor.findMany({
+        where: {
+          projectId,
+          vendor: {
+            id: { not: vendor.id }, // Exclude the current vendor
+          },
+        },
+        include: {
+          vendor: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Case-insensitive name comparison
+      const vendorNameLower = vendor.name.toLowerCase().trim();
+      const existingVendorWithSameName = existingProjectVendors.find(
+        (pv) => pv.vendor.name.toLowerCase().trim() === vendorNameLower
+      );
+
+      if (existingVendorWithSameName) {
+        return reply.status(400).send({
+          error: `A vendor with the name "${existingVendorWithSameName.vendor.name}" is already linked to this project (case-insensitive match)`,
+        });
+      }
+
+      // Check if a vendor with the same organization number already exists in this project
+      // (excluding the current vendor to avoid false positives)
+      if (vendor.organizationNumber) {
+        const existingProjectVendorWithOrgNumber = await db.projectVendor.findFirst({
+          where: {
+            projectId,
+            vendor: {
+              organizationNumber: vendor.organizationNumber,
+              id: { not: vendor.id }, // Exclude the current vendor
+            },
+          },
+          include: {
+            vendor: {
+              select: {
+                name: true,
+                organizationNumber: true,
+              },
+            },
+          },
+        });
+
+        if (existingProjectVendorWithOrgNumber) {
+          return reply.status(400).send({
+            error: `A vendor with organization number ${vendor.organizationNumber} (${existingProjectVendorWithOrgNumber.vendor.name}) is already linked to this project`,
+          });
+        }
+      }
+
+      // Check if vendor is already linked to project
+      const existingLink = await db.projectVendor.findUnique({
+        where: {
+          projectId_vendorId: {
+            projectId,
+            vendorId: vendor.id,
+          },
+        },
+      });
+
+      if (existingLink) {
+        return reply.status(400).send({ error: "Vendor already linked to this project" });
+      }
+
+      // Create project-vendor link
+      const projectVendor = await db.projectVendor.create({
+        data: {
+          projectId,
+          vendorId: vendor.id,
+          status: (request.body.status as any) || "Pending",
+        },
+        include: {
+          vendor: {
+            include: {
+              VendorContactPerson: true,
+            },
+          },
+        },
+      });
+
+      return reply.status(201).send({
+        id: projectVendor.id,
+        projectId: projectVendor.projectId,
+        vendorId: projectVendor.vendorId,
+        status: projectVendor.status,
+        createdAt: projectVendor.createdAt,
+        updatedAt: projectVendor.updatedAt,
+        vendor: {
+          id: projectVendor.vendor.id,
+          name: projectVendor.vendor.name,
+          organizationNumber: projectVendor.vendor.organizationNumber,
+          emailDomain: projectVendor.vendor.emailDomain,
+          additionalData: projectVendor.vendor.additionalData,
+          contacts: projectVendor.vendor.VendorContactPerson.map((contact) => ({
+            id: contact.id,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            isMainContact: contact.isMainContact,
+            createdAt: contact.createdAt,
+            updatedAt: contact.updatedAt,
+          })),
+        },
+      });
+    }
+  );
+
+  // Update vendor details
+  fastify.put<{
+    Params: { id: string; vendorId: string };
+    Body: {
+      name?: string;
+      organizationNumber?: string;
+      emailDomain?: string;
+      additionalData?: any;
+    };
+  }>(
+    "/:id/vendors/:vendorId/details",
+    { preHandler: [authenticate] },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string; vendorId: string };
+        Body: {
+          name?: string;
+          organizationNumber?: string;
+          emailDomain?: string;
+          additionalData?: any;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      const vendorId = request.params.vendorId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify vendor exists and is linked to project
+      const vendor = await db.vendor.findUnique({
+        where: { id: vendorId },
+      });
+
+      if (!vendor || vendor.tenantId !== currentUser.tenantId) {
+        return reply.status(404).send({ error: "Vendor not found" });
+      }
+
+      const projectVendor = await db.projectVendor.findUnique({
+        where: {
+          projectId_vendorId: {
+            projectId,
+            vendorId,
+          },
+        },
+      });
+
+      if (!projectVendor) {
+        return reply.status(404).send({ error: "Vendor not linked to this project" });
+      }
+
+      // Prepare update data
+      const updateData: {
+        name?: string;
+        organizationNumber?: string | null;
+        emailDomain?: string | null;
+        additionalData?: any;
+      } = {};
+
+      // Validate and set name if provided
+      if (request.body.name !== undefined) {
+        if (!request.body.name.trim()) {
+          return reply.status(400).send({ error: "Vendor name cannot be empty" });
+        }
+        updateData.name = request.body.name.trim();
+      }
+
+      // Clean and validate organization number format if provided
+      if (request.body.organizationNumber !== undefined) {
+        let cleanOrgNumber: string | null = null;
+        if (request.body.organizationNumber) {
+          cleanOrgNumber = request.body.organizationNumber.replace(/\D/g, "");
+          if (cleanOrgNumber.length !== 9) {
+            return reply.status(400).send({ error: "Invalid organization number format. Must be exactly 9 digits." });
+          }
+
+          // If organization number is provided, validate with brreg.no
+          const nameToValidate = updateData.name || vendor.name;
+          const brregValidation = await validateBrregOrganizationNumber(
+            cleanOrgNumber,
+            nameToValidate
+          );
+
+          if (!brregValidation.valid) {
+            // If not found in brreg, return error - don't save invalid org number
+            if (brregValidation.notFound) {
+              return reply.status(400).send({
+                error: "Organization number not found in brreg.no. Please enter a valid Norwegian organization number or remove it.",
+              });
+            } else {
+              return reply.status(400).send({
+                error: brregValidation.error || "Invalid organization number",
+                brregName: brregValidation.brregName,
+              });
+            }
+          }
+        }
+
+        updateData.organizationNumber = cleanOrgNumber;
+      }
+
+      if (request.body.emailDomain !== undefined) {
+        updateData.emailDomain = request.body.emailDomain || null;
+      }
+
+      if (request.body.additionalData !== undefined) {
+        updateData.additionalData = request.body.additionalData;
+      }
+
+      // Check for duplicate name in project (case-insensitive, excluding current vendor)
+      const nameToCheck = (updateData.name || vendor.name).toLowerCase().trim();
+      const existingProjectVendors = await db.projectVendor.findMany({
+        where: {
+          projectId,
+          vendor: {
+            id: { not: vendorId },
+          },
+        },
+        include: {
+          vendor: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Case-insensitive name comparison
+      const existingVendorWithSameName = existingProjectVendors.find(
+        (pv) => pv.vendor.name.toLowerCase().trim() === nameToCheck
+      );
+
+      if (existingVendorWithSameName) {
+        return reply.status(400).send({
+          error: `A vendor with the name "${existingVendorWithSameName.vendor.name}" is already linked to this project (case-insensitive match)`,
+        });
+      }
+
+      // Check for duplicate organization number in project (excluding current vendor)
+      const orgNumberToCheck = updateData.organizationNumber !== undefined ? updateData.organizationNumber : vendor.organizationNumber;
+      if (orgNumberToCheck) {
+        const existingProjectVendorWithOrgNumber = await db.projectVendor.findFirst({
+          where: {
+            projectId,
+            vendor: {
+              organizationNumber: orgNumberToCheck,
+              id: { not: vendorId },
+            },
+          },
+          include: {
+            vendor: {
+              select: {
+                name: true,
+                organizationNumber: true,
+              },
+            },
+          },
+        });
+
+        if (existingProjectVendorWithOrgNumber) {
+          return reply.status(400).send({
+            error: `A vendor with organization number ${orgNumberToCheck} (${existingProjectVendorWithOrgNumber.vendor.name}) is already linked to this project`,
+          });
+        }
+      }
+
+      // Update vendor
+      const updatedVendor = await db.vendor.update({
+        where: { id: vendorId },
+        data: updateData,
+        include: {
+          VendorContactPerson: true,
+        },
+      });
+
+      // Return updated project-vendor with vendor details
+      const updatedProjectVendor = await db.projectVendor.findUnique({
+        where: {
+          projectId_vendorId: {
+            projectId,
+            vendorId,
+          },
+        },
+        include: {
+          vendor: {
+            include: {
+              VendorContactPerson: true,
+            },
+          },
+        },
+      });
+
+      return reply.send({
+        id: updatedProjectVendor!.id,
+        projectId: updatedProjectVendor!.projectId,
+        vendorId: updatedProjectVendor!.vendorId,
+        status: updatedProjectVendor!.status,
+        createdAt: updatedProjectVendor!.createdAt,
+        updatedAt: updatedProjectVendor!.updatedAt,
+        vendor: {
+          id: updatedProjectVendor!.vendor.id,
+          name: updatedProjectVendor!.vendor.name,
+          organizationNumber: updatedProjectVendor!.vendor.organizationNumber,
+          emailDomain: updatedProjectVendor!.vendor.emailDomain,
+          additionalData: updatedProjectVendor!.vendor.additionalData,
+          contacts: updatedProjectVendor!.vendor.VendorContactPerson.map((contact) => ({
+            id: contact.id,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            isMainContact: contact.isMainContact,
+            createdAt: contact.createdAt,
+            updatedAt: contact.updatedAt,
+          })),
+        },
+      });
+    }
+  );
+
+  // Update project-vendor relationship (mainly status)
+  fastify.put<{
+    Params: { id: string; vendorId: string };
+    Body: {
+      status: string;
+    };
+  }>(
+    "/:id/vendors/:vendorId",
+    { preHandler: [authenticate] },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string; vendorId: string };
+        Body: {
+          status: string;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      const vendorId = request.params.vendorId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Update the project-vendor relationship
+      const projectVendor = await db.projectVendor.update({
+        where: {
+          projectId_vendorId: {
+            projectId,
+            vendorId,
+          },
+        },
+        data: {
+          status: request.body.status as any,
+        },
+        include: {
+          vendor: {
+            include: {
+              VendorContactPerson: true,
+            },
+          },
+        },
+      });
+
+      return reply.send({
+        id: projectVendor.id,
+        projectId: projectVendor.projectId,
+        vendorId: projectVendor.vendorId,
+        status: projectVendor.status,
+        createdAt: projectVendor.createdAt,
+        updatedAt: projectVendor.updatedAt,
+        vendor: {
+          id: projectVendor.vendor.id,
+          name: projectVendor.vendor.name,
+          organizationNumber: projectVendor.vendor.organizationNumber,
+          emailDomain: projectVendor.vendor.emailDomain,
+          additionalData: projectVendor.vendor.additionalData,
+          contacts: projectVendor.vendor.VendorContactPerson.map((contact) => ({
+            id: contact.id,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+            isMainContact: contact.isMainContact,
+            createdAt: contact.createdAt,
+            updatedAt: contact.updatedAt,
+          })),
+        },
+      });
+    }
+  );
+
+  // Remove vendor from project
+  fastify.delete<{ Params: { id: string; vendorId: string } }>(
+    "/:id/vendors/:vendorId",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest<{ Params: { id: string; vendorId: string } }>, reply: FastifyReply) => {
+      const projectId = request.params.id;
+      const vendorId = request.params.vendorId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Delete the project-vendor link (vendor itself remains for other projects)
+      await db.projectVendor.delete({
+        where: {
+          projectId_vendorId: {
+            projectId,
+            vendorId,
+          },
+        },
+      });
+
+      return reply.status(204).send();
+    }
+  );
+
+  // Add contact person to vendor
+  fastify.post<{
+    Params: { id: string; vendorId: string };
+    Body: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      isMainContact?: boolean;
+    };
+  }>(
+    "/:id/vendors/:vendorId/contacts",
+    { preHandler: [authenticate] },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string; vendorId: string };
+        Body: {
+          firstName: string;
+          lastName: string;
+          email: string;
+          isMainContact?: boolean;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      const vendorId = request.params.vendorId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify vendor exists and is linked to project
+      const vendor = await db.vendor.findUnique({
+        where: { id: vendorId },
+        include: {
+          VendorContactPerson: true,
+        },
+      });
+
+      if (!vendor || vendor.tenantId !== currentUser.tenantId) {
+        return reply.status(404).send({ error: "Vendor not found" });
+      }
+
+      const projectVendor = await db.projectVendor.findUnique({
+        where: {
+          projectId_vendorId: {
+            projectId,
+            vendorId,
+          },
+        },
+      });
+
+      if (!projectVendor) {
+        return reply.status(404).send({ error: "Vendor not linked to this project" });
+      }
+
+      // Check if this is the first contact
+      const isFirstContact = vendor.VendorContactPerson.length === 0;
+      const shouldBeMainContact = request.body.isMainContact ?? isFirstContact;
+
+      // If setting as main contact, unset other main contacts
+      if (shouldBeMainContact) {
+        await db.vendorContactPerson.updateMany({
+          where: {
+            vendorId,
+            isMainContact: true,
+          },
+          data: {
+            isMainContact: false,
+          },
+        });
+      }
+
+      // Create contact person
+      const contact = await db.vendorContactPerson.create({
+        data: {
+          vendorId,
+          firstName: request.body.firstName,
+          lastName: request.body.lastName,
+          email: request.body.email,
+          isMainContact: shouldBeMainContact,
+        },
+      });
+
+      return reply.status(201).send({
+        id: contact.id,
+        vendorId: contact.vendorId,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        email: contact.email,
+        isMainContact: contact.isMainContact,
+        createdAt: contact.createdAt,
+        updatedAt: contact.updatedAt,
+      });
+    }
+  );
+
+  // Update contact person
+  fastify.put<{
+    Params: { id: string; vendorId: string; contactId: string };
+    Body: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      isMainContact?: boolean;
+    };
+  }>(
+    "/:id/vendors/:vendorId/contacts/:contactId",
+    { preHandler: [authenticate] },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string; vendorId: string; contactId: string };
+        Body: {
+          firstName?: string;
+          lastName?: string;
+          email?: string;
+          isMainContact?: boolean;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      const vendorId = request.params.vendorId;
+      const contactId = request.params.contactId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify contact exists
+      const existingContact = await db.vendorContactPerson.findUnique({
+        where: { id: contactId },
+      });
+
+      if (!existingContact || existingContact.vendorId !== vendorId) {
+        return reply.status(404).send({ error: "Contact not found" });
+      }
+
+      // If setting as main contact, unset other main contacts
+      if (request.body.isMainContact === true) {
+        await db.vendorContactPerson.updateMany({
+          where: {
+            vendorId,
+            isMainContact: true,
+            id: { not: contactId },
+          },
+          data: {
+            isMainContact: false,
+          },
+        });
+      }
+
+      // Update contact person
+      const contact = await db.vendorContactPerson.update({
+        where: { id: contactId },
+        data: {
+          firstName: request.body.firstName,
+          lastName: request.body.lastName,
+          email: request.body.email,
+          isMainContact: request.body.isMainContact,
+        },
+      });
+
+      return reply.send({
+        id: contact.id,
+        vendorId: contact.vendorId,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        email: contact.email,
+        isMainContact: contact.isMainContact,
+        createdAt: contact.createdAt,
+        updatedAt: contact.updatedAt,
+      });
+    }
+  );
+
+  // Delete contact person
+  fastify.delete<{ Params: { id: string; vendorId: string; contactId: string } }>(
+    "/:id/vendors/:vendorId/contacts/:contactId",
+    { preHandler: [authenticate] },
+    async (
+      request: FastifyRequest<{ Params: { id: string; vendorId: string; contactId: string } }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      const vendorId = request.params.vendorId;
+      const contactId = request.params.contactId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify contact exists
+      const existingContact = await db.vendorContactPerson.findUnique({
+        where: { id: contactId },
+      });
+
+      if (!existingContact || existingContact.vendorId !== vendorId) {
+        return reply.status(404).send({ error: "Contact not found" });
+      }
+
+      // Delete contact person
+      await db.vendorContactPerson.delete({
+        where: { id: contactId },
+      });
+
+      // If the deleted contact was the main contact, set the next contact as main if any exist
+      if (existingContact.isMainContact) {
+        const nextContact = await db.vendorContactPerson.findFirst({
+          where: { vendorId },
+          orderBy: { createdAt: "asc" },
+        });
+
+        if (nextContact) {
+          await db.vendorContactPerson.update({
+            where: { id: nextContact.id },
+            data: { isMainContact: true },
+          });
+        }
+      }
 
       return reply.status(204).send();
     }
