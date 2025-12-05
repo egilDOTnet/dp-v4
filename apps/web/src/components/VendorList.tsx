@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { ProjectVendor, VendorStatus } from "@/lib/api";
 import ContactPersonForm from "./ContactPersonForm";
 import VendorForm from "./VendorForm";
@@ -432,8 +432,8 @@ export default function VendorList({
             const mainContact = vendor.contacts?.find((c) => c.isMainContact);
 
             return (
-              <>
-                <tr key={projectVendor.id} className="hover:bg-gray-50">
+              <Fragment key={projectVendor.id}>
+                <tr className="hover:bg-gray-50">
                   <td className="px-4 py-4">
                     <div className="flex items-center">
                       <button
@@ -680,7 +680,7 @@ export default function VendorList({
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
 
