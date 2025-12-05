@@ -189,7 +189,6 @@ export default function RequirementHierarchyComponent({
   const [formData, setFormData] = useState({ title: "", description: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [expandedHierarchies, setExpandedHierarchies] = useState<Set<string>>(new Set());
@@ -404,7 +403,6 @@ export default function RequirementHierarchyComponent({
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
-      setActiveDragId(null);
       return;
     }
 
@@ -416,7 +414,6 @@ export default function RequirementHierarchyComponent({
     const newIndex = hierarchiesToReorder.findIndex((h) => h.id === over.id);
 
     if (oldIndex === -1 || newIndex === -1) {
-      setActiveDragId(null);
       return;
     }
 
@@ -439,7 +436,6 @@ export default function RequirementHierarchyComponent({
       setError(err.message || "Failed to reorder hierarchies");
     } finally {
       setLoading(false);
-      setActiveDragId(null);
     }
   };
 
@@ -447,7 +443,6 @@ export default function RequirementHierarchyComponent({
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
-      setActiveDragId(null);
       return;
     }
 
@@ -464,7 +459,6 @@ export default function RequirementHierarchyComponent({
     );
 
     if (oldIndex === -1 || newIndex === -1) {
-      setActiveDragId(null);
       return;
     }
 
@@ -518,7 +512,6 @@ export default function RequirementHierarchyComponent({
       setError(err.message || "Failed to reorder items");
     } finally {
       setLoading(false);
-      setActiveDragId(null);
     }
   };
 
@@ -537,8 +530,7 @@ export default function RequirementHierarchyComponent({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={(event) => {
-          setActiveDragId(event.active.id as string);
+        onDragStart={() => {
           setIsDragging(true);
         }}
         onDragEnd={(event) => {
@@ -721,8 +713,7 @@ export default function RequirementHierarchyComponent({
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
-                  onDragStart={(event) => {
-                    setActiveDragId(event.active.id as string);
+                  onDragStart={() => {
                     setIsDragging(true);
                   }}
                   onDragEnd={(event) => {
@@ -983,7 +974,7 @@ export default function RequirementHierarchyComponent({
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
-                  onDragStart={(event) => setActiveDragId(event.active.id as string)}
+                  onDragStart={() => {}}
                   onDragEnd={(event) => handleDragEnd(event, h1.id)}
                 >
                   <SortableContext

@@ -23,7 +23,7 @@ interface VendorFormProps {
 }
 
 export default function VendorForm({
-  projectId,
+  projectId: _projectId,
   existingVendor,
   onSubmit,
   onCancel,
@@ -45,8 +45,8 @@ export default function VendorForm({
   const [deleting, setDeleting] = useState(false);
   const [lookingUpOrgNumber, setLookingUpOrgNumber] = useState(false);
   const [brregName, setBrregName] = useState<string | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
-  const orgNumberLookupTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const orgNumberLookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // Search brreg.no when user types

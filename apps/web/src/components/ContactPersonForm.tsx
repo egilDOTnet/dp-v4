@@ -19,8 +19,8 @@ interface ContactPersonFormProps {
 }
 
 export default function ContactPersonForm({
-  vendorId,
-  vendorName,
+  vendorId: _vendorId,
+  vendorName: _vendorName,
   existingContact,
   isFirstContact,
   onSubmit,

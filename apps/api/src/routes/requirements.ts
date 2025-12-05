@@ -279,7 +279,7 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
           title: body.title,
           description: body.description || null,
           number,
-          order: (maxOrder?.order || 0) + 1,
+          order: (maxOrder || 0) + 1,
         },
         include: {
           parent: true,
@@ -661,7 +661,7 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
           description: body.description,
           type: body.type as any,
           status: (body.status || null) as any,
-          order: (maxOrder?.order || 0) + 1,
+          order: (maxOrder || 0) + 1,
           createdById: currentUser.userId,
           lastModifiedById: currentUser.userId,
         },

@@ -3,13 +3,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/contexts/AuthContext";
 import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
 
 export default function RequirementsPage() {
   const params = useParams();
-  const { user } = useAuth();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [hierarchies, setHierarchies] = useState<RequirementHierarchy[]>([]);
@@ -19,11 +17,6 @@ export default function RequirementsPage() {
   const [selectedHierarchyId, setSelectedHierarchyId] = useState<string | null>(null);
   const [createForHierarchyId, setCreateForHierarchyId] = useState<string | null>(null);
 
-  // Get requirements for selected hierarchy
-  const selectedHierarchy = hierarchies.find((h) => h.id === selectedHierarchyId);
-  const hierarchyRequirements = selectedHierarchyId
-    ? requirements.filter((r) => r.hierarchyId === selectedHierarchyId)
-    : [];
 
   const loadData = async () => {
     try {

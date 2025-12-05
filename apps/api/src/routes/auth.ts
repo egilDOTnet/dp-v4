@@ -246,7 +246,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
           email: decoded.email,
           token,
         });
-      } catch (err) {
+      } catch {
         return reply.status(400).send({ error: "Invalid token" });
       }
     }
@@ -284,7 +284,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             data: {
               name: `${decoded.email.split("@")[0]} Company`,
             },
-          });
+          } as any);
 
           // Derive name from email
           const nameData = deriveNameFromEmail(decoded.email);
@@ -346,7 +346,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
             companyName: user.tenant?.name,
           },
         });
-      } catch (err) {
+      } catch {
         return reply.status(400).send({ error: "Invalid token" });
       }
     }

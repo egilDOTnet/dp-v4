@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ProjectVendor, VendorStatus, VendorContactPerson } from "@/lib/api";
+import { ProjectVendor, VendorStatus } from "@/lib/api";
 import ContactPersonForm from "./ContactPersonForm";
 import VendorForm from "./VendorForm";
 
@@ -69,7 +69,6 @@ export default function VendorList({
 }: VendorListProps) {
   const [expandedVendorId, setExpandedVendorId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const [deletingContact, setDeletingContact] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [addingContactVendorId, setAddingContactVendorId] = useState<string | null>(null);
   const [addingVendor, setAddingVendor] = useState(showAddVendorForm);
@@ -125,11 +124,10 @@ export default function VendorList({
     if (!confirm("Are you sure you want to delete this contact?")) {
       return;
     }
-    setDeletingContact(contactId);
     try {
       await onDeleteContact(vendorId, contactId);
-    } finally {
-      setDeletingContact(null);
+    } catch (error) {
+      // Error handling
     }
   };
 
@@ -391,10 +389,6 @@ export default function VendorList({
     }
   };
 
-  const getStatusLabel = (status: VendorStatus) => {
-    const option = STATUS_OPTIONS.find((opt) => opt.value === status);
-    return option?.label || status;
-  };
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">

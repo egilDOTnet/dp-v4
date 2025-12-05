@@ -75,7 +75,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
     },
     async (request: FastifyRequest<{ Body: UpdateProfileBody }>, reply: FastifyReply) => {
       try {
-        request.log.info("Update profile request received", { body: request.body });
+        request.log.info({ body: request.body }, "Update profile request received");
         
         if (!request.user) {
           return reply.status(401).send({ error: "Unauthorized" });
@@ -84,10 +84,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
         let body;
         try {
           body = updateProfileSchema.parse(request.body);
-          request.log.info("Validation passed", { body });
-        } catch (err: any) {
-          request.log.error("Validation error", err);
-          return reply.status(400).send({ error: `Validation error: ${err.message}` });
+          request.log.info({ body }, "Validation passed");
+        } catch (err: unknown) {
+          request.log.error({ err: err as Error }, "Validation error");
+          const errorMessage = err instanceof Error ? err.message : "Validation error";
+          return reply.status(400).send({ error: `Validation error: ${errorMessage}` });
         }
 
         request.log.info("Fetching user");
@@ -110,7 +111,7 @@ export default async function userRoutes(fastify: FastifyInstance) {
           updateData.lastName = typeof body.lastName === 'string' ? body.lastName.trim() || null : null;
         }
         
-        request.log.info("Update data", { updateData });
+        request.log.info({ updateData }, "Update data");
         
         if (Object.keys(updateData).length > 0) {
           request.log.info("Updating user");

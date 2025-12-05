@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, User } from "@/lib/api";
 
 interface AuthContextType {
@@ -17,31 +17,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      refreshUser().catch(() => {
-        localStorage.removeItem("token");
-        setUser(null);
-        setLoading(false);
-      });
-    } else {
+  const refreshUser = useCallback(async () => {
+    try {
+      const userData = await api.auth.me();
+      setUser(userData);
+      setLoading(false);
+    } catch (error) {
+      // Silently fail if API is not available or token is invalid
+      localStorage.removeItem("token");
+      setUser(null);
       setLoading(false);
     }
   }, []);
 
-  const refreshUser = async () => {
-    try {
-      const userData = await api.auth.me();
-      setUser(userData);
-    } catch (error) {
-      localStorage.removeItem("token");
-      setUser(null);
-      throw error;
-    } finally {
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      refreshUser();
+    } else {
       setLoading(false);
     }
-  };
+  }, [refreshUser]);
 
   const login = (token: string, userData: User) => {
     localStorage.setItem("token", token);

@@ -102,7 +102,7 @@ export default function RequirementList({
   onRequirementUpdate,
   shouldShowCreateForm = false,
   onCreateFormClose,
-  selectedHierarchyId = null,
+  selectedHierarchyId: _selectedHierarchyId = null,
   disableDragAndDrop = false,
 }: RequirementListProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
@@ -113,10 +113,8 @@ export default function RequirementList({
   });
   const [editingFields, setEditingFields] = useState<Record<string, Set<string>>>({});
   const [formData, setFormData] = useState<Record<string, RequirementFormData>>({});
-  const [expandedRequirements, setExpandedRequirements] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [showHistoryId, setShowHistoryId] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, RequirementHistory[]>>({});
   const [saveTimeouts, setSaveTimeouts] = useState<Record<string, NodeJS.Timeout>>({});
@@ -237,7 +235,6 @@ export default function RequirementList({
       if (!clickedInsideRequirement) {
         // Exit all edit modes
         setEditingFields({});
-        setExpandedRequirements(new Set());
         setShowHistoryId(null);
       }
     };
@@ -394,11 +391,6 @@ export default function RequirementList({
       // If no fields are being edited for this requirement, collapse it
       const stillEditing = editingFields[requirementId]?.size > 0;
       if (!stillEditing) {
-        setExpandedRequirements((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(requirementId);
-          return newSet;
-        });
         setShowHistoryId((prev) => (prev === requirementId ? null : prev));
       }
     }, 150);
@@ -442,9 +434,6 @@ export default function RequirementList({
       newFields[requirementId].add(field);
       return newFields;
     });
-
-    // Expand requirement when editing
-    setExpandedRequirements((prev) => new Set(prev).add(requirementId));
   };
 
   const updateFormField = (
@@ -465,16 +454,8 @@ export default function RequirementList({
     }));
   };
 
-  const handleRequirementClick = (requirementId: string) => {
-    setExpandedRequirements((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(requirementId)) {
-        newSet.delete(requirementId);
-      } else {
-        newSet.add(requirementId);
-      }
-      return newSet;
-    });
+  const handleRequirementClick = (_requirementId: string) => {
+    // Requirement click handler - functionality removed
   };
 
   const handleDelete = async (id: string) => {
@@ -506,7 +487,6 @@ export default function RequirementList({
     const { active, over } = event;
 
     if (!over || active.id === over.id) {
-      setActiveDragId(null);
       return;
     }
 
@@ -514,7 +494,6 @@ export default function RequirementList({
     const newIndex = sortedRequirements.findIndex((r) => r.id === over.id);
 
     if (oldIndex === -1 || newIndex === -1) {
-      setActiveDragId(null);
       return;
     }
 
@@ -534,7 +513,6 @@ export default function RequirementList({
       setError(err.message || "Failed to reorder requirements");
     } finally {
       setLoading(false);
-      setActiveDragId(null);
     }
   };
 
@@ -572,7 +550,6 @@ export default function RequirementList({
       newFields[requirementId].add("status");
       return newFields;
     });
-    setExpandedRequirements((prev) => new Set(prev).add(requirementId));
     // Save the restored values
     handleFieldSave(requirementId, "description", historyEntry.description);
     handleFieldSave(requirementId, "type", historyEntry.type);
@@ -755,7 +732,6 @@ export default function RequirementList({
 
           {sortedRequirements.map((requirement) => {
               // Render without sortable wrapper when drag and drop is disabled
-              const isExpanded = expandedRequirements.has(requirement.id);
               const isEditingDescription = editingFields[requirement.id]?.has("description");
               const isEditingType = editingFields[requirement.id]?.has("type");
               const isEditingStatus = editingFields[requirement.id]?.has("status");
@@ -1009,7 +985,7 @@ export default function RequirementList({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={(event) => setActiveDragId(event.active.id as string)}
+          onDragStart={() => {}}
           onDragEnd={handleDragEnd}
         >
           <SortableContext
@@ -1137,7 +1113,6 @@ export default function RequirementList({
               )}
 
               {sortedRequirements.map((requirement) => {
-                const isExpanded = expandedRequirements.has(requirement.id);
                 const isEditingDescription = editingFields[requirement.id]?.has("description");
                 const isEditingType = editingFields[requirement.id]?.has("type");
                 const isEditingStatus = editingFields[requirement.id]?.has("status");

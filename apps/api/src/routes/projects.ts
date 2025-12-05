@@ -34,7 +34,7 @@ async function validateBrregOrganizationNumber(
       return { valid: false, error: "Failed to verify organization number with brreg.no" };
     }
 
-    const entity: BrregEntity = await response.json();
+    const entity = await response.json() as BrregEntity;
     const brregName = entity.navn.trim();
 
     // If found in brreg, the name must match exactly
@@ -47,7 +47,7 @@ async function validateBrregOrganizationNumber(
     }
 
     return { valid: true, brregName };
-  } catch (error: any) {
+  } catch {
     return { valid: false, error: "Error verifying organization number with brreg.no" };
   }
 }
@@ -245,7 +245,7 @@ async function initializeProjectPhases(projectId: string) {
             order: taskIndex + 1,
           })),
         },
-      },
+      } as any,
       include: {
         Task: true,
       },
@@ -297,15 +297,15 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         projects = await db.project.findMany({
           where: { tenantId: user.tenantId },
           include: {
-            ProjectMember: {
-              include: {
-                User: {
-                  select: {
-                    id: true,
-                    email: true,
-                    name: true,
-                    firstName: true,
-                    lastName: true,
+          ProjectMember: {
+            include: {
+              User: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  firstName: true,
+                  lastName: true,
                   },
                 },
               },
@@ -318,15 +318,15 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         projects = await db.project.findMany({
           where: { id: { in: projectIds } },
           include: {
-            ProjectMember: {
-              include: {
-                User: {
-                  select: {
-                    id: true,
-                    email: true,
-                    name: true,
-                    firstName: true,
-                    lastName: true,
+          ProjectMember: {
+            include: {
+              User: {
+                select: {
+                  id: true,
+                  email: true,
+                  name: true,
+                  firstName: true,
+                  lastName: true,
                   },
                 },
               },
@@ -422,7 +422,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         tenantId: project.tenantId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
-        members: project.ProjectMember.map((m) => {
+        members: (project.ProjectMember || []).map((m) => {
           const user = m.User as typeof m.User & { firstName: string | null; lastName: string | null };
           const displayName = user.firstName && user.lastName
             ? `${user.firstName} ${user.lastName}`
@@ -479,11 +479,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           endDate: body.endDate ? new Date(body.endDate) : null,
           tenantId: currentUser.tenantId,
           ProjectMember: {
-            create: body.memberIds?.map((userId) => ({
+            create: (body.memberIds?.map((userId) => ({
               userId,
-            })) || [],
+            })) || []) as any,
           },
-        },
+        } as any,
         include: {
           ProjectMember: {
             include: {
@@ -511,7 +511,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         tenantId: project.tenantId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
-        members: project.ProjectMember.map((m) => {
+        members: (project.ProjectMember || []).map((m) => {
           const user = m.User as typeof m.User & { firstName: string | null; lastName: string | null };
           const displayName = user.firstName && user.lastName
             ? `${user.firstName} ${user.lastName}`
@@ -584,7 +584,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           data: newMemberIds.map((userId) => ({
             projectId,
             userId,
-          })),
+          })) as any,
         });
 
         // Send email notifications for newly added members
@@ -598,9 +598,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       const updatedProject = await db.project.findUnique({
         where: { id: projectId },
         include: {
-          members: {
+          ProjectMember: {
             include: {
-              user: {
+              User: {
                 select: {
                   id: true,
                   email: true,
@@ -685,7 +685,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       const currentMembers = await db.projectMember.findMany({
         where: { projectId },
         include: {
-          user: {
+          User: {
             select: {
               id: true,
               role: true,
@@ -697,14 +697,14 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       // Check if any of the members being removed are admins
       const membersToRemove = currentMembers.filter((m) => body.memberIds.includes(m.userId));
       const adminMembersToRemove = membersToRemove.filter(
-        (m) => m.user.role === "CompanyAdministrator" || m.user.role === "GlobalAdministrator"
+        (m) => m.User.role === "CompanyAdministrator" || m.User.role === "GlobalAdministrator"
       );
 
       // Count remaining admin members after removal
       const remainingAdminMembers = currentMembers.filter(
         (m) =>
           !body.memberIds.includes(m.userId) &&
-          (m.user.role === "CompanyAdministrator" || m.user.role === "GlobalAdministrator")
+          (m.User.role === "CompanyAdministrator" || m.User.role === "GlobalAdministrator")
       );
 
       // Prevent removal if it would leave no admin members
@@ -726,9 +726,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       const updatedProject = await db.project.findUnique({
         where: { id: projectId },
         include: {
-          members: {
+          ProjectMember: {
             include: {
-              user: {
+              User: {
                 select: {
                   id: true,
                   email: true,
@@ -773,10 +773,12 @@ export default async function projectRoutes(fastify: FastifyInstance) {
   );
 
   // Get all phases for a project with task counts and status
-  fastify.get(
+  fastify.get<{
+    Params: { id: string };
+  }>(
     "/:id/phases",
     { preHandler: [authenticate] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       const projectId = request.params.id;
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
@@ -866,10 +868,12 @@ export default async function projectRoutes(fastify: FastifyInstance) {
   );
 
   // Get tasks for a specific phase
-  fastify.get(
+  fastify.get<{
+    Params: { id: string; phaseId: string };
+  }>(
     "/:id/phases/:phaseId/tasks",
     { preHandler: [authenticate] },
-    async (request: FastifyRequest<{ Params: { id: string; phaseId: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       const projectId = request.params.id;
       const phaseId = request.params.phaseId;
       if (!request.user) {
@@ -1383,9 +1387,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           endDate: request.body.endDate === null ? null : request.body.endDate ? new Date(request.body.endDate) : undefined,
         },
         include: {
-          members: {
+          ProjectMember: {
             include: {
-              user: {
+              User: {
                 select: {
                   id: true,
                   email: true,
@@ -1465,10 +1469,12 @@ export default async function projectRoutes(fastify: FastifyInstance) {
   );
 
   // Get all vendors for a project
-  fastify.get(
+  fastify.get<{
+    Params: { id: string };
+  }>(
     "/:id/vendors",
     { preHandler: [authenticate] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       const projectId = request.params.id;
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
@@ -2028,7 +2034,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       }
 
       // Update vendor
-      const updatedVendor = await db.vendor.update({
+      await db.vendor.update({
         where: { id: vendorId },
         data: updateData,
         include: {

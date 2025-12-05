@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { FastifyInstance } from "fastify";
 import { authenticate } from "../middleware/auth";
 
 interface BrregEntity {
@@ -38,10 +38,12 @@ interface BrregSearchResponse {
 
 export default async function vendorRoutes(fastify: FastifyInstance) {
   // Search brreg.no for companies
-  fastify.get(
+  fastify.get<{
+    Querystring: { query: string };
+  }>(
     "/search",
     { preHandler: [authenticate] },
-    async (request: FastifyRequest<{ Querystring: { query: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       const { query } = request.query;
 
       if (!query || query.trim().length < 2) {
@@ -58,7 +60,7 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
           return reply.status(502).send({ error: "Failed to search company registry" });
         }
 
-        const data: BrregSearchResponse = await response.json();
+        const data = await response.json() as BrregSearchResponse;
         
         // Transform the response to a simpler format
         const results = data._embedded?.enheter.map((entity) => ({
@@ -81,18 +83,20 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
           results,
           total: data.page.totalElements,
         });
-      } catch (error: any) {
-        request.log.error("Error searching brreg.no:", error);
+      } catch (error: unknown) {
+        request.log.error({ err: error }, "Error searching brreg.no");
         return reply.status(500).send({ error: "Internal server error" });
       }
     }
   );
 
   // Get detailed information for a specific organization number
-  fastify.get(
+  fastify.get<{
+    Params: { orgNumber: string };
+  }>(
     "/brreg/:orgNumber",
     { preHandler: [authenticate] },
-    async (request: FastifyRequest<{ Params: { orgNumber: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       const { orgNumber } = request.params;
 
       // Validate organization number format (9 digits)
@@ -113,7 +117,7 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
           return reply.status(502).send({ error: "Failed to fetch company details" });
         }
 
-        const entity: BrregEntity = await response.json();
+        const entity = await response.json() as BrregEntity;
 
         // Return detailed information
         return reply.send({
@@ -132,8 +136,8 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
           industry: entity.naeringskode1?.beskrivelse || null,
           rawData: entity, // Store for future AI analysis
         });
-      } catch (error: any) {
-        request.log.error("Error fetching from brreg.no:", error);
+      } catch (error: unknown) {
+        request.log.error({ err: error }, "Error fetching from brreg.no");
         return reply.status(500).send({ error: "Internal server error" });
       }
     }

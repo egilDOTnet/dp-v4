@@ -7,7 +7,6 @@ import {
   api,
   Project,
   ProjectVendor,
-  VendorContactPerson,
   VendorStatus,
 } from "@/lib/api";
 import VendorList from "@/components/VendorList";

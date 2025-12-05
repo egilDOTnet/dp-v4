@@ -29,6 +29,12 @@ pnpm-debug.log*
 .DS_Store
 *.pem
 
+# Backup files
+*.bak
+
+# Assets
+assets/
+
 # Turbo
 .turbo
 

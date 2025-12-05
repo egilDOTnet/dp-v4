@@ -32,7 +32,7 @@ export async function authenticate(
       tenantId: user.tenantId,
       role: user.role as any,
     };
-  } catch (err) {
+  } catch {
     reply.status(401).send({ error: "Unauthorized" });
   }
 }
