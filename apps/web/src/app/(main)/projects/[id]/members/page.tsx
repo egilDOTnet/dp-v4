@@ -149,8 +149,8 @@ export default function ProjectMembersPage() {
         }
       }
 
-      // Navigate to project detail page
-      router.push(`/projects/${projectId}`);
+      // Navigate back to manage project page
+      router.push(`/projects/${projectId}/manage`);
     } catch (err: any) {
       setError(err.message || "Failed to update members");
       setSubmitting(false);

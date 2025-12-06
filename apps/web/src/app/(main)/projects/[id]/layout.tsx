@@ -74,12 +74,15 @@ export default function ProjectLayout({
       <aside className="w-64 flex-shrink-0">
         <div className="bg-white rounded-lg shadow-md p-4 sticky top-4">
           {/* Project Header */}
-          <div className="mb-6 pb-4 border-b border-gray-200">
+          <Link
+            href={`/projects/${projectId}`}
+            className="block mb-6 pb-4 border-b border-gray-200 hover:bg-gray-50 -mx-4 px-4 transition-colors rounded-t-lg"
+          >
             <h2 className="text-lg font-semibold text-gray-900 mb-1">{project.name}</h2>
             {project.type && (
               <p className="text-sm text-gray-500">{project.type}</p>
             )}
-          </div>
+          </Link>
 
           {/* Navigation Links */}
           <nav className="space-y-1">
@@ -106,10 +109,10 @@ export default function ProjectLayout({
           <div className="mt-6 pt-4 border-t border-gray-200">
             {isAdmin && (
               <Link
-                href={`/projects/${projectId}/members?edit=true`}
+                href={`/projects/${projectId}/manage`}
                 className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
-                Manage Members
+                Manage Project
               </Link>
             )}
           </div>
