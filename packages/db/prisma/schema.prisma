@@ -36,6 +36,7 @@ model Project {
   ProjectMember ProjectMember[]
   requirementHierarchies RequirementHierarchy[]
   ProjectVendor ProjectVendor[]
+  RFI           RFI?
 
   @@index([tenantId])
 }
@@ -82,8 +83,10 @@ model Template {
   isGlobal  Boolean  @default(false)
   tenantId  String?
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   Tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  RFIEmailTemplates RFI[] @relation("RFIEmailTemplate")
+  RFIInformationTemplates RFI[] @relation("RFIInformationTemplate")
 
   @@index([isGlobal])
   @@index([tenantId])
@@ -244,6 +247,7 @@ model ProjectVendor {
 
   project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   vendor    Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  RFIVendorResponses RFIVendorResponse[] @relation("ProjectVendorRFIResponses")
 
   @@unique([projectId, vendorId])
   @@index([projectId])
@@ -256,12 +260,133 @@ model VendorContactPerson {
   firstName     String
   lastName      String
   email         String
+  phone         String?
   isMainContact Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  RFIVendorResponses RFIVendorResponse[] @relation("ContactPersonRFIResponses")
 
   @@index([vendorId])
   @@index([email])
+}
+
+enum RFIQuestionType {
+  YesNo
+  Dropdown
+  MultipleChoice
+  Scale
+  ContactDetails
+  SingleText
+  MultilineText
+}
+
+enum RFIVendorResponseStatus {
+  Sent
+  Received
+  Answered
+  Rejected
+}
+
+model RFI {
+  id               String            @id @default(cuid())
+  projectId        String            @unique
+  emailSubject     String?           @default("")
+  emailText        String?           @default("")
+  rfiInformation   String?           @default("")
+  emailTemplateId  String?
+  rfiInformationTemplateId String?
+  deadline         DateTime?
+  autoPublishDate  DateTime?
+  isPublished      Boolean           @default(false)
+  publishedAt      DateTime?
+  unpublishedAt    DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  emailTemplate    Template?         @relation("RFIEmailTemplate", fields: [emailTemplateId], references: [id], onDelete: SetNull)
+  rfiInformationTemplate Template?   @relation("RFIInformationTemplate", fields: [rfiInformationTemplateId], references: [id], onDelete: SetNull)
+  questions        RFIQuestion[]
+  vendorResponses  RFIVendorResponse[]
+
+  @@index([projectId])
+  @@index([emailTemplateId])
+  @@index([rfiInformationTemplateId])
+}
+
+model RFIQuestion {
+  id          String            @id @default(cuid())
+  rfiId       String
+  title       String
+  description String?
+  type        RFIQuestionType
+  order       Int
+  required    Boolean           @default(true)
+  scaleLabels Json?             // For Scale type: { "1": "Poor", "2": "Fair", ... }
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  rfi         RFI               @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  options     RFIQuestionOption[]
+  responses   RFIResponse[]
+
+  @@index([rfiId])
+  @@index([rfiId, order])
+}
+
+model RFIQuestionOption {
+  id         String       @id @default(cuid())
+  questionId String
+  label      String
+  value      String?
+  xAxis      Boolean      @default(false)
+  yAxis      Boolean      @default(false)
+  order      Int
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  question   RFIQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@index([questionId, order])
+}
+
+model RFIVendorResponse {
+  id              String                @id @default(cuid())
+  rfiId           String
+  projectVendorId String
+  contactPersonId String
+  status          RFIVendorResponseStatus @default(Sent)
+  sentAt          DateTime?
+  answeredAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  rfi             RFI                   @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  projectVendor   ProjectVendor         @relation("ProjectVendorRFIResponses", fields: [projectVendorId], references: [id], onDelete: Cascade)
+  contactPerson   VendorContactPerson   @relation("ContactPersonRFIResponses", fields: [contactPersonId], references: [id], onDelete: Restrict)
+  responses       RFIResponse[]
+
+  @@unique([rfiId, projectVendorId])
+  @@index([rfiId])
+  @@index([projectVendorId])
+  @@index([contactPersonId])
+}
+
+model RFIResponse {
+  id                 String            @id @default(cuid())
+  vendorResponseId   String
+  questionId         String
+  answer             Json              // Flexible JSON to store different answer types
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  vendorResponse     RFIVendorResponse @relation(fields: [vendorResponseId], references: [id], onDelete: Cascade)
+  question           RFIQuestion       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorResponseId, questionId])
+  @@index([vendorResponseId])
+  @@index([questionId])
 }

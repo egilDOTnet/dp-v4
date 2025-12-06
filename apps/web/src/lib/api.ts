@@ -2,6 +2,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export interface ApiError {
   error: string;
+  message?: string;
 }
 
 export async function apiRequest<T>(
@@ -20,22 +21,42 @@ export async function apiRequest<T>(
     (headers as Record<string, string>)["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
 
-  if (!response.ok) {
-    const error: ApiError = await response.json();
-    throw new Error(error.error || "Request failed");
+    if (!response.ok) {
+      let errorData: ApiError;
+      try {
+        errorData = await response.json();
+      } catch {
+        // If response is not JSON, create a generic error
+        errorData = { error: `Request failed with status ${response.status}` };
+      }
+      const errorMessage = errorData.message 
+        ? `${errorData.error || "Request failed"}: ${errorData.message}`
+        : (errorData.error || "Request failed");
+      throw new Error(errorMessage);
+    }
+
+    // Handle 204 No Content responses (no body to parse)
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return response.json();
+  } catch (error: any) {
+    // Handle network errors (CORS, connection refused, etc.)
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Could not connect to server at ${API_URL}. Please check if the API server is running.`
+      );
+    }
+    // Re-throw other errors as-is
+    throw error;
   }
-
-  // Handle 204 No Content responses (no body to parse)
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json();
 }
 
 export const api = {
@@ -391,6 +412,169 @@ export const api = {
         `/api/projects/${projectId}/requirements/${id}/history`
       ),
   },
+  rfi: {
+    get: (projectId: string) =>
+      apiRequest<RFI>(`/api/projects/${projectId}/rfi`),
+    update: (
+      projectId: string,
+      data: {
+        emailSubject?: string;
+        emailText?: string;
+        rfiInformation?: string;
+        deadline?: string | null;
+        autoPublishDate?: string | null;
+      }
+    ) =>
+      apiRequest<RFI>(`/api/projects/${projectId}/rfi`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    publish: (projectId: string) =>
+      apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfi/publish`, {
+        method: "POST",
+      }),
+    unpublish: (projectId: string) =>
+      apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfi/unpublish`, {
+        method: "POST",
+      }),
+    questions: {
+      list: (projectId: string) =>
+        apiRequest<RFIQuestion[]>(`/api/projects/${projectId}/rfi/questions`),
+      create: (
+        projectId: string,
+        data: {
+          title: string;
+          description?: string | null;
+          type: RFIQuestionType;
+          required?: boolean;
+          scaleLabels?: Record<string, string> | null;
+        }
+      ) =>
+        apiRequest<RFIQuestion>(`/api/projects/${projectId}/rfi/questions`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (
+        projectId: string,
+        questionId: string,
+        data: {
+          title?: string;
+          description?: string | null;
+          type?: RFIQuestionType;
+          required?: boolean;
+          scaleLabels?: Record<string, string> | null;
+        }
+      ) =>
+        apiRequest<RFIQuestion>(
+          `/api/projects/${projectId}/rfi/questions/${questionId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, questionId: string) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfi/questions/${questionId}`,
+          {
+            method: "DELETE",
+          }
+        ),
+      reorder: (
+        projectId: string,
+        data: {
+          questionIds: string[];
+        }
+      ) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfi/questions/reorder`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      options: {
+        create: (
+          projectId: string,
+          questionId: string,
+          data: {
+            label: string;
+            value?: string | null;
+            xAxis?: boolean;
+            yAxis?: boolean;
+          }
+        ) =>
+          apiRequest<RFIQuestionOption>(
+            `/api/projects/${projectId}/rfi/questions/${questionId}/options`,
+            {
+              method: "POST",
+              body: JSON.stringify(data),
+            }
+          ),
+        update: (
+          projectId: string,
+          questionId: string,
+          optionId: string,
+          data: {
+            label?: string;
+            value?: string | null;
+            xAxis?: boolean;
+            yAxis?: boolean;
+          }
+        ) =>
+          apiRequest<RFIQuestionOption>(
+            `/api/projects/${projectId}/rfi/questions/${questionId}/options/${optionId}`,
+            {
+              method: "PUT",
+              body: JSON.stringify(data),
+            }
+          ),
+        delete: (
+          projectId: string,
+          questionId: string,
+          optionId: string
+        ) =>
+          apiRequest<{ success: boolean }>(
+            `/api/projects/${projectId}/rfi/questions/${questionId}/options/${optionId}`,
+            {
+              method: "DELETE",
+            }
+          ),
+        reorder: (
+          projectId: string,
+          questionId: string,
+          data: {
+            optionIds: string[];
+          }
+        ) =>
+          apiRequest<{ success: boolean }>(
+            `/api/projects/${projectId}/rfi/questions/${questionId}/options/reorder`,
+            {
+              method: "PUT",
+              body: JSON.stringify(data),
+            }
+          ),
+      },
+    },
+    vendorResponses: {
+      list: (projectId: string) =>
+        apiRequest<RFIVendorResponse[]>(
+          `/api/projects/${projectId}/rfi/vendor-responses`
+        ),
+    },
+    send: (projectId: string) =>
+      apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfi/send`, {
+        method: "POST",
+      }),
+    resend: (projectId: string, vendorId: string) =>
+      apiRequest<{ success: boolean }>(
+        `/api/projects/${projectId}/rfi/resend/${vendorId}`,
+        {
+          method: "POST",
+        }
+      ),
+    preview: (projectId: string) =>
+      apiRequest<RFI>(`/api/projects/${projectId}/rfi/preview`),
+  },
 };
 
 export interface User {
@@ -601,5 +785,75 @@ export interface BrregCompanyDetails {
   website: string | null;
   industry: string | null;
   rawData: any;
+}
+
+export type RFIQuestionType =
+  | "YesNo"
+  | "Dropdown"
+  | "MultipleChoice"
+  | "Scale"
+  | "ContactDetails"
+  | "SingleText"
+  | "MultilineText";
+
+export type RFIVendorResponseStatus = "Sent" | "Received" | "Answered" | "Rejected";
+
+export interface RFIQuestionOption {
+  id: string;
+  questionId: string;
+  label: string;
+  value: string | null;
+  xAxis: boolean;
+  yAxis: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RFIQuestion {
+  id: string;
+  rfiId: string;
+  title: string;
+  description: string | null;
+  type: RFIQuestionType;
+  order: number;
+  required: boolean;
+  scaleLabels: Record<string, string> | null;
+  createdAt: string;
+  updatedAt: string;
+  options?: RFIQuestionOption[];
+}
+
+export interface RFI {
+  id: string;
+  projectId: string;
+  emailSubject: string;
+  emailText: string;
+  rfiInformation: string;
+  deadline: string | null;
+  autoPublishDate: string | null;
+  isPublished: boolean;
+  publishedAt: string | null;
+  unpublishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  questions?: RFIQuestion[];
+}
+
+export interface RFIVendorResponse {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  contactPerson: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string | null;
+  };
+  status: RFIVendorResponseStatus;
+  sentAt: string | null;
+  answeredAt: string | null;
+  createdAt: string;
 }
 

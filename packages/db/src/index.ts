@@ -13,9 +13,17 @@ export const db =
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
 // Verify that new models are available (helps catch when Prisma client needs regeneration)
-if (process.env.NODE_ENV === "development" && !("projectVendor" in db)) {
-  console.warn(
-    "⚠️  Warning: Prisma client may be missing new models. Please restart the API server after running 'pnpm prisma generate'"
-  );
+if (process.env.NODE_ENV === "development") {
+  if (!("projectVendor" in db)) {
+    console.warn(
+      "⚠️  Warning: Prisma client may be missing new models. Please restart the API server after running 'pnpm prisma generate'"
+    );
+  }
+  // Check for RFI models
+  if (!("rFI" in db)) {
+    console.warn(
+      "⚠️  Warning: RFI models not found in Prisma client. Please run 'pnpm prisma generate' in packages/db and restart the API server."
+    );
+  }
 }
 

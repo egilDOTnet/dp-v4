@@ -245,10 +245,21 @@ export default function RequirementHierarchyComponent({
       return;
     }
     
+    const isCurrentlyExpanded = expandedHierarchies.has(hierarchyId);
+    
     setExpandedHierarchies((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(hierarchyId)) {
+      if (isCurrentlyExpanded) {
         newSet.delete(hierarchyId);
+      } else {
+        newSet.add(hierarchyId);
+      }
+      return newSet;
+    });
+    
+    // Schedule state updates for parent component after this render completes
+    setTimeout(() => {
+      if (isCurrentlyExpanded) {
         // If collapsing and this hierarchy is selected, deselect it
         if (selectedHierarchyId === hierarchyId) {
           onHierarchySelect(null);
@@ -261,12 +272,10 @@ export default function RequirementHierarchyComponent({
           }
         });
       } else {
-        newSet.add(hierarchyId);
         // When expanding, select it to show requirements
         onHierarchySelect(hierarchyId);
       }
-      return newSet;
-    });
+    }, 0);
   };
 
   const handleCreate = async (parentId: string | null) => {
