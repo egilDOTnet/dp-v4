@@ -1141,6 +1141,277 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       return reply.send(history);
     }
   );
+
+  // Get requirement comments
+  fastify.get(
+    "/:projectId/requirements/:requirementId/comments",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, requirementId } = request.params as { projectId: string; requirementId: string };
+      const currentUser = getUser(request);
+
+      const requirement = await db.requirement.findUnique({
+        where: { id: requirementId },
+        include: {
+          hierarchy: true,
+        },
+      });
+
+      if (!requirement || requirement.hierarchy.projectId !== projectId) {
+        return reply.status(404).send({ error: "Requirement not found" });
+      }
+
+      // Verify project access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const isMember = project.ProjectMember.some(
+        (pm) => pm.userId === currentUser.userId
+      );
+      if (!isMember && project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const comments = await db.requirementComment.findMany({
+        where: { requirementId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      return reply.send(comments);
+    }
+  );
+
+  // Create requirement comment
+  fastify.post(
+    "/:projectId/requirements/:requirementId/comments",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, requirementId } = request.params as { projectId: string; requirementId: string };
+      const body = request.body as {
+        content: string;
+      };
+      const currentUser = getUser(request);
+
+      const requirement = await db.requirement.findUnique({
+        where: { id: requirementId },
+        include: {
+          hierarchy: true,
+        },
+      });
+
+      if (!requirement || requirement.hierarchy.projectId !== projectId) {
+        return reply.status(404).send({ error: "Requirement not found" });
+      }
+
+      // Verify project access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const isMember = project.ProjectMember.some(
+        (pm) => pm.userId === currentUser.userId
+      );
+      if (!isMember && project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      const comment = await db.requirementComment.create({
+        data: {
+          requirementId,
+          userId: currentUser.userId,
+          content: body.content,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return reply.status(201).send(comment);
+    }
+  );
+
+  // Update requirement comment
+  fastify.put(
+    "/:projectId/requirements/:requirementId/comments/:commentId",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, requirementId, commentId } = request.params as { 
+        projectId: string; 
+        requirementId: string; 
+        commentId: string;
+      };
+      const body = request.body as {
+        content?: string;
+        isResolved?: boolean;
+      };
+      const currentUser = getUser(request);
+
+      const requirement = await db.requirement.findUnique({
+        where: { id: requirementId },
+        include: {
+          hierarchy: true,
+        },
+      });
+
+      if (!requirement || requirement.hierarchy.projectId !== projectId) {
+        return reply.status(404).send({ error: "Requirement not found" });
+      }
+
+      const comment = await db.requirementComment.findUnique({
+        where: { id: commentId },
+      });
+
+      if (!comment || comment.requirementId !== requirementId) {
+        return reply.status(404).send({ error: "Comment not found" });
+      }
+
+      // Verify project access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const isMember = project.ProjectMember.some(
+        (pm) => pm.userId === currentUser.userId
+      );
+      if (!isMember && project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Only allow comment owner to update content
+      if (body.content !== undefined && comment.userId !== currentUser.userId) {
+        return reply.status(403).send({ error: "You can only edit your own comments" });
+      }
+
+      // Only allow admins to update isResolved status
+      const isAdmin = currentUser.role === "CompanyAdministrator" || currentUser.role === "GlobalAdministrator";
+      if (body.isResolved !== undefined && !isAdmin) {
+        return reply.status(403).send({ error: "Only administrators can resolve comments" });
+      }
+
+      const updateData: { content?: string; isResolved?: boolean } = {};
+      if (body.content !== undefined) {
+        updateData.content = body.content;
+      }
+      if (body.isResolved !== undefined) {
+        updateData.isResolved = body.isResolved;
+      }
+
+      const updated = await db.requirementComment.update({
+        where: { id: commentId },
+        data: updateData,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return reply.send(updated);
+    }
+  );
+
+  // Delete requirement comment
+  fastify.delete(
+    "/:projectId/requirements/:requirementId/comments/:commentId",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId, requirementId, commentId } = request.params as { 
+        projectId: string; 
+        requirementId: string; 
+        commentId: string;
+      };
+      const currentUser = getUser(request);
+
+      const requirement = await db.requirement.findUnique({
+        where: { id: requirementId },
+        include: {
+          hierarchy: true,
+        },
+      });
+
+      if (!requirement || requirement.hierarchy.projectId !== projectId) {
+        return reply.status(404).send({ error: "Requirement not found" });
+      }
+
+      const comment = await db.requirementComment.findUnique({
+        where: { id: commentId },
+      });
+
+      if (!comment || comment.requirementId !== requirementId) {
+        return reply.status(404).send({ error: "Comment not found" });
+      }
+
+      // Verify project access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const isMember = project.ProjectMember.some(
+        (pm) => pm.userId === currentUser.userId
+      );
+      if (!isMember && project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Only allow comment owner or admin to delete
+      const isAdmin = currentUser.role === "CompanyAdministrator" || currentUser.role === "GlobalAdministrator";
+      if (comment.userId !== currentUser.userId && !isAdmin) {
+        return reply.status(403).send({ error: "You can only delete your own comments" });
+      }
+
+      await db.requirementComment.delete({
+        where: { id: commentId },
+      });
+
+      return reply.status(204).send();
+    }
+  );
 }
 
 

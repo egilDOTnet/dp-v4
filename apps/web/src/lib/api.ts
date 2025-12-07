@@ -286,6 +286,10 @@ export const api = {
           }),
       },
     },
+    dashboard: {
+      getStats: (projectId: string) =>
+        apiRequest<DashboardStats>(`/api/projects/${projectId}/dashboard/stats`),
+    },
   },
   templates: {
     list: () => apiRequest<Template[]>("/api/templates"),
@@ -411,6 +415,44 @@ export const api = {
       apiRequest<RequirementHistory[]>(
         `/api/projects/${projectId}/requirements/${id}/history`
       ),
+    comments: {
+      list: (projectId: string, requirementId: string) =>
+        apiRequest<RequirementComment[]>(
+          `/api/projects/${projectId}/requirements/${requirementId}/comments`
+        ),
+      create: (
+        projectId: string,
+        requirementId: string,
+        data: { content: string }
+      ) =>
+        apiRequest<RequirementComment>(
+          `/api/projects/${projectId}/requirements/${requirementId}/comments`,
+          {
+            method: "POST",
+            body: JSON.stringify(data),
+          }
+        ),
+      update: (
+        projectId: string,
+        requirementId: string,
+        commentId: string,
+        data: { content?: string; isResolved?: boolean }
+      ) =>
+        apiRequest<RequirementComment>(
+          `/api/projects/${projectId}/requirements/${requirementId}/comments/${commentId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, requirementId: string, commentId: string) =>
+        apiRequest<void>(
+          `/api/projects/${projectId}/requirements/${requirementId}/comments/${commentId}`,
+          {
+            method: "DELETE",
+          }
+        ),
+    },
   },
   rfi: {
     get: (projectId: string) =>
@@ -855,5 +897,40 @@ export interface RFIVendorResponse {
   sentAt: string | null;
   answeredAt: string | null;
   createdAt: string;
+}
+
+export interface RequirementComment {
+  id: string;
+  requirementId: string;
+  userId: string;
+  content: string;
+  isResolved: boolean;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+}
+
+export interface DashboardStats {
+  vendors: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  rfi: {
+    questionCount: number;
+    status: "planning" | "ongoing" | "finished";
+    deadline: string | null;
+  };
+  requirements: {
+    total: number;
+    byStatus: Record<string, number>;
+    byType: Record<string, number>;
+    unresolvedComments: number;
+  };
 }
 

@@ -123,6 +123,7 @@ model User {
   createdRequirements   Requirement[]           @relation("RequirementCreator")
   modifiedRequirements  Requirement[]            @relation("RequirementModifier")
   requirementHistories  RequirementHistory[]
+  requirementComments   RequirementComment[]
 
   @@index([email])
   @@index([tenantId])
@@ -166,6 +167,7 @@ model Requirement {
   createdBy       User                 @relation("RequirementCreator", fields: [createdById], references: [id], onDelete: Restrict)
   lastModifiedBy  User                 @relation("RequirementModifier", fields: [lastModifiedById], references: [id], onDelete: Restrict)
   history         RequirementHistory[]
+  comments        RequirementComment[]
 
   @@index([hierarchyId])
   @@index([hierarchyId, order])
@@ -184,6 +186,22 @@ model RequirementHistory {
   modifiedBy    User        @relation(fields: [modifiedById], references: [id], onDelete: Restrict)
 
   @@index([requirementId])
+}
+
+model RequirementComment {
+  id            String      @id @default(cuid())
+  requirementId String
+  userId        String
+  content       String
+  isResolved    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
+  @@index([userId])
 }
 
 enum RequirementType {

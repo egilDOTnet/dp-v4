@@ -2568,5 +2568,136 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       return reply.status(204).send();
     }
   );
+
+  // Get dashboard stats for a project
+  fastify.get(
+    "/:projectId/dashboard/stats",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId } = request.params as { projectId: string };
+      const currentUser = getUser(request);
+
+      // Verify project access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const isMember = project.ProjectMember.some(
+        (pm) => pm.userId === currentUser.userId
+      );
+      if (!isMember && project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Get vendor stats
+      const projectVendors = await db.projectVendor.findMany({
+        where: { projectId },
+        select: { status: true },
+      });
+
+      const vendorStats: {
+        total: number;
+        byStatus: Record<string, number>;
+      } = {
+        total: projectVendors.length,
+        byStatus: {},
+      };
+
+      projectVendors.forEach((pv) => {
+        vendorStats.byStatus[pv.status] = (vendorStats.byStatus[pv.status] || 0) + 1;
+      });
+
+      // Get RFI stats
+      const rfi = await db.rFI.findUnique({
+        where: { projectId },
+        include: {
+          _count: {
+            select: { questions: true },
+          },
+        },
+      });
+
+      const rfiStats: {
+        questionCount: number;
+        status: "planning" | "ongoing" | "finished";
+        deadline: string | null;
+      } = {
+        questionCount: rfi?._count.questions || 0,
+        status: "planning",
+        deadline: rfi?.deadline?.toISOString() || null,
+      };
+
+      if (rfi) {
+        const now = new Date();
+        if (rfi.unpublishedAt) {
+          rfiStats.status = "finished";
+        } else if (rfi.isPublished) {
+          if (rfi.deadline && new Date(rfi.deadline) < now) {
+            rfiStats.status = "finished";
+          } else {
+            rfiStats.status = "ongoing";
+          }
+        } else {
+          rfiStats.status = "planning";
+        }
+      }
+
+      // Get requirement stats
+      const requirementHierarchies = await db.requirementHierarchy.findMany({
+        where: { projectId },
+        select: { id: true },
+      });
+
+      const hierarchyIds = requirementHierarchies.map((h) => h.id);
+
+      const requirements = await db.requirement.findMany({
+        where: {
+          hierarchyId: { in: hierarchyIds },
+        },
+        select: {
+          type: true,
+          status: true,
+        },
+      });
+
+      const unresolvedCommentCount = await db.requirementComment.count({
+        where: {
+          requirement: {
+            hierarchyId: { in: hierarchyIds },
+          },
+          isResolved: false,
+        },
+      });
+
+      const requirementStats: {
+        total: number;
+        byStatus: Record<string, number>;
+        byType: Record<string, number>;
+        unresolvedComments: number;
+      } = {
+        total: requirements.length,
+        byStatus: {},
+        byType: {},
+        unresolvedComments: unresolvedCommentCount,
+      };
+
+      requirements.forEach((req) => {
+        const statusKey = req.status || "None";
+        requirementStats.byStatus[statusKey] = (requirementStats.byStatus[statusKey] || 0) + 1;
+        requirementStats.byType[req.type] = (requirementStats.byType[req.type] || 0) + 1;
+      });
+
+      return reply.send({
+        vendors: vendorStats,
+        rfi: rfiStats,
+        requirements: requirementStats,
+      });
+    }
+  );
 }
 
