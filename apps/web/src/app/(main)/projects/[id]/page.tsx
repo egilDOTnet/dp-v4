@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, Project, Phase } from "@/lib/api";
+import { api, Project, Phase, DashboardStats } from "@/lib/api";
 import PhaseTimeline from "@/components/PhaseTimeline";
+import VendorWidget from "@/components/VendorWidget";
+import RFIWidget from "@/components/RFIWidget";
+import RequirementsWidget from "@/components/RequirementsWidget";
 
 export default function ProjectDashboardPage() {
   const params = useParams();
@@ -14,6 +17,7 @@ export default function ProjectDashboardPage() {
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [phases, setPhases] = useState<Phase[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -24,11 +28,13 @@ export default function ProjectDashboardPage() {
     setLoading(true);
     Promise.all([
       api.projects.get(projectId),
-      api.projects.phases.list(projectId)
+      api.projects.phases.list(projectId),
+      api.projects.dashboard.getStats(projectId)
     ])
-      .then(([projectData, phasesData]) => {
+      .then(([projectData, phasesData, statsData]) => {
         setProject(projectData);
         setPhases(phasesData);
+        setDashboardStats(statsData);
       })
       .catch((err) => {
         setError(err.message || "Failed to load project");
@@ -167,6 +173,15 @@ export default function ProjectDashboardPage() {
         selectedPhaseId={null}
         onPhaseClick={handlePhaseClick}
       />
+
+      {/* Dashboard Widgets */}
+      {dashboardStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+          <VendorWidget stats={dashboardStats.vendors} />
+          <RFIWidget stats={dashboardStats.rfi} />
+          <RequirementsWidget stats={dashboardStats.requirements} />
+        </div>
+      )}
     </div>
   );
 }

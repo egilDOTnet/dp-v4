@@ -1468,6 +1468,144 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // Get dashboard stats for a project
+  fastify.get<{
+    Params: { id: string };
+  }>(
+    "/:id/dashboard/stats",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const projectId = request.params.id;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: getUser(request).userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Get vendor stats
+      const projectVendors = await db.projectVendor.findMany({
+        where: { projectId },
+        select: { status: true },
+      });
+
+      const vendorStats = {
+        total: projectVendors.length,
+        byStatus: projectVendors.reduce((acc, pv) => {
+          acc[pv.status] = (acc[pv.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      };
+
+      // Get RFI stats
+      const rfi = await db.rFI.findUnique({
+        where: { projectId },
+        include: {
+          RFIQuestion: true,
+        },
+      });
+
+      let rfiStatus: "planning" | "ongoing" | "finished" = "planning";
+      if (rfi?.isPublished && rfi.deadline) {
+        const deadline = new Date(rfi.deadline);
+        const now = new Date();
+        if (now > deadline) {
+          rfiStatus = "finished";
+        } else {
+          rfiStatus = "ongoing";
+        }
+      } else if (rfi?.isPublished) {
+        rfiStatus = "ongoing";
+      }
+
+      const rfiStats = {
+        questionCount: rfi?.RFIQuestion?.length || 0,
+        status: rfiStatus,
+        deadline: rfi?.deadline || null,
+      };
+
+      // Get requirements stats
+      const requirements = await db.requirement.findMany({
+        where: {
+          hierarchy: {
+            projectId,
+          },
+        },
+        select: {
+          type: true,
+          status: true,
+        },
+      });
+
+      const requirementsByStatus = requirements.reduce((acc, req) => {
+        const status = req.status || "None";
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const requirementsByType = requirements.reduce((acc, req) => {
+        acc[req.type] = (acc[req.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Get unresolved comments count
+      // Note: This assumes there's a RequirementComment model
+      // If it doesn't exist yet, we'll return 0
+      let unresolvedComments = 0;
+      try {
+        if (db.requirementComment) {
+          unresolvedComments = await db.requirementComment.count({
+            where: {
+              requirement: {
+                hierarchy: {
+                  projectId,
+                },
+              },
+              resolved: false,
+            },
+          });
+        }
+      } catch {
+        // If RequirementComment doesn't exist, just return 0
+        unresolvedComments = 0;
+      }
+
+      const requirementsStats = {
+        total: requirements.length,
+        byStatus: requirementsByStatus,
+        byType: requirementsByType,
+        unresolvedComments,
+      };
+
+      return reply.send({
+        vendors: vendorStats,
+        rfi: rfiStats,
+        requirements: requirementsStats,
+      });
+    }
+  );
+
   // Get all vendors for a project
   fastify.get<{
     Params: { id: string };

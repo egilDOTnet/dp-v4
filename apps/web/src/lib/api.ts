@@ -161,6 +161,9 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ memberIds }),
       }),
+    dashboard: {
+      getStats: (projectId: string) => apiRequest<DashboardStats>(`/api/projects/${projectId}/dashboard/stats`),
+    },
     phases: {
       list: (projectId: string) => apiRequest<Phase[]>(`/api/projects/${projectId}/phases`),
       getTasks: (projectId: string, phaseId: string) =>
@@ -855,5 +858,23 @@ export interface RFIVendorResponse {
   sentAt: string | null;
   answeredAt: string | null;
   createdAt: string;
+}
+
+export interface DashboardStats {
+  vendors: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+  rfi: {
+    questionCount: number;
+    status: "planning" | "ongoing" | "finished";
+    deadline: string | null;
+  };
+  requirements: {
+    total: number;
+    byStatus: Record<string, number>;
+    byType: Record<string, number>;
+    unresolvedComments: number;
+  };
 }
 
