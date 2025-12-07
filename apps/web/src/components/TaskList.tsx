@@ -26,6 +26,7 @@ interface TaskListProps {
   tasks: Task[];
   projectMembers: Project["members"];
   onTaskUpdate: () => void;
+  phaseTitle?: string;
 }
 
 type FilterType = "all" | "completed" | "remaining";
@@ -113,6 +114,7 @@ export default function TaskList({
   tasks,
   projectMembers,
   onTaskUpdate,
+  phaseTitle,
 }: TaskListProps) {
   const [filter, setFilter] = useState<FilterType>("remaining");
   const [isCreatingNewTask, setIsCreatingNewTask] = useState(false);
@@ -777,7 +779,7 @@ export default function TaskList({
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Tasks</h2>
+        <h2 className="text-xl font-semibold">{phaseTitle || "Tasks"}</h2>
         <div className="flex items-center gap-3">
           {/* Filter Toggle - Connected Button Group */}
           <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">

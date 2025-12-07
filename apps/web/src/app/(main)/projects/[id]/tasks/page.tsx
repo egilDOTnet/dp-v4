@@ -137,7 +137,6 @@ export default function TasksPage() {
 
       {/* Phase Timeline - Always visible */}
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Project Phases</h2>
         <PhaseTimeline
           phases={phases}
           selectedPhaseId={selectedPhaseId}
@@ -148,17 +147,13 @@ export default function TasksPage() {
       {/* Task List - Shown when phase is selected */}
       {selectedPhaseId && selectedPhase && (
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">
-              {selectedPhase.order}. {selectedPhase.name}
-            </h2>
-          </div>
           <TaskList
             projectId={projectId}
             phaseId={selectedPhaseId}
             tasks={tasks}
             projectMembers={project.members || []}
             onTaskUpdate={handleTaskUpdate}
+            phaseTitle={`${selectedPhase.order}. ${selectedPhase.name}`}
           />
         </div>
       )}
