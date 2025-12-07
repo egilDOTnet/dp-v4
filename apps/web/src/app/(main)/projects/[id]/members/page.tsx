@@ -26,6 +26,7 @@ export default function ProjectMembersPage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showHeroBanner, setShowHeroBanner] = useState(true);
 
   // Load project and company users
   useEffect(() => {
@@ -54,6 +55,19 @@ export default function ProjectMembersPage() {
         setError(err.message || "Failed to load data");
       });
   }, [projectId, isEditMode]);
+
+  useEffect(() => {
+    // Check if user has dismissed the hero banner before
+    const dismissed = localStorage.getItem("members-hero-banner-dismissed");
+    if (dismissed === "true") {
+      setShowHeroBanner(false);
+    }
+  }, []);
+
+  const handleDismissHeroBanner = () => {
+    localStorage.setItem("members-hero-banner-dismissed", "true");
+    setShowHeroBanner(false);
+  };
 
   const handleToggleMember = (userId: string) => {
     if (selectedMemberIds.includes(userId)) {
@@ -196,6 +210,52 @@ export default function ProjectMembersPage() {
           ? "Select or deselect members to update the project membership."
           : "Select existing members or create new ones to add to the project."}
       </p>
+
+      {/* Hero Banner */}
+      {showHeroBanner && (
+        <div className="mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Member Management</h3>
+              <p className="text-gray-700 mb-3">
+                Managing your <strong>project team</strong> ensures the right people have access to project information and can contribute to the procurement process effectively.
+              </p>
+              <p className="text-gray-700 mb-3">
+                <strong>Here's what you can do:</strong>
+              </p>
+              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+                <li><strong>Add existing users:</strong> Select from your company's user list to add to the project</li>
+                <li><strong>Create new team members:</strong> Invite new users to your company and project</li>
+                <li><strong>Control project access:</strong> Determine who can view and contribute to project activities</li>
+                <li><strong>Manage permissions:</strong> Company administrators have full project management rights</li>
+              </ul>
+              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="text-3xl flex-shrink-0">💡</div>
+                  <div className="flex-1 text-sm text-gray-700 italic">
+                    <div className="font-bold not-italic mb-1">Tip:</div>
+                    <div>Include all stakeholders who need visibility into the procurement process!</div>
+                    <div>Team members can be assigned as task owners and collaborate effectively.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={handleDismissHeroBanner}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Existing Members List */}

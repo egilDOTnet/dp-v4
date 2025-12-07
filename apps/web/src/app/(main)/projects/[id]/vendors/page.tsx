@@ -19,6 +19,7 @@ export default function VendorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAddVendorForm, setShowAddVendorForm] = useState(false);
+  const [showHeroBanner, setShowHeroBanner] = useState(true);
 
   const loadProject = async () => {
     try {
@@ -47,6 +48,19 @@ export default function VendorsPage() {
       loadVendors();
     }
   }, [projectId]);
+
+  useEffect(() => {
+    // Check if user has dismissed the hero banner before
+    const dismissed = localStorage.getItem("vendors-hero-banner-dismissed");
+    if (dismissed === "true") {
+      setShowHeroBanner(false);
+    }
+  }, []);
+
+  const handleDismissHeroBanner = () => {
+    localStorage.setItem("vendors-hero-banner-dismissed", "true");
+    setShowHeroBanner(false);
+  };
 
   const handleAddVendor = async (data: {
     name: string;
@@ -220,6 +234,52 @@ export default function VendorsPage() {
           Add Vendor
         </button>
       </div>
+
+      {/* Hero Banner */}
+      {showHeroBanner && (
+        <div className="mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Vendor Management</h3>
+              <p className="text-gray-700 mb-3">
+                Building a comprehensive list of <strong>potential vendors</strong> is crucial for a successful procurement process. This section helps you organize vendor information and track their engagement throughout your project.
+              </p>
+              <p className="text-gray-700 mb-3">
+                <strong>Here's what you can do:</strong>
+              </p>
+              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+                <li><strong>Add vendors:</strong> Create vendor profiles with organization details and email domains</li>
+                <li><strong>Manage contacts:</strong> Add multiple contact persons for each vendor organization</li>
+                <li><strong>Track status:</strong> Monitor vendors as Potential, Invited, Participating, or Rejected</li>
+                <li><strong>Organize information:</strong> Keep all vendor details in one centralized location</li>
+              </ul>
+              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="text-3xl flex-shrink-0">💡</div>
+                  <div className="flex-1 text-sm text-gray-700 italic">
+                    <div className="font-bold not-italic mb-1">Tip:</div>
+                    <div>Add contact persons early in the process!</div>
+                    <div>This will streamline RFI and RFP distribution when you're ready to engage vendors.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={handleDismissHeroBanner}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
 
       <VendorList
         projectId={projectId}

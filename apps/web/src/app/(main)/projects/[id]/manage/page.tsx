@@ -18,6 +18,7 @@ export default function ManageProjectPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showHeroBanner, setShowHeroBanner] = useState(true);
 
   const isAdmin =
     user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
@@ -62,6 +63,19 @@ export default function ManageProjectPage() {
         setLoading(false);
       });
   }, [projectId, isAdmin, router]);
+
+  useEffect(() => {
+    // Check if user has dismissed the hero banner before
+    const dismissed = localStorage.getItem("manage-hero-banner-dismissed");
+    if (dismissed === "true") {
+      setShowHeroBanner(false);
+    }
+  }, []);
+
+  const handleDismissHeroBanner = () => {
+    localStorage.setItem("manage-hero-banner-dismissed", "true");
+    setShowHeroBanner(false);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +148,52 @@ export default function ManageProjectPage() {
       </nav>
 
       <h1 className="text-3xl font-bold mb-6">Manage Project</h1>
+
+      {/* Hero Banner */}
+      {showHeroBanner && (
+        <div className="mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Project Management</h3>
+              <p className="text-gray-700 mb-3">
+                This section provides <strong>administrative controls</strong> for your project. Here you can update project information, manage team members, and maintain overall project settings.
+              </p>
+              <p className="text-gray-700 mb-3">
+                <strong>Here's what you can do:</strong>
+              </p>
+              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+                <li><strong>Edit project details:</strong> Update project name, type, and description</li>
+                <li><strong>Manage dates:</strong> Set and adjust project start and end dates</li>
+                <li><strong>Team management:</strong> Add or remove project members and control access</li>
+                <li><strong>View project information:</strong> See a complete overview of your project setup</li>
+              </ul>
+              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="text-3xl flex-shrink-0">💡</div>
+                  <div className="flex-1 text-sm text-gray-700 italic">
+                    <div className="font-bold not-italic mb-1">Tip:</div>
+                    <div>Keep project dates updated to help with deadline planning!</div>
+                    <div>Accurate dates ensure your team knows when key milestones are approaching.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={handleDismissHeroBanner}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-2xl font-semibold mb-4">Project Details</h2>

@@ -21,6 +21,7 @@ export default function TasksPage() {
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showHeroBanner, setShowHeroBanner] = useState(true);
 
   const loadProject = () => {
     api.projects
@@ -82,6 +83,19 @@ export default function TasksPage() {
     }
   }, [selectedPhaseId, projectId]);
 
+  useEffect(() => {
+    // Check if user has dismissed the hero banner before
+    const dismissed = localStorage.getItem("tasks-hero-banner-dismissed");
+    if (dismissed === "true") {
+      setShowHeroBanner(false);
+    }
+  }, []);
+
+  const handleDismissHeroBanner = () => {
+    localStorage.setItem("tasks-hero-banner-dismissed", "true");
+    setShowHeroBanner(false);
+  };
+
   const handlePhaseClick = (phaseId: string) => {
     setSelectedPhaseId(phaseId);
   };
@@ -134,6 +148,52 @@ export default function TasksPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Tasks</h1>
       </div>
+
+      {/* Hero Banner */}
+      {showHeroBanner && (
+        <div className="mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Tasks</h3>
+              <p className="text-gray-700 mb-3">
+                <strong>Tasks</strong> are organized into phases that guide you through the procurement process step by step. Each phase represents a major milestone, and tasks within each phase help you stay on track with specific activities.
+              </p>
+              <p className="text-gray-700 mb-3">
+                <strong>Here's what you can do:</strong>
+              </p>
+              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+                <li><strong>View tasks by phase:</strong> Click on any phase to see its tasks and track progress</li>
+                <li><strong>Assign task owners:</strong> Designate team members responsible for each task</li>
+                <li><strong>Track completion:</strong> Mark tasks as complete to update phase progress</li>
+                <li><strong>Add context:</strong> Include descriptions and links to relevant resources</li>
+              </ul>
+              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="text-3xl flex-shrink-0">💡</div>
+                  <div className="flex-1 text-sm text-gray-700 italic">
+                    <div className="font-bold not-italic mb-1">Tip:</div>
+                    <div>Keep tasks updated regularly to help your team stay aligned on priorities.</div>
+                    <div>Completed tasks automatically update the phase progress indicators!</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={handleDismissHeroBanner}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Phase Timeline - Always visible */}
       <div className="mb-6">
