@@ -162,14 +162,11 @@ export default function ProjectDashboardPage() {
       </div>
 
       {/* Phase Timeline */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Project Phases</h2>
-        <PhaseTimeline
-          phases={phases}
-          selectedPhaseId={null}
-          onPhaseClick={handlePhaseClick}
-        />
-      </div>
+      <PhaseTimeline
+        phases={phases}
+        selectedPhaseId={null}
+        onPhaseClick={handlePhaseClick}
+      />
     </div>
   );
 }
