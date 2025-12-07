@@ -10,12 +10,11 @@
     "clean": "turbo run clean"
   },
   "devDependencies": {
-    "turbo": "^2.0.0"
+    "turbo": "^2.6.1"
   },
   "packageManager": "pnpm@8.15.0",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.9.0",
     "pnpm": ">=8.0.0"
   }
 }
-

@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "password" | "magic-link">("email");
   const [magicLink, setMagicLink] = useState("");
-  const [userExists, setUserExists] = useState<boolean | null>(null);
+  const [_userExists, setUserExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
