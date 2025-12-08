@@ -626,7 +626,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
     const nextOrder = calculateNextOrder();
 
     return (
-      <div ref={formRef} className="border-2 border-primary-600 rounded-lg bg-white flex items-stretch overflow-hidden">
+      <div ref={formRef} className="border-2 border-primary-600 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden">
         {/* Left side: Number with solid background */}
         <div className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg">
           <span className="font-semibold text-lg">
@@ -717,7 +717,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                       className={`px-3 py-1 text-xs font-medium transition-colors ${
                         !required
                           ? "bg-primary-600 text-white"
-                          : "bg-white text-gray-700 hover:bg-gray-50"
+                          : "bg-background-tertiary text-text-primary hover:bg-background-primary"
                       }`}
                     >
                       Optional
@@ -728,7 +728,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                       className={`px-3 py-1 text-xs font-medium transition-colors ${
                         required
                           ? "bg-primary-600 text-white"
-                          : "bg-white text-gray-700 hover:bg-gray-50"
+                          : "bg-background-tertiary text-text-primary hover:bg-background-primary"
                       }`}
                     >
                       Required
@@ -894,7 +894,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                       };
 
                       return (
-                        <div className="border-2 border-primary-600 rounded-lg bg-white flex items-stretch overflow-hidden" data-question-id={question.id}>
+                        <div className="border-2 border-primary-600 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden" data-question-id={question.id}>
                           {/* Left side: Number with solid background (drag handle) */}
                           <div
                             {...attributes}
@@ -1062,7 +1062,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                           className={`px-3 py-1 text-xs font-medium transition-colors ${
                                             !questionFormData.required
                                               ? "bg-primary-600 text-white"
-                                              : "bg-white text-gray-700 hover:bg-gray-50"
+                                              : "bg-background-tertiary text-text-primary hover:bg-background-primary"
                                           }`}
                                         >
                                           Optional
@@ -1077,7 +1077,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                           className={`px-3 py-1 text-xs font-medium transition-colors ${
                                             questionFormData.required
                                               ? "bg-primary-600 text-white"
-                                              : "bg-white text-gray-700 hover:bg-gray-50"
+                                              : "bg-background-tertiary text-text-primary hover:bg-background-primary"
                                           }`}
                                         >
                                           Required

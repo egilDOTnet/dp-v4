@@ -189,7 +189,7 @@ export default function RFIPage() {
   if (loading) {
     return (
       <div>
-        <nav className="mb-4 text-sm text-gray-600">
+        <nav className="mb-4 text-sm text-text-secondary">
           <Link href="/dashboard" className="hover:text-primary-600">
             Dashboard
           </Link>
@@ -202,7 +202,7 @@ export default function RFIPage() {
             {project?.name || "Project"}
           </Link>
           <span className="mx-2">/</span>
-          <span className="text-gray-900">RFI</span>
+          <span className="text-text-primary">RFI</span>
         </nav>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
@@ -243,23 +243,23 @@ export default function RFIPage() {
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to the RFI Module</h3>
-                <p className="text-gray-700 mb-3">
+                <h3 className="text-lg font-semibold text-text-primary mb-2">Welcome to the RFI Module</h3>
+                <p className="text-text-primary mb-3">
                   A <strong>Request for Information (RFI)</strong> is your first step in the procurement process. It helps you gather preliminary information from potential vendors about their capabilities, experience, and solutions before diving into detailed proposals.
                 </p>
-                <p className="text-gray-700 mb-3">
+                <p className="text-text-primary mb-3">
                   <strong>Here's how this module works:</strong>
                 </p>
-                <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+                <ul className="list-disc list-inside text-text-primary space-y-1 mb-4 ml-2">
                   <li><strong>Email text:</strong> Compose the invitation email that vendors will receive</li>
                   <li><strong>RFI information:</strong> Add context about your project and what you're looking for</li>
                   <li><strong>Questionnaire:</strong> Create questions to understand vendors' capabilities</li>
                   <li><strong>Publish & Send:</strong> When ready, set a deadline and publish to send the RFI to all your vendors</li>
                 </ul>
-                <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+                <div className="bg-background-primary/60 border border-primary-300 rounded-md p-3 shadow-sm">
                   <div className="flex items-start gap-3">
                     <div className="text-3xl flex-shrink-0">💡</div>
-                    <div className="flex-1 text-sm text-gray-700 italic">
+                    <div className="flex-1 text-sm text-text-primary italic">
                       <div className="font-bold not-italic mb-1">Tip:</div>
                       <div>Take your time crafting clear questions.</div>
                       <div>Good questions lead to valuable insights that help you make informed decisions!</div>
@@ -378,7 +378,7 @@ export default function RFIPage() {
       </div>
 
       {/* Tab content */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-background-secondary rounded-lg shadow-md p-6 border border-border-primary">
         {activeTab === "email" && (
           <div className="space-y-4">
             <div className="mb-6">

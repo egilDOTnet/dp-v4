@@ -9,12 +9,12 @@ import React, { forwardRef, useId } from "react";
 const baseInputClasses = `
   w-full px-3 py-2 
   border rounded-md 
-  text-gray-900 dark:text-gray-100
-  bg-white dark:bg-gray-800
-  border-gray-300 dark:border-gray-600
-  placeholder-gray-400 dark:placeholder-gray-500
+  text-text-primary
+  bg-background-secondary
+  border-border-primary
+  placeholder-text-tertiary
   focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
-  disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-60
+  disabled:bg-background-tertiary disabled:cursor-not-allowed disabled:opacity-60
   transition-colors
 `.trim().replace(/\s+/g, " ");
 
@@ -61,7 +61,7 @@ export function FormField({
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          className="block text-sm font-medium text-text-primary"
         >
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
@@ -90,7 +90,7 @@ export function FormField({
       {!error && helperText && (
         <p
           id={`${inputId}-helper`}
-          className="text-sm text-gray-500 dark:text-gray-400"
+          className="text-sm text-text-secondary"
         >
           {helperText}
         </p>
@@ -219,13 +219,13 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           ref={ref}
           type="checkbox"
           id={checkboxId}
-          className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500 bg-white dark:bg-gray-800"
+          className="h-4 w-4 rounded border-border-primary text-primary-600 focus:ring-primary-500 bg-background-secondary"
           {...props}
         />
         {label && (
           <label
             htmlFor={checkboxId}
-            className="ml-2 text-sm text-gray-700 dark:text-gray-300"
+            className="ml-2 text-sm text-text-primary"
           >
             {label}
           </label>
@@ -258,11 +258,11 @@ const buttonVariantClasses: Record<ButtonVariant, string> = {
   primary:
     "bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 border-transparent",
   secondary:
-    "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500 border-gray-300 dark:border-gray-600",
+    "bg-background-secondary text-text-primary hover:bg-background-tertiary focus:ring-primary-500 border-border-primary",
   danger:
     "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 border-transparent",
   ghost:
-    "bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:ring-primary-500 border-transparent",
+    "bg-transparent text-text-primary hover:bg-background-tertiary focus:ring-primary-500 border-transparent",
 };
 
 const buttonSizeClasses: Record<ButtonSize, string> = {

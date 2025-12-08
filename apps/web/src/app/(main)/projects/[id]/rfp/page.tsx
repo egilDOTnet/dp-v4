@@ -34,7 +34,7 @@ export default function RFPPage() {
 
   return (
     <div>
-      <nav className="mb-4 text-sm text-gray-600">
+      <nav className="mb-4 text-sm text-text-secondary">
         <Link href="/dashboard" className="hover:text-primary-600">
           Dashboard
         </Link>
@@ -47,7 +47,7 @@ export default function RFPPage() {
           {project?.name || "Project"}
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-900">RFP</span>
+        <span className="text-text-primary">RFP</span>
       </nav>
 
       {/* Hero Banner */}
@@ -60,23 +60,23 @@ export default function RFPPage() {
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to the RFP Module (Coming Soon)</h3>
-              <p className="text-gray-700 mb-3">
+              <h3 className="text-lg font-semibold text-text-primary mb-2">Welcome to the RFP Module (Coming Soon)</h3>
+              <p className="text-text-primary mb-3">
                 A <strong>Request for Proposal (RFP)</strong> is the formal step after your RFI where you request detailed proposals from qualified vendors. This is where vendors provide comprehensive responses to your specific requirements.
               </p>
-              <p className="text-gray-700 mb-3">
+              <p className="text-text-primary mb-3">
                 <strong>Future features will include:</strong>
               </p>
-              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+              <ul className="list-disc list-inside text-text-primary space-y-1 mb-4 ml-2">
                 <li><strong>RFP content management:</strong> Create and organize detailed proposal requests</li>
                 <li><strong>Set deadlines:</strong> Manage submission timelines and auto-publish dates</li>
                 <li><strong>Q&A functionality:</strong> Handle vendor questions during the RFP period</li>
                 <li><strong>Document links:</strong> Attach relevant specifications, requirements, and supporting materials</li>
               </ul>
-              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+              <div className="bg-background-primary/60 border border-primary-300 rounded-md p-3 shadow-sm">
                 <div className="flex items-start gap-3">
                   <div className="text-3xl flex-shrink-0">💡</div>
-                  <div className="flex-1 text-sm text-gray-700 italic">
+                  <div className="flex-1 text-sm text-text-primary italic">
                     <div className="font-bold not-italic mb-1">Tip:</div>
                     <div>This feature will help you collect detailed, comparable proposals from qualified vendors.</div>
                     <div>Use your RFI insights to create a focused and effective RFP!</div>
@@ -96,12 +96,12 @@ export default function RFPPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-md p-12 text-center">
-        <h1 className="text-3xl font-bold mb-4">Request for Proposal (RFP)</h1>
-        <p className="text-gray-600 mb-2">
+      <div className="bg-background-secondary rounded-lg shadow-md p-12 text-center border border-border-primary">
+        <h1 className="text-3xl font-bold mb-4 text-text-primary">Request for Proposal (RFP)</h1>
+        <p className="text-text-secondary mb-2">
           Manage RFP contents, dates, Q&A with vendors, and links to necessary content
         </p>
-        <p className="text-gray-400 text-sm italic">Coming soon</p>
+        <p className="text-text-tertiary text-sm italic">Coming soon</p>
       </div>
     </div>
   );

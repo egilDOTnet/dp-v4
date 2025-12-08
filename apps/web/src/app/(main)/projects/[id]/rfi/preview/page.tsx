@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, RFI, RFIQuestion, RFIQuestionType } from "@/lib/api";
+import { api, RFI, RFIQuestion } from "@/lib/api";
 
 export default function RFIPreviewPage() {
   const params = useParams();
@@ -93,14 +93,14 @@ export default function RFIPreviewPage() {
 
       case "ContactDetails":
         return (
-          <div className="space-y-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
+          <div className="space-y-4 p-4 bg-background-secondary border border-gray-200 rounded-md">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Vendor Name
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-background-tertiary"
                 disabled
                 placeholder="Vendor name (read-only)"
               />
@@ -244,7 +244,7 @@ export default function RFIPreviewPage() {
         <span className="text-gray-900">Preview</span>
       </nav>
 
-      <div className="bg-white rounded-lg shadow-md p-8">
+      <div className="bg-background-secondary rounded-lg shadow-md p-8">
         {/* RFI Information */}
         {rfi.rfiInformation && (
           <div className="mb-8">
@@ -282,14 +282,14 @@ export default function RFIPreviewPage() {
         {/* Contact Details Section */}
         <div className="mt-12 pt-8 border-t">
           <h2 className="text-xl font-semibold mb-4">Contact Details</h2>
-          <div className="space-y-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
+          <div className="space-y-4 p-4 bg-background-secondary border border-gray-200 rounded-md">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Vendor Name
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-background-tertiary"
                 disabled
                 placeholder="[Vendor name will be shown here]"
               />

@@ -184,7 +184,7 @@ export default function VendorsPage() {
         <Breadcrumbs items={breadcrumbItems} />
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600 dark:text-gray-400">
+          <p className="mt-4 text-text-secondary">
             Loading vendors...
           </p>
         </div>
@@ -231,15 +231,15 @@ export default function VendorsPage() {
             </svg>
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <h3 className="text-lg font-semibold text-text-primary mb-2">
               Welcome to Vendor Management
             </h3>
-            <p className="text-gray-700 dark:text-gray-300 mb-3">
+            <p className="text-text-primary mb-3">
               Building a comprehensive list of{" "}
               <strong>potential vendors</strong> is crucial for a successful
               procurement process.
             </p>
-            <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1 mb-4 ml-2 text-sm">
+            <ul className="list-disc list-inside text-text-primary space-y-1 mb-4 ml-2 text-sm">
               <li>
                 <strong>Add vendors:</strong> Create vendor profiles with
                 organization details
@@ -251,10 +251,10 @@ export default function VendorsPage() {
                 <strong>Track status:</strong> Monitor vendor engagement
               </li>
             </ul>
-            <div className="bg-white/60 dark:bg-gray-800/60 border border-primary-300 dark:border-primary-700 rounded-md p-3">
+            <div className="bg-background-primary/60 border border-primary-300 dark:border-primary-700 rounded-md p-3">
               <div className="flex items-start gap-3">
                 <div className="text-2xl">💡</div>
-                <div className="text-sm text-gray-700 dark:text-gray-300 italic">
+                <div className="text-sm text-text-primary italic">
                   <strong className="not-italic">Tip:</strong> Add contact
                   persons early to streamline RFI and RFP distribution.
                 </div>
@@ -275,7 +275,7 @@ export default function VendorsPage() {
           />
         </div>
         {isSearching && (
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="text-sm text-text-secondary">
             {displayItems.length} of {vendors.length} vendors
           </span>
         )}

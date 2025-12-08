@@ -16,7 +16,7 @@ export const Card: React.FC<CardProps> = ({
   onClick,
 }) => {
   const baseStyles =
-    "bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-all duration-150";
+    "bg-background-secondary rounded-lg shadow-sm border border-border-primary transition-all duration-150";
 
   const variantStyles = {
     default: "",
@@ -47,7 +47,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
 }) => {
   return (
     <div
-      className={`px-6 py-4 border-b border-gray-200 dark:border-gray-700 ${className}`}
+      className={`px-6 py-4 border-b border-border-primary ${className}`}
     >
       {children}
     </div>
@@ -77,7 +77,7 @@ export const CardFooter: React.FC<CardFooterProps> = ({
 }) => {
   return (
     <div
-      className={`px-6 py-4 border-t border-gray-200 dark:border-gray-700 ${className}`}
+      className={`px-6 py-4 border-t border-border-primary ${className}`}
     >
       {children}
     </div>

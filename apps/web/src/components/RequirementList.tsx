@@ -671,7 +671,7 @@ export default function RequirementList({
                   ref={(el) => {
                     requirementRefs.current[requirement.id] = el;
                   }}
-                  className={`border-2 ${colorClasses.border} rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
+                  className={`border-2 ${colorClasses.border} rounded-lg bg-background-tertiary flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
                     cancelingRequirementId === requirement.id
                       ? "opacity-0 scale-95"
                       : newlyCreatedRequirementId === requirement.id
@@ -834,7 +834,7 @@ export default function RequirementList({
                                 getFilteredHistory(requirement.id).map((entry) => (
                                   <div
                                     key={entry.id}
-                                    className="bg-gray-50 rounded p-3 text-sm grid grid-cols-4 gap-4"
+                                    className="bg-background-secondary rounded p-3 text-sm grid grid-cols-4 gap-4"
                                   >
                                     {/* Description - 3 columns */}
                                     <div className="col-span-3">
@@ -1140,7 +1140,7 @@ export default function RequirementList({
                         ref={(el) => {
                           requirementRefs.current[requirement.id] = el;
                         }}
-                        className={`border-2 ${colorClasses.border} rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
+                        className={`border-2 ${colorClasses.border} rounded-lg bg-background-tertiary flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
                           cancelingRequirementId === requirement.id
                             ? "opacity-0 scale-95"
                             : newlyCreatedRequirementId === requirement.id
@@ -1303,7 +1303,7 @@ export default function RequirementList({
                                       getFilteredHistory(requirement.id).map((entry) => (
                                         <div
                                           key={entry.id}
-                                          className="bg-gray-50 rounded p-3 text-sm grid grid-cols-4 gap-4"
+                                          className="bg-background-secondary rounded p-3 text-sm grid grid-cols-4 gap-4"
                                         >
                                           {/* Description - 3 columns */}
                                           <div className="col-span-3">
@@ -1428,7 +1428,7 @@ export default function RequirementList({
                       requirementRefs.current["__new__"] = el;
                     }
                   }}
-                  className={`border-2 ${colorClasses.border} rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
+                  className={`border-2 ${colorClasses.border} rounded-lg bg-background-tertiary flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
                     isNewRequirementAnimating
                       ? "opacity-100 translate-y-0"
                       : "opacity-0 -translate-y-4"

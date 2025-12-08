@@ -44,7 +44,7 @@ export const LoadingScreen: React.FC<{ message?: string }> = ({
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
       <LoadingSpinner size="lg" />
-      <p className="text-gray-600 dark:text-gray-400">{message}</p>
+      <p className="text-text-secondary">{message}</p>
     </div>
   );
 };

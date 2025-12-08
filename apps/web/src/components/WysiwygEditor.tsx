@@ -62,8 +62,8 @@ export default function WysiwygEditor({
       <button
         type="button"
         onClick={() => execCommand(command, value)}
-        className={`px-2 py-1 rounded hover:bg-gray-100 ${
-          active ? "bg-gray-200" : ""
+        className={`px-2 py-1 rounded hover:bg-background-primary ${
+          active ? "bg-background-secondary" : ""
         }`}
         title={title}
         onMouseDown={(e) => e.preventDefault()}
@@ -76,7 +76,7 @@ export default function WysiwygEditor({
   return (
     <div className="border border-gray-300 rounded-md">
       {/* Toolbar */}
-      <div className="border-b border-gray-300 bg-gray-50 p-2 flex items-center gap-1 flex-wrap">
+      <div className="border-b border-gray-300 bg-background-secondary p-2 flex items-center gap-1 flex-wrap">
         <ToolbarButton
           command="formatBlock"
           value="h1"
@@ -188,7 +188,7 @@ export default function WysiwygEditor({
               execCommand("createLink", url);
             }
           }}
-          className="px-2 py-1 rounded hover:bg-gray-100"
+          className="px-2 py-1 rounded hover:bg-background-primary"
           title="Insert Link"
           onMouseDown={(e) => e.preventDefault()}
         >
@@ -211,7 +211,7 @@ export default function WysiwygEditor({
           onClick={() => {
             execCommand("formatBlock", "p");
           }}
-          className="px-2 py-1 rounded hover:bg-gray-100"
+          className="px-2 py-1 rounded hover:bg-background-primary"
           title="Paragraph"
           onMouseDown={(e) => e.preventDefault()}
         >

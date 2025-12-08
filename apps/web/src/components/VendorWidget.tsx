@@ -41,9 +41,9 @@ export default function VendorWidget({ stats }: VendorWidgetProps) {
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 h-full">
+    <div className="bg-background-secondary rounded-lg shadow-md p-6 h-full border border-border-primary">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Vendors</h3>
+        <h3 className="text-lg font-semibold text-text-primary">Vendors</h3>
         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
           <span className="text-2xl font-bold text-primary-600">
             {stats.total}
@@ -52,12 +52,12 @@ export default function VendorWidget({ stats }: VendorWidgetProps) {
       </div>
 
       {stats.total === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-text-secondary">
           <p className="text-sm">No vendors yet</p>
         </div>
       ) : (
         <div>
-          <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+          <h4 className="text-xs font-semibold text-text-secondary uppercase mb-2">
             By Status
           </h4>
           <div className="space-y-2">

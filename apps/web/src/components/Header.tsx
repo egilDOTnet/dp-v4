@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -67,14 +68,9 @@ export function Header() {
   };
 
   return (
-    <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm transition-colors">
+    <header className="border-b border-border-primary bg-background-tertiary shadow-sm transition-colors">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <Link
-          href="/dashboard"
-          className="text-xl font-bold text-primary-700 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 cursor-pointer transition-colors"
-        >
-          Dynamic Purchase
-        </Link>
+        <Logo href="/dashboard" height={36} />
         {user && (
           <div className="flex items-center gap-4">
             {isAdmin && (
@@ -88,18 +84,18 @@ export function Header() {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-background-primary transition-colors"
                 aria-expanded={showMenu}
                 aria-haspopup="true"
               >
                 <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium">
                   {getInitial()}
                 </div>
-                <span className="hidden sm:block text-gray-900 dark:text-gray-100">
+                <span className="hidden sm:block text-text-primary">
                   {getDisplayName()}
                 </span>
                 <svg
-                  className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${showMenu ? "rotate-180" : ""}`}
+                  className={`w-4 h-4 text-text-secondary transition-transform ${showMenu ? "rotate-180" : ""}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -113,13 +109,13 @@ export function Header() {
                 </svg>
               </button>
               {showMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 animate-fade-in">
+                <div className="absolute right-0 mt-2 w-56 bg-background-tertiary rounded-lg shadow-2xl border border-border-primary py-1 z-50 animate-fade-in backdrop-blur-sm">
                   {/* User info */}
-                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <div className="px-4 py-3 border-b border-border-primary">
+                    <p className="text-sm font-medium text-text-primary">
                       {getDisplayName()}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-xs text-text-secondary truncate">
                       {user.email}
                     </p>
                   </div>
@@ -131,7 +127,7 @@ export function Header() {
                         setShowMenu(false);
                         router.push("/dashboard");
                       }}
-                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-primary transition-colors"
                     >
                       <svg
                         className="w-4 h-4"
@@ -155,7 +151,7 @@ export function Header() {
                           setShowMenu(false);
                           router.push("/projects/new");
                         }}
-                        className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors sm:hidden"
+                        className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-secondary transition-colors sm:hidden"
                       >
                         <svg
                           className="w-4 h-4"
@@ -179,7 +175,7 @@ export function Header() {
                         setShowMenu(false);
                         router.push("/profile");
                       }}
-                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-primary transition-colors"
                     >
                       <svg
                         className="w-4 h-4"
@@ -199,10 +195,10 @@ export function Header() {
                   </div>
 
                   {/* Theme toggle */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 py-1">
+                  <div className="border-t border-border-primary py-1">
                     <button
                       onClick={toggleTheme}
-                      className="flex items-center justify-between w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="flex items-center justify-between w-full px-4 py-2 text-sm text-text-primary hover:bg-background-secondary transition-colors"
                     >
                       <span className="flex items-center gap-3">
                         {resolvedTheme === "light" ? (
@@ -242,10 +238,10 @@ export function Header() {
                   </div>
 
                   {/* Logout */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 py-1">
+                  <div className="border-t border-border-primary py-1">
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-background-secondary transition-colors"
                     >
                       <svg
                         className="w-4 h-4"

@@ -46,7 +46,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     <div className={`relative ${className}`}>
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
         <svg
-          className="h-5 w-5 text-gray-400 dark:text-gray-500"
+          className="h-5 w-5 text-text-tertiary"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -71,10 +71,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           pl-10 
           pr-24 
           py-2 
-          bg-white dark:bg-gray-800
-          text-gray-900 dark:text-gray-100
+          bg-background-secondary
+          text-text-primary
           border 
-          border-gray-300 dark:border-gray-600
+          border-border-primary
           rounded-md 
           transition-all 
           duration-150 
@@ -82,12 +82,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           focus:ring-2 
           focus:ring-primary-500 
           focus:border-primary-500
-          placeholder:text-gray-400 dark:placeholder:text-gray-500
+          placeholder:text-text-tertiary
         "
       />
       <div className="absolute inset-y-0 right-0 flex items-center pr-3 gap-2">
         {showShortcutHint && !value && (
-          <kbd className="hidden sm:inline-block px-2 py-1 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded">
+          <kbd className="hidden sm:inline-block px-2 py-1 text-xs text-text-tertiary bg-background-secondary border border-border-primary rounded">
             ⌘K
           </kbd>
         )}
@@ -95,7 +95,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           <button
             type="button"
             onClick={handleClear}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-text-tertiary hover:text-text-secondary transition-colors"
             aria-label="Clear search"
           >
             <svg

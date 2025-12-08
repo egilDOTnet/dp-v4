@@ -339,13 +339,13 @@ export function VendorFormDialog({
 
             {/* Search Results Dropdown */}
             {showResults && searchResults.length > 0 && !companySelected && (
-              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+              <div className="absolute z-10 w-full mt-1 bg-background-tertiary border border-border-primary rounded-md shadow-lg max-h-60 overflow-auto">
                 {searchResults.map((result) => (
                   <button
                     key={result.organizationNumber}
                     type="button"
                     onClick={() => handleSelectCompany(result)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                    className="w-full text-left px-4 py-3 hover:bg-background-primary border-b border-border-primary last:border-b-0"
                   >
                     <div className="font-medium text-gray-900 dark:text-gray-100">{result.name}</div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">

@@ -32,7 +32,7 @@ export const Avatar: React.FC<AvatarProps> = ({
 
   const statusColors = {
     online: "bg-green-500",
-    offline: "bg-gray-400 dark:bg-gray-500",
+    offline: "bg-text-tertiary",
     away: "bg-amber-500",
   };
 
@@ -54,7 +54,7 @@ export const Avatar: React.FC<AvatarProps> = ({
           justify-center 
           font-semibold 
           overflow-hidden
-          ${src ? "bg-gray-100 dark:bg-gray-700" : "bg-primary-500 text-white"}
+          ${src ? "bg-background-tertiary" : "bg-primary-500 text-white"}
         `}
       >
         {src ? (
@@ -76,7 +76,7 @@ export const Avatar: React.FC<AvatarProps> = ({
             ${statusSizes[size]} 
             ${statusColors[status]} 
             rounded-full 
-            border-white dark:border-gray-800
+            border-background-primary
           `}
         />
       )}

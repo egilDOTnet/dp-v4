@@ -41,6 +41,20 @@
   --color-warning-100: #fef3c7;
   --color-warning-500: #f59e0b;
   --color-warning-600: #d97706;
+
+  /* Semantic Background Colors - Light mode defaults (will be overridden in :root and .dark) */
+  --color-background-primary: #f3f4f6;  /* Gray-100 - page background (darkest) */
+  --color-background-secondary: #f9fafb; /* Gray-50 - cards/content (medium) */
+  --color-background-tertiary: #ffffff;  /* White - sidebar/elevated (lightest) */
+
+  /* Semantic Text Colors - Light mode defaults */
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
+
+  /* Semantic Border Colors - Light mode defaults */
+  --color-border-primary: #e5e7eb;
+  --color-border-secondary: #d1d5db;
 }
 
 /* =================================================================
@@ -48,10 +62,11 @@
    ================================================================= */
 
 :root {
-  /* Light mode colors */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f9fafb;
-  --color-bg-tertiary: #f3f4f6;
+  /* Light mode colors - override @theme defaults */
+  /* For visual hierarchy: page=gray-100 (darkest), cards=gray-50 (medium), elevated=white (lightest) */
+  --color-background-primary: #f3f4f6;  /* Gray-100 - page background (darkest shade for depth) */
+  --color-background-secondary: #f9fafb; /* Gray-50 - cards/content (medium) */
+  --color-background-tertiary: #ffffff;  /* White - sidebar/elevated (lightest, most elevated) */
   
   --color-text-primary: #111827;
   --color-text-secondary: #4b5563;
@@ -59,6 +74,11 @@
   
   --color-border-primary: #e5e7eb;
   --color-border-secondary: #d1d5db;
+
+  /* Legacy variable names for backwards compatibility */
+  --color-bg-primary: var(--color-background-primary);
+  --color-bg-secondary: var(--color-background-secondary);
+  --color-bg-tertiary: var(--color-background-tertiary);
 }
 
 /* =================================================================
@@ -66,9 +86,11 @@
    ================================================================= */
 
 .dark {
-  --color-bg-primary: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-bg-tertiary: #334155;
+  /* Dark mode colors - override @theme defaults */
+  /* For visual hierarchy: page=gray-950 (darkest), cards=gray-900 (medium), elevated=gray-800 (lightest) */
+  --color-background-primary: #0f172a;  /* Gray-950 - page background (darkest at back) */
+  --color-background-secondary: #1e293b; /* Gray-900 - cards/content (medium, elevated) */
+  --color-background-tertiary: #334155;  /* Gray-800 - sidebar/elevated (lightest, most elevated) */
   
   --color-text-primary: #f9fafb;
   --color-text-secondary: #d1d5db;
@@ -76,6 +98,11 @@
   
   --color-border-primary: #374151;
   --color-border-secondary: #4b5563;
+
+  /* Legacy variable names for backwards compatibility */
+  --color-bg-primary: var(--color-background-primary);
+  --color-bg-secondary: var(--color-background-secondary);
+  --color-bg-tertiary: var(--color-background-tertiary);
 }
 
 /* =================================================================
@@ -92,7 +119,7 @@ html.dark {
 }
 
 body {
-  background-color: var(--color-bg-primary);
+  background-color: var(--color-background-primary);
   color: var(--color-text-primary);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
@@ -116,7 +143,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-secondary);
+  background: var(--color-background-secondary);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -130,7 +157,7 @@ body {
 
 /* Dark mode scrollbar */
 .dark ::-webkit-scrollbar-track {
-  background: var(--color-bg-tertiary);
+  background: var(--color-background-tertiary);
 }
 
 .dark ::-webkit-scrollbar-thumb {

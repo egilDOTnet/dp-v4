@@ -72,15 +72,15 @@ const sizeClasses: Record<DialogVariant, Record<DialogSize, string>> = {
 
 function DialogHeader({ title, description, onClose }: DialogHeaderProps) {
   return (
-    <div className="flex items-start justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+    <div className="flex items-start justify-between p-4 sm:p-6 border-b border-border-primary">
       <div className="flex-1 pr-4">
         {title && (
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-text-primary">
             {title}
           </h2>
         )}
         {description && (
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-text-secondary">
             {description}
           </p>
         )}
@@ -88,7 +88,7 @@ function DialogHeader({ title, description, onClose }: DialogHeaderProps) {
       <button
         type="button"
         onClick={onClose}
-        className="rounded-md p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors"
+        className="rounded-md p-2 text-text-tertiary hover:text-text-secondary hover:bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors"
         aria-label="Close"
       >
         <svg
@@ -111,7 +111,7 @@ function DialogHeader({ title, description, onClose }: DialogHeaderProps) {
 
 function DialogFooter({ children }: DialogFooterProps) {
   return (
-    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 p-4 sm:p-6 border-t border-border-primary bg-background-secondary">
       {children}
     </div>
   );
@@ -233,7 +233,7 @@ export function Dialog({
               ref={dialogRef}
               className={`
                 relative w-full ${sizeClasses.modal[size]} 
-                transform rounded-lg bg-white dark:bg-gray-900 shadow-xl 
+                transform rounded-lg bg-background-secondary shadow-xl 
                 transition-all duration-300
                 ${open ? "translate-y-0 opacity-100 scale-100" : "translate-y-4 opacity-0 scale-95"}
                 ${className}
@@ -257,7 +257,7 @@ export function Dialog({
               ref={dialogRef}
               className={`
                 relative w-full ${sizeClasses.slideOver[size]}
-                transform bg-white dark:bg-gray-900 shadow-xl 
+                transform bg-background-secondary shadow-xl 
                 transition-transform duration-300 ease-out
                 ${open ? "translate-x-0" : "translate-x-full"}
                 h-full overflow-y-auto
@@ -336,7 +336,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-text-primary bg-background-secondary border border-border-primary rounded-md hover:bg-background-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
           >
             {cancelText}
           </button>
@@ -351,7 +351,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
+      <p className="text-sm text-text-secondary">{message}</p>
     </Dialog>
   );
 }

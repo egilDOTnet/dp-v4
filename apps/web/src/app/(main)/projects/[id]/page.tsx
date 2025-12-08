@@ -62,7 +62,7 @@ export default function ProjectDashboardPage() {
     return (
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading project...</p>
+        <p className="mt-4 text-text-secondary">Loading project...</p>
       </div>
     );
   }
@@ -78,7 +78,7 @@ export default function ProjectDashboardPage() {
   return (
     <div>
       {/* Breadcrumb Navigation */}
-      <nav className="mb-4 text-sm text-gray-600">
+      <nav className="mb-4 text-sm text-text-secondary">
         <Link href="/dashboard" className="hover:text-primary-600">
           Dashboard
         </Link>
@@ -87,7 +87,7 @@ export default function ProjectDashboardPage() {
           Projects
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-900">{project.name}</span>
+        <span className="text-text-primary">{project.name}</span>
       </nav>
 
       <div className="mb-6">
@@ -104,23 +104,23 @@ export default function ProjectDashboardPage() {
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Your Project Dashboard</h3>
-              <p className="text-gray-700 mb-3">
+              <h3 className="text-lg font-semibold text-text-primary mb-2">Welcome to Your Project Dashboard</h3>
+              <p className="text-text-primary mb-3">
                 This is your <strong>central hub</strong> for monitoring project progress and accessing all procurement activities. From here, you can quickly navigate to any section of your project and track key metrics.
               </p>
-              <p className="text-gray-700 mb-3">
+              <p className="text-text-primary mb-3">
                 <strong>Key features on this dashboard:</strong>
               </p>
-              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+              <ul className="list-disc list-inside text-text-primary space-y-1 mb-4 ml-2">
                 <li><strong>Phase Timeline:</strong> Track progress through procurement phases with task completion metrics</li>
                 <li><strong>Vendor Overview:</strong> Quick access to vendor management and status tracking</li>
                 <li><strong>RFI Status:</strong> Monitor your Request for Information progress and responses</li>
                 <li><strong>Requirements Tracking:</strong> Keep tabs on requirement priorities and statuses</li>
               </ul>
-              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+              <div className="bg-background-primary/60 border border-primary-300 rounded-md p-3 shadow-sm">
                 <div className="flex items-start gap-3">
                   <div className="text-3xl flex-shrink-0">💡</div>
-                  <div className="flex-1 text-sm text-gray-700 italic">
+                  <div className="flex-1 text-sm text-text-primary italic">
                     <div className="font-bold not-italic mb-1">Tip:</div>
                     <div>Use the dashboard widgets to quickly identify areas that need your attention.</div>
                     <div>Click on any phase in the timeline to jump directly to its tasks!</div>
@@ -141,51 +141,51 @@ export default function ProjectDashboardPage() {
       )}
 
       {/* Project Information */}
-      <div className="bg-white rounded-lg shadow-md mb-6 p-6">
+      <div className="bg-background-secondary rounded-lg shadow-md mb-6 p-6 border border-border-primary">
         <div className="grid grid-cols-3 gap-6">
           {/* Column 1: Type and Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-text-primary mb-2">
               Type & Description
             </label>
             {project.type ? (
-              <p className="text-gray-900">{project.type}</p>
+              <p className="text-text-primary">{project.type}</p>
             ) : (
-              <p className="text-gray-400 italic">No type specified</p>
+              <p className="text-text-tertiary italic">No type specified</p>
             )}
           </div>
 
           {/* Column 2: Dates */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-text-primary mb-2">
               Dates
             </label>
             <div className="space-y-2">
               {project.startDate && (
                 <div>
-                  <span className="text-xs text-gray-500">Start: </span>
-                  <span className="text-gray-900">
+                  <span className="text-xs text-text-secondary">Start: </span>
+                  <span className="text-text-primary">
                     {new Date(project.startDate).toLocaleDateString()}
                   </span>
                 </div>
               )}
               {project.endDate && (
                 <div>
-                  <span className="text-xs text-gray-500">Planned End: </span>
-                  <span className="text-gray-900">
+                  <span className="text-xs text-text-secondary">Planned End: </span>
+                  <span className="text-text-primary">
                     {new Date(project.endDate).toLocaleDateString()}
                   </span>
                 </div>
               )}
               {!project.startDate && !project.endDate && (
-                <p className="text-gray-400 italic text-sm">No dates set</p>
+                <p className="text-text-tertiary italic text-sm">No dates set</p>
               )}
             </div>
           </div>
 
           {/* Column 3: Members */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-text-primary mb-2">
               Members
             </label>
             {project.members && project.members.length > 0 ? (
@@ -199,14 +199,14 @@ export default function ProjectDashboardPage() {
                         member.name ||
                         member.email;
                   return (
-                    <li key={member.id} className="text-gray-900 text-sm">
+                    <li key={member.id} className="text-text-primary text-sm">
                       {displayName}
                     </li>
                   );
                 })}
               </ul>
             ) : (
-              <p className="text-gray-400 italic text-sm">No members</p>
+              <p className="text-text-tertiary italic text-sm">No members</p>
             )}
           </div>
         </div>

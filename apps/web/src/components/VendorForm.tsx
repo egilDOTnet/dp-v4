@@ -247,7 +247,7 @@ export default function VendorForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+      className="space-y-4 bg-background-secondary p-4 rounded-lg border border-border-primary"
     >
       {/* Company Name with Search */}
       <div className="relative" ref={resultsRef}>
@@ -270,7 +270,7 @@ export default function VendorForm({
             }}
             required
             placeholder="Type company name (searches Norwegian companies automatically)"
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+            className="w-full px-3 py-2 border border-border-primary bg-background-tertiary text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-text-tertiary"
           />
           {searching && (
             <div className="absolute right-3 top-2.5">
@@ -281,13 +281,13 @@ export default function VendorForm({
 
         {/* Search Results Dropdown */}
         {showResults && searchResults.length > 0 && !companySelected && (
-          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+          <div className="absolute z-10 w-full mt-1 bg-background-tertiary border border-border-primary rounded-md shadow-lg max-h-60 overflow-auto">
             {searchResults.map((result) => (
               <button
                 key={result.organizationNumber}
                 type="button"
                 onClick={() => handleSelectCompany(result)}
-                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                className="w-full text-left px-4 py-3 hover:bg-background-primary border-b border-border-primary last:border-b-0"
               >
                 <div className="font-medium text-gray-900 dark:text-gray-100">
                   {result.name}
@@ -334,7 +334,7 @@ export default function VendorForm({
             }}
             placeholder="9 digits (for Norwegian companies)"
             maxLength={9}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+            className="w-full px-3 py-2 border border-border-primary bg-background-tertiary text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-text-tertiary"
           />
           {lookingUpOrgNumber && (
             <div className="absolute right-3 top-2.5">
@@ -413,7 +413,7 @@ export default function VendorForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="px-4 py-2 text-sm font-medium border border-border-primary text-text-primary rounded-md hover:bg-background-primary"
         >
           Cancel
         </button>
@@ -432,7 +432,7 @@ export default function VendorForm({
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full mx-4 border border-gray-200 dark:border-gray-700">
+          <div className="bg-background-tertiary rounded-lg shadow-lg p-6 max-w-md w-full mx-4 border border-border-primary">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">
               Remove Vendor
             </h3>
@@ -444,7 +444,7 @@ export default function VendorForm({
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
-                className="px-4 py-2 text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium border border-border-primary text-text-primary rounded-md hover:bg-background-primary disabled:opacity-50"
               >
                 Cancel
               </button>

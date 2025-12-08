@@ -34,7 +34,7 @@ export default function EvaluationPage() {
 
   return (
     <div>
-      <nav className="mb-4 text-sm text-gray-600">
+      <nav className="mb-4 text-sm text-text-secondary">
         <Link href="/dashboard" className="hover:text-primary-600">
           Dashboard
         </Link>
@@ -47,7 +47,7 @@ export default function EvaluationPage() {
           {project?.name || "Project"}
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-gray-900">Evaluation</span>
+        <span className="text-text-primary">Evaluation</span>
       </nav>
 
       {/* Hero Banner */}
@@ -60,23 +60,23 @@ export default function EvaluationPage() {
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Evaluation (Coming Soon)</h3>
-              <p className="text-gray-700 mb-3">
+              <h3 className="text-lg font-semibold text-text-primary mb-2">Welcome to Evaluation (Coming Soon)</h3>
+              <p className="text-text-primary mb-3">
                 The <strong>Evaluation</strong> module will help you systematically review and validate vendor responses against your requirements and RFP criteria. This is where data-driven vendor selection decisions are made.
               </p>
-              <p className="text-gray-700 mb-3">
+              <p className="text-text-primary mb-3">
                 <strong>Future features will include:</strong>
               </p>
-              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
+              <ul className="list-disc list-inside text-text-primary space-y-1 mb-4 ml-2">
                 <li><strong>Compare responses:</strong> Side-by-side comparison of vendor proposals</li>
                 <li><strong>Score against requirements:</strong> Evaluate how well each vendor meets your needs</li>
                 <li><strong>Add evaluation comments:</strong> Capture team feedback and assessment notes</li>
                 <li><strong>Track evaluation progress:</strong> Monitor which vendors have been reviewed</li>
               </ul>
-              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
+              <div className="bg-background-primary/60 border border-primary-300 rounded-md p-3 shadow-sm">
                 <div className="flex items-start gap-3">
                   <div className="text-3xl flex-shrink-0">💡</div>
-                  <div className="flex-1 text-sm text-gray-700 italic">
+                  <div className="flex-1 text-sm text-text-primary italic">
                     <div className="font-bold not-italic mb-1">Tip:</div>
                     <div>This feature will help you make objective, data-driven vendor selection decisions.</div>
                     <div>Stay tuned for powerful evaluation and comparison tools!</div>
@@ -96,12 +96,12 @@ export default function EvaluationPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-md p-12 text-center">
-        <h1 className="text-3xl font-bold mb-4">Evaluation</h1>
-        <p className="text-gray-600 mb-2">
+      <div className="bg-background-secondary rounded-lg shadow-md p-12 text-center border border-border-primary">
+        <h1 className="text-3xl font-bold mb-4 text-text-primary">Evaluation</h1>
+        <p className="text-text-secondary mb-2">
           Review and validate vendor responses according to requirements and RFP
         </p>
-        <p className="text-gray-400 text-sm italic">Coming soon</p>
+        <p className="text-text-tertiary text-sm italic">Coming soon</p>
       </div>
     </div>
   );

@@ -228,7 +228,7 @@ export default function TasksPage() {
             />
           </div>
           {isSearching && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-text-secondary">
               {filteredTasks.length} of {tasks.length} tasks
             </span>
           )}

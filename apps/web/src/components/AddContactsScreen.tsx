@@ -178,7 +178,7 @@ export default function AddContactsScreen({
   const allContactsSaved = contacts.every((c) => !c.isNew && c.firstName && c.lastName && c.email);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-background-secondary rounded-lg shadow-md p-6">
       <h2 className="text-2xl font-semibold mb-2">Add Contact Persons</h2>
       <p className="text-sm text-gray-600 mb-6">for {vendorName}</p>
 
@@ -220,7 +220,7 @@ export default function AddContactsScreen({
           return (
             <div
               key={contact.id || `contact-${index}`}
-              className="flex items-center justify-between bg-gray-50 p-4 rounded-lg border border-gray-200"
+              className="flex items-center justify-between bg-background-primary p-4 rounded-lg border border-border-primary"
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2">

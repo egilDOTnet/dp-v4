@@ -39,8 +39,8 @@ export default function PhaseTimeline({
   const sortedPhases = [...phases].sort((a, b) => a.order - b.order);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Phases</h3>
+    <div className="bg-background-secondary rounded-lg shadow-md p-6 border border-border-primary">
+      <h3 className="text-lg font-semibold text-text-primary mb-4">Project Phases</h3>
       <div className="flex gap-2 justify-between">
         {sortedPhases.map((phase) => {
           const isSelected = phase.id === selectedPhaseId;
@@ -72,7 +72,7 @@ export default function PhaseTimeline({
               
               {/* Tooltip on hover */}
               {isHovered && (
-                <div className="absolute z-50 top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 p-3 bg-gray-900 text-white text-sm rounded-lg shadow-lg pointer-events-none">
+                <div className="absolute z-50 top-full left-1/2 transform -translate-x-1/2 mt-2 w-64 p-3 bg-background-primary text-text-primary text-sm rounded-lg shadow-lg pointer-events-none border border-border-primary">
                   <div className="font-semibold mb-1">
                     Phase {phase.order}: {phase.name}
                   </div>

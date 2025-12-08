@@ -53,7 +53,7 @@ export default function ProjectsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" />
-        <p className="mt-4 text-gray-600 dark:text-gray-400">
+        <p className="mt-4 text-text-secondary">
           Loading projects...
         </p>
       </div>
@@ -100,7 +100,7 @@ export default function ProjectsPage() {
             />
           </div>
           {isSearching && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-text-secondary">
               {filteredItems.length} of {projects.length} projects
             </span>
           )}
@@ -176,7 +176,7 @@ export default function ProjectsPage() {
             <Link key={project.id} href={`/projects/${project.id}`}>
               <Card variant="interactive" className="h-full">
                 <CardBody>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  <h2 className="text-xl font-semibold text-text-primary mb-2">
                     {project.name}
                   </h2>
                   {project.type && (
@@ -186,7 +186,7 @@ export default function ProjectsPage() {
                       </Badge>
                     </div>
                   )}
-                  <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="space-y-1 text-sm text-text-secondary">
                     {project.startDate && (
                       <p>
                         Start:{" "}

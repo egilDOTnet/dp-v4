@@ -107,7 +107,7 @@ export const EntityForm: React.FC<EntityFormProps> = ({
   return (
     <div
       ref={formRef}
-      className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${className}`}
+      className={`bg-background-secondary border border-border-primary rounded-lg p-4 ${className}`}
       onKeyDown={handleKeyDown}
     >
       {/* Form Content */}
@@ -156,16 +156,16 @@ export const EntityForm: React.FC<EntityFormProps> = ({
 
       {/* Keyboard shortcut hint */}
       <div className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-        <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+        <kbd className="px-1.5 py-0.5 bg-background-primary rounded">
           Esc
         </kbd>{" "}
         to cancel
         <span className="mx-2">·</span>
-        <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+        <kbd className="px-1.5 py-0.5 bg-background-primary rounded">
           ⌘
         </kbd>
         +
-        <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+        <kbd className="px-1.5 py-0.5 bg-background-primary rounded">
           Enter
         </kbd>{" "}
         to save

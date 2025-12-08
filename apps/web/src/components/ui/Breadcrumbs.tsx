@@ -27,7 +27,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
             <li key={index} className="flex items-center">
               {index > 0 && (
                 <svg
-                  className="w-4 h-4 text-gray-400 dark:text-gray-500 mx-2"
+                  className="w-4 h-4 text-text-tertiary mx-2"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -41,7 +41,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
               {!isLast && item.href ? (
                 <Link
                   href={item.href}
-                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  className="text-text-secondary hover:text-text-primary transition-colors"
                 >
                   {item.label}
                 </Link>
@@ -49,8 +49,8 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
                 <span
                   className={
                     isLast
-                      ? "text-gray-900 dark:text-gray-100 font-medium"
-                      : "text-gray-500 dark:text-gray-400"
+                      ? "text-text-primary font-medium"
+                      : "text-text-secondary"
                   }
                 >
                   {item.label}

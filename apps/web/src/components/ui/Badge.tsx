@@ -17,7 +17,7 @@ export const Badge: React.FC<BadgeProps> = ({
     "inline-flex items-center justify-center font-medium rounded-full whitespace-nowrap";
 
   const variantStyles = {
-    default: "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+    default: "bg-background-tertiary text-text-primary",
     success: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300",
     warning:
       "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300",

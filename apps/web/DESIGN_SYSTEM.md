@@ -41,7 +41,7 @@ const { theme, setTheme, toggleTheme } = useTheme();
 ## Color System
 
 ### Light Mode
-- **Primary**: #0066CC → #004C99 (Blue)
+- **Primary**: #0066CC →#003264 (Blue)
 - **Background**: White → Gray-50 → Gray-100
 - **Text**: Gray-900 → Gray-700 → Gray-500
 - **Success**: #10B981 (Green)
@@ -49,7 +49,7 @@ const { theme, setTheme, toggleTheme } = useTheme();
 - **Error**: #EF4444 (Red)
 
 ### Dark Mode
-- **Primary**: #3B82F6 → #60A5FA (Lighter Blue)
+- **Primary**: #3B82F6 →#85b8f8 (Lighter Blue)
 - **Background**: Gray-950 → Gray-900 → Gray-800
 - **Text**: Gray-50 → Gray-300 → Gray-400
 - **Success**: #34D399 (Lighter Green)
@@ -395,6 +395,15 @@ const { query, setQuery, filteredItems } = useSearch({
 <SearchBar value={query} onChange={setQuery} />
 ```
 
+## Logo
+
+The application logo is currently using the PNG version from `assets/dynamicpurchaselogo.png`. The logo is displayed in:
+- Header component (main navigation)
+- Login page
+- Other authentication pages
+
+**Future Enhancement**: The current PNG logo should be replaced with a high-quality SVG version that better matches the original design. This will improve scalability and visual quality across different screen sizes and resolutions.
+
 ## Future Enhancements
 
 - Toast notification system (component exists, needs integration)
@@ -404,6 +413,7 @@ const { query, setQuery, filteredItems } = useSearch({
 - Skeleton loaders for page loads
 - Virtual scrolling for large lists
 - More animation presets
+- High-quality SVG logo version
 
 ## Support
 

@@ -259,7 +259,7 @@ export default function ProjectMembersPage() {
 
       <div className="space-y-6">
         {/* Existing Members List */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-background-secondary rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">Company Members</h2>
           {allAvailableUsers.length === 0 ? (
             <p className="text-gray-500">No other members available in your company.</p>
@@ -272,7 +272,7 @@ export default function ProjectMembersPage() {
                 return (
                   <label
                     key={member.id}
-                    className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                    className="flex items-center space-x-3 cursor-pointer hover:bg-background-primary p-2 rounded"
                   >
                     <input
                       type="checkbox"
@@ -292,7 +292,7 @@ export default function ProjectMembersPage() {
         </div>
 
         {/* Create New Member Form */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-background-secondary rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">Create New Member</h2>
           <form onSubmit={handleAddNewMember} className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
@@ -385,7 +385,7 @@ export default function ProjectMembersPage() {
             <button
               type="button"
               onClick={() => router.push(`/projects/${projectId}`)}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-background-primary"
             >
               Skip
             </button>
@@ -394,7 +394,7 @@ export default function ProjectMembersPage() {
             <button
               type="button"
               onClick={() => router.push(`/projects/${projectId}`)}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-background-primary"
             >
               Cancel
             </button>

@@ -8,7 +8,7 @@ export default function MainLayout({
 }) {
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors">
+      <div className="min-h-screen bg-background-primary transition-colors">
         <Header />
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {children}

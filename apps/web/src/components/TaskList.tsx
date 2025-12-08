@@ -790,7 +790,7 @@ export default function TaskList({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-background-secondary rounded-lg shadow-md p-6 border border-border-primary">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">{phaseTitle || "Tasks"}</h2>
         <div className="flex items-center gap-3">
@@ -801,7 +801,7 @@ export default function TaskList({
               className={`px-3 py-1.5 text-sm transition-colors ${
                 filter === "remaining"
                   ? "bg-primary-600 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
+                  : "bg-background-secondary text-text-primary hover:bg-background-tertiary"
               }`}
             >
               Remaining Tasks
@@ -812,7 +812,7 @@ export default function TaskList({
               className={`px-3 py-1.5 text-sm transition-colors ${
                 filter === "completed"
                   ? "bg-primary-600 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
+                  : "bg-background-secondary text-text-primary hover:bg-background-tertiary"
               }`}
             >
               Completed Tasks
@@ -823,7 +823,7 @@ export default function TaskList({
               className={`px-3 py-1.5 text-sm transition-colors ${
                 filter === "all"
                   ? "bg-primary-600 text-white"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
+                  : "bg-background-secondary text-text-primary hover:bg-background-tertiary"
               }`}
             >
               All Tasks
@@ -847,7 +847,7 @@ export default function TaskList({
         {/* New Task - Inline Edit Mode */}
         {isCreatingNewTask && (
           <div
-            className={`border-2 border-primary-500 rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
+            className={`border-2 border-primary-500 rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
               isNewTaskAnimating
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 -translate-y-4"
@@ -897,7 +897,7 @@ export default function TaskList({
                   onBlur={handleNewTaskBlur}
                   onKeyDown={handleNewTaskKeyDown}
                   placeholder="Enter task name..."
-                  className="flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border border-border-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500"
                   autoFocus
                 />
 
@@ -1041,7 +1041,7 @@ export default function TaskList({
                         taskRefs.current[task.id] = el;
                       }}
                       className={`
-                        border-2 border-primary-500 rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-300 ease-out
+                        border-2 border-primary-500 rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-300 ease-out
                         ${isCompleting ? "opacity-0 scale-95" : ""}
                         ${isNewlyCreated ? "shadow-lg scale-105" : ""}
                         ${isDragging ? "opacity-50 shadow-md" : ""}
@@ -1179,8 +1179,8 @@ export default function TaskList({
                             }}
                             className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
                               editingFields[task.id]?.has("name")
-                                ? "border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-gray-300 focus:bg-white"
+                                ? "border-border-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-border-primary focus:bg-background-secondary"
                             } ${
                               isCompleted ? "line-through" : ""
                             }`}
@@ -1192,7 +1192,7 @@ export default function TaskList({
                             <button
                               type="button"
                               onClick={() => handleDescriptionClick(task)}
-                              className="flex-shrink-0 text-gray-500 hover:text-gray-700"
+                              className="flex-shrink-0 text-text-secondary hover:text-text-primary"
                               title="Description"
                             >
                               <svg
@@ -1261,7 +1261,7 @@ export default function TaskList({
                                     />
                                   </svg>
                                   {task.startDate ? (
-                                    <span className="text-gray-900 whitespace-nowrap">{formatDateDisplay(task.startDate)}</span>
+                                    <span className="text-text-primary whitespace-nowrap">{formatDateDisplay(task.startDate)}</span>
                                   ) : (
                                     <span className="text-gray-500 whitespace-nowrap">Start date</span>
                                   )}
@@ -1395,7 +1395,7 @@ export default function TaskList({
                               />
                             ) : (
                               <p
-                                className="text-sm text-gray-700 whitespace-pre-wrap cursor-pointer hover:text-gray-900"
+                                className="text-sm text-text-primary whitespace-pre-wrap cursor-pointer hover:text-text-primary"
                                 onClick={() => {
                                   ensureFormData(task);
                                   setEditingDescriptions((prev) => new Set(prev).add(task.id));
@@ -1445,7 +1445,7 @@ export default function TaskList({
                         taskRefs.current[task.id] = el;
                       }}
                       className={`
-                        border-2 rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-500 ease-out
+                        border-2 rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-500 ease-out
                         ${isNewlyCreated ? "border-primary-500 shadow-lg scale-105" : ""}
                         ${isDelayed && !isNewlyCreated ? "border-red-400" : ""}
                         ${isCompleted && !isNewlyCreated ? "border-green-400" : ""}
@@ -1538,8 +1538,8 @@ export default function TaskList({
                             }}
                             className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
                               editingFields[task.id]?.has("name")
-                                ? "border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-gray-300 focus:bg-white"
+                                ? "border-border-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-border-primary focus:bg-background-secondary"
                             } ${isCompleted ? "line-through" : ""}`}
                           />
                         </div>

@@ -445,40 +445,40 @@ export default function VendorList({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
+    <div className="bg-background-secondary rounded-lg shadow-md overflow-hidden border border-border-primary">
       {/* Empty state message */}
       {!addingVendor && safeVendors.length === 0 && (
         <div className="p-6 text-center">
-          <p className="text-gray-600 dark:text-gray-400">No vendors added yet</p>
+          <p className="text-text-secondary">No vendors added yet</p>
         </div>
       )}
 
       {safeVendors.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+          <table className="w-full divide-y divide-border-primary">
+            <thead className="bg-background-tertiary">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[25%]">
+                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider w-[25%]">
                   Name
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
+                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider w-[12%]">
                   Org Number
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
+                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider w-[15%]">
                   Email Domain
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[18%]">
+                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider w-[18%]">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
+                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider w-[10%]">
                   Contacts
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[20%]">
+                <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase tracking-wider w-[20%]">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-background-secondary divide-y divide-border-primary">
               {safeVendors.map((projectVendor) => {
                 const vendor = projectVendor.vendor;
                 const isExpanded = expandedVendorId === vendor.id;
@@ -489,12 +489,12 @@ export default function VendorList({
 
                 return (
                   <Fragment key={projectVendor.id}>
-                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <tr className="hover:bg-background-tertiary">
                       <td className="px-4 py-4">
                         <div className="flex items-center">
                           <button
                             onClick={() => toggleExpand(vendor.id)}
-                            className="mr-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                            className="mr-2 text-text-tertiary hover:text-text-secondary flex-shrink-0"
                           >
                             {isExpanded ? (
                               <svg
@@ -530,11 +530,11 @@ export default function VendorList({
                             className="min-w-0 flex-1 cursor-pointer"
                             onClick={() => toggleExpand(vendor.id)}
                           >
-                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate hover:text-primary-600 dark:hover:text-primary-400">
+                            <div className="text-sm font-medium text-text-primary truncate hover:text-primary-600">
                               {vendor.name}
                             </div>
                             {mainContact && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              <div className="text-xs text-text-secondary truncate">
                                 Main: {mainContact.firstName}{" "}
                                 {mainContact.lastName}
                               </div>
@@ -542,12 +542,12 @@ export default function VendorList({
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-4 py-4 text-sm text-text-secondary">
                         <div className="truncate">
                           {vendor.organizationNumber || "-"}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-4 py-4 text-sm text-text-secondary">
                         <div className="truncate">
                           {vendor.emailDomain || "-"}
                         </div>
@@ -562,7 +562,7 @@ export default function VendorList({
                             )
                           }
                           disabled={updatingStatus === vendor.id}
-                          className="w-full text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
+                          className="w-full text-sm border-border-primary bg-background-secondary text-text-primary rounded-md focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
                         >
                           {STATUS_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -571,7 +571,7 @@ export default function VendorList({
                           ))}
                         </select>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-4 py-4 text-sm text-text-secondary">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
                           {contactCount}
                         </span>
@@ -598,7 +598,7 @@ export default function VendorList({
                       <tr>
                         <td
                           colSpan={6}
-                          className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50"
+                          className="px-4 py-4 bg-background-secondary"
                         >
                           <div
                             className={`transition-all duration-300 ease-out ${
@@ -629,11 +629,11 @@ export default function VendorList({
                       <tr>
                         <td
                           colSpan={6}
-                          className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50"
+                          className="px-4 py-4 bg-background-secondary"
                         >
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                              <h4 className="font-medium text-sm text-text-primary">
                                 Contact Persons
                               </h4>
                               {!addingContactVendorId && (
@@ -730,11 +730,11 @@ export default function VendorList({
                                     .map((contact) => (
                                       <div
                                         key={contact.id}
-                                        className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-md border border-gray-200 dark:border-gray-700"
+                                        className="flex items-center justify-between bg-background-tertiary p-3 rounded-md border border-border-primary"
                                       >
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-2">
-                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            <div className="text-sm font-medium text-text-primary">
                                               {contact.firstName}{" "}
                                               {contact.lastName}
                                             </div>
@@ -744,7 +744,7 @@ export default function VendorList({
                                               </span>
                                             )}
                                           </div>
-                                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                          <div className="text-sm text-text-secondary mt-1">
                                             {contact.email}
                                           </div>
                                         </div>
@@ -771,7 +771,7 @@ export default function VendorList({
                               vendor.contacts.length === 0) &&
                               !addingContactVendorId && (
                                 <div className="text-center py-4">
-                                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                  <p className="text-sm text-text-secondary italic">
                                     No contacts added yet
                                   </p>
                                 </div>
@@ -789,7 +789,7 @@ export default function VendorList({
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50"
+                    className="px-4 py-4 bg-background-secondary"
                   >
                     <div
                       className={`transition-all duration-300 ease-out ${

@@ -177,7 +177,7 @@ export default function ContactPersonForm({
           <button
             type="button"
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm font-medium border border-gray-300 rounded-md hover:bg-gray-50"
+            className="px-3 py-1.5 text-sm font-medium border border-border-primary rounded-md hover:bg-background-primary"
           >
             Cancel
           </button>
@@ -196,7 +196,7 @@ export default function ContactPersonForm({
         {/* Delete Confirmation Dialog */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-background-tertiary rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold mb-4">Delete Contact</h3>
               <p className="text-gray-700 mb-6">
                 Are you sure you want to delete "{existingContact?.firstName} {existingContact?.lastName}"? This action cannot be undone.
@@ -205,7 +205,7 @@ export default function ContactPersonForm({
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={deleting}
-                  className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium border border-border-primary rounded-md hover:bg-background-primary disabled:opacity-50"
                 >
                   Cancel
                 </button>

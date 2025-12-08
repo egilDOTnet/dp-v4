@@ -11,7 +11,7 @@ export const Table: React.FC<TableProps> = ({ children, className = "" }) => {
   return (
     <div className="overflow-x-auto">
       <table
-        className={`w-full divide-y divide-gray-200 dark:divide-gray-700 ${className}`}
+        className={`w-full divide-y divide-border-primary ${className}`}
       >
         {children}
       </table>
@@ -29,7 +29,7 @@ export const TableHeader: React.FC<TableHeaderProps> = ({
   className = "",
 }) => {
   return (
-    <thead className={`bg-gray-50 dark:bg-gray-800 ${className}`}>
+    <thead className={`bg-background-tertiary ${className}`}>
       {children}
     </thead>
   );
@@ -46,7 +46,7 @@ export const TableBody: React.FC<TableBodyProps> = ({
 }) => {
   return (
     <tbody
-      className={`bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700 ${className}`}
+      className={`bg-background-secondary divide-y divide-border-primary ${className}`}
     >
       {children}
     </tbody>
@@ -66,7 +66,7 @@ export const TableRow: React.FC<TableRowProps> = ({
 }) => {
   return (
     <tr
-      className={`${onClick ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800" : ""} ${className}`}
+      className={`${onClick ? "cursor-pointer hover:bg-background-tertiary" : ""} ${className}`}
       onClick={onClick}
     >
       {children}
@@ -85,7 +85,7 @@ export const TableHead: React.FC<TableHeadProps> = ({
 }) => {
   return (
     <th
-      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${className}`}
+      className={`px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider ${className}`}
     >
       {children}
     </th>
@@ -103,7 +103,7 @@ export const TableCell: React.FC<TableCellProps> = ({
 }) => {
   return (
     <td
-      className={`px-4 py-4 text-sm text-gray-900 dark:text-gray-100 ${className}`}
+      className={`px-4 py-4 text-sm text-text-primary ${className}`}
     >
       {children}
     </td>

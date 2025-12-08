@@ -722,7 +722,7 @@ export default function RequirementHierarchyComponent({
               }}
             >
               {isEditing ? (
-                <div className="border-2 border-primary-900 rounded-lg bg-white flex items-stretch overflow-hidden">
+                <div className="border-2 border-primary-900 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden">
                   {/* Left side: Number - same as view mode */}
                   <div 
                     className="bg-primary-900 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
@@ -920,7 +920,7 @@ export default function RequirementHierarchyComponent({
                           }}
                         >
                           {isEditing2 ? (
-                            <div className="border-2 border-primary-800 rounded-lg bg-white flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
+                            <div className="border-2 border-primary-800 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
                               {/* Left side: Number - same as view mode */}
                               <div 
                                 className="bg-primary-800 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
@@ -1239,7 +1239,7 @@ export default function RequirementHierarchyComponent({
                                 <button
                                   onClick={cancelEdit}
                                   disabled={loading}
-                                  className="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 text-sm"
+                                  className="px-3 py-1 border border-border-primary rounded-md hover:bg-background-primary disabled:opacity-50 text-sm"
                                 >
                                   Cancel
                                 </button>
@@ -1332,7 +1332,7 @@ export default function RequirementHierarchyComponent({
                                     {(() => {
                                       const count = requirements.filter((r) => r.hierarchyId === h2.id).length;
                                       return count > 0 ? (
-                                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-200 text-gray-700 text-xs font-medium">
+                                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-background-secondary text-text-primary text-xs font-medium">
                                           {count}
                                         </span>
                                       ) : null;
@@ -1352,7 +1352,7 @@ export default function RequirementHierarchyComponent({
                                     e.stopPropagation();
                                     startEdit(h2);
                                   }}
-                                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors"
+                                  className="px-3 py-1 bg-background-primary text-text-primary rounded-md hover:bg-background-secondary text-sm transition-colors"
                                 >
                                   Edit
                                 </button>
@@ -1410,7 +1410,7 @@ export default function RequirementHierarchyComponent({
               {/* Create Level 2 Hierarchy - only show if parent is expanded */}
               {expandedHierarchies.has(h1.id) && isCreatingChild && (
                 <div className="mt-2" style={{ marginLeft: '3.5rem' }}>
-                  <div className="border border-gray-200 rounded p-3 bg-gray-50 space-y-3">
+                  <div className="border border-border-primary rounded p-3 bg-background-secondary space-y-3">
                     <input
                       ref={(el) => {
                         titleInputRefs.current[`create-${h1.id}`] = el;
@@ -1441,7 +1441,7 @@ export default function RequirementHierarchyComponent({
                       <button
                         onClick={cancelCreate}
                         disabled={loading}
-                        className="px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 text-sm"
+                        className="px-3 py-1 border border-border-primary rounded-md hover:bg-background-primary disabled:opacity-50 text-sm"
                       >
                         Cancel
                       </button>

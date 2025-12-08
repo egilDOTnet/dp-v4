@@ -135,7 +135,7 @@ export default function ProfilePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" />
-        <p className="mt-4 text-gray-600 dark:text-gray-400">
+        <p className="mt-4 text-text-secondary">
           Loading profile...
         </p>
       </div>
@@ -158,7 +158,7 @@ export default function ProfilePage() {
         {/* Profile Information Card */}
         <Card>
           <CardBody className="space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-lg font-semibold text-text-primary">
               Personal Information
             </h2>
 
@@ -210,10 +210,10 @@ export default function ProfilePage() {
         {/* Theme Selection Card */}
         <Card>
           <CardBody className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-lg font-semibold text-text-primary">
               Appearance
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-text-secondary">
               Choose how the application looks to you
             </p>
 
@@ -228,7 +228,7 @@ export default function ProfilePage() {
                     ${
                       preference === option.value
                         ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
-                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-300"
+                        : "border-border-primary hover:border-border-secondary text-text-primary"
                     }
                   `}
                 >
@@ -263,7 +263,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Keyboard hints */}
-        <p className="text-xs text-gray-400 dark:text-gray-500">
+        <p className="text-xs text-text-tertiary">
           Theme changes are applied immediately and saved locally
         </p>
       </div>

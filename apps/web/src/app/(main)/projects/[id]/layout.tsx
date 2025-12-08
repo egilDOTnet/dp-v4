@@ -52,7 +52,7 @@ export default function ProjectLayout({
     return (
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading project...</p>
+        <p className="mt-4 text-text-secondary">Loading project...</p>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default function ProjectLayout({
     <div className="flex gap-6">
       {/* Sidebar Navigation */}
       <aside className="w-64 flex-shrink-0">
-        <div className="bg-white rounded-lg shadow-md sticky top-4 overflow-hidden">
+        <div className="bg-background-tertiary rounded-lg shadow-md sticky top-4 overflow-hidden border border-border-primary">
           {/* Project Header - Primary color background */}
           <Link
             href={`/projects/${projectId}`}
@@ -95,7 +95,7 @@ export default function ProjectLayout({
                   className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? "bg-primary-50 text-primary-700 border-l-4 border-primary-600"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                      : "text-text-primary hover:bg-background-primary"
                   }`}
                   title={item.description}
                 >
@@ -106,14 +106,14 @@ export default function ProjectLayout({
           </nav>
 
           {/* Full-width divider before Manage Project */}
-          <div className="border-t border-gray-200"></div>
+          <div className="border-t border-border-primary"></div>
 
           {/* Project Actions */}
           <div className="p-4">
             {isAdmin && (
               <Link
                 href={`/projects/${projectId}/manage`}
-                className="block px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="block px-3 py-2 rounded-md text-sm font-medium text-text-primary hover:bg-background-primary"
               >
                 Manage Project
               </Link>
