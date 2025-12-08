@@ -32,7 +32,10 @@ interface RequirementHierarchyProps {
   onAddRequirement?: (hierarchyId: string) => void;
   createForHierarchyId?: string | null;
   onCreateFormClose?: () => void;
+  expandedHierarchies: Set<string>;
+  onExpandedHierarchiesChange: (hierarchies: Set<string>) => void;
 }
+
 
 interface SortableHierarchyItemProps {
   hierarchy: RequirementHierarchyType;
@@ -69,7 +72,7 @@ function SortableHierarchyItem({
 
 interface SortableRequirementWrapperProps {
   requirement: Requirement;
-  children: React.ReactNode;
+  children: (props: { attributes: any; listeners: any }) => React.ReactNode;
 }
 
 function SortableRequirementWrapper({
@@ -94,33 +97,8 @@ function SortableRequirementWrapper({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative group/requirement">
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute -left-5 top-0 w-2.5 flex flex-col items-center justify-center gap-0.5 cursor-grab active:cursor-grabbing opacity-0 group-hover/requirement:opacity-100 transition-opacity z-10 hover:opacity-100"
-        style={{ paddingTop: '0.25rem' }}
-        title="Drag to reorder"
-      >
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-      </div>
-      {children}
+    <div ref={setNodeRef} style={style} className="relative">
+      {children({ attributes, listeners })}
     </div>
   );
 }
@@ -131,10 +109,13 @@ interface RequirementItemProps {
   requirement: Requirement;
   onRequirementUpdate: () => void;
   selectedHierarchyId?: string | null;
+  hierarchyLevel?: 1 | 2;
+  dragAttributes?: any;
+  dragListeners?: any;
 }
 
-function RequirementItem({ projectId, requirement, onRequirementUpdate, selectedHierarchyId }: RequirementItemProps) {
-  // Use RequirementList but only for this single requirement with drag disabled
+function RequirementItem({ projectId, requirement, onRequirementUpdate, selectedHierarchyId, hierarchyLevel = 1, dragAttributes, dragListeners }: RequirementItemProps) {
+  // Use RequirementList but only for this single requirement with drag enabled if props provided
   return (
     <RequirementList
       projectId={projectId}
@@ -144,7 +125,10 @@ function RequirementItem({ projectId, requirement, onRequirementUpdate, selected
       shouldShowCreateForm={false}
       onCreateFormClose={() => {}}
       selectedHierarchyId={selectedHierarchyId}
-      disableDragAndDrop={true}
+      disableDragAndDrop={!dragAttributes}
+      hierarchyLevel={hierarchyLevel}
+      dragAttributes={dragAttributes}
+      dragListeners={dragListeners}
     />
   );
 }
@@ -155,9 +139,10 @@ interface RequirementCreateFormProps {
   hierarchyId: string;
   onRequirementUpdate: () => void;
   onClose?: () => void;
+  hierarchyLevel?: 1 | 2;
 }
 
-function RequirementCreateForm({ projectId, hierarchyId, onRequirementUpdate, onClose }: RequirementCreateFormProps) {
+function RequirementCreateForm({ projectId, hierarchyId, onRequirementUpdate, onClose, hierarchyLevel = 1 }: RequirementCreateFormProps) {
   return (
     <RequirementList
       projectId={projectId}
@@ -168,6 +153,7 @@ function RequirementCreateForm({ projectId, hierarchyId, onRequirementUpdate, on
       onCreateFormClose={onClose}
       selectedHierarchyId={null}
       disableDragAndDrop={true}
+      hierarchyLevel={hierarchyLevel}
     />
   );
 }
@@ -183,6 +169,8 @@ export default function RequirementHierarchyComponent({
   onAddRequirement,
   createForHierarchyId,
   onCreateFormClose,
+  expandedHierarchies,
+  onExpandedHierarchiesChange,
 }: RequirementHierarchyProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingParentId, setCreatingParentId] = useState<string | null>(null);
@@ -191,7 +179,6 @@ export default function RequirementHierarchyComponent({
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
-  const [expandedHierarchies, setExpandedHierarchies] = useState<Set<string>>(new Set());
   const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const sensors = useSensors(
@@ -247,15 +234,13 @@ export default function RequirementHierarchyComponent({
     
     const isCurrentlyExpanded = expandedHierarchies.has(hierarchyId);
     
-    setExpandedHierarchies((prev) => {
-      const newSet = new Set(prev);
-      if (isCurrentlyExpanded) {
-        newSet.delete(hierarchyId);
-      } else {
-        newSet.add(hierarchyId);
-      }
-      return newSet;
-    });
+    const newSet = new Set(expandedHierarchies);
+    if (isCurrentlyExpanded) {
+      newSet.delete(hierarchyId);
+    } else {
+      newSet.add(hierarchyId);
+    }
+    onExpandedHierarchiesChange(newSet);
     
     // Schedule state updates for parent component after this render completes
     setTimeout(() => {
@@ -396,6 +381,11 @@ export default function RequirementHierarchyComponent({
     setError("");
   };
 
+  // Wrapper for requirement updates - expanded state is now managed by parent
+  const handleRequirementUpdateWithState = async () => {
+    await onRequirementUpdate();
+  };
+
   const toggleDescription = (hierarchyId: string) => {
     setExpandedDescriptions((prev) => {
       const newSet = new Set(prev);
@@ -414,9 +404,6 @@ export default function RequirementHierarchyComponent({
     if (!over || active.id === over.id) {
       return;
     }
-
-    // Save current expanded state
-    const currentExpandedHierarchies = new Set(expandedHierarchies);
 
     const hierarchiesToReorder = parentId === null ? level1Hierarchies : level2Hierarchies.filter((h) => h.parentId === parentId);
     const oldIndex = hierarchiesToReorder.findIndex((h) => h.id === active.id);
@@ -437,10 +424,8 @@ export default function RequirementHierarchyComponent({
         hierarchyIds,
         parentId: parentId || undefined,
       });
+      // Expanded state is now managed by parent - no need to save/restore
       await onHierarchyUpdate();
-      
-      // Restore expanded state after data loads
-      setExpandedHierarchies(currentExpandedHierarchies);
     } catch (err: any) {
       setError(err.message || "Failed to reorder hierarchies");
     } finally {
@@ -455,8 +440,135 @@ export default function RequirementHierarchyComponent({
       return;
     }
 
-    // Save current expanded state for all hierarchies
-    const currentExpandedHierarchies = new Set(expandedHierarchies);
+    // Check if this is a level 2 requirement being dragged
+    const draggedRequirement = requirements.find(r => r.id === active.id);
+    const level2HierarchiesInParent = hierarchies.filter(h => h.parentId === parentId);
+    const isLevel2Requirement = draggedRequirement && level2HierarchiesInParent.some(h => h.id === draggedRequirement.hierarchyId);
+    
+    console.log('handleChildDragEnd:', {
+      activeId: active.id,
+      overId: over.id,
+      draggedRequirement,
+      isLevel2Requirement,
+      level2HierarchiesInParent: level2HierarchiesInParent.map(h => h.id)
+    });
+    
+    if (isLevel2Requirement) {
+      // Handle level 2 requirement drag - determine target hierarchy
+      const overRequirement = requirements.find(r => r.id === over.id);
+      const overHierarchy = level2HierarchiesInParent.find(h => h.id === over.id);
+      
+      // Validate that we have a valid drop target
+      if (!overRequirement && !overHierarchy) {
+        // Dropped on something that's not a requirement or level 2 hierarchy - abort
+        return;
+      }
+      
+      let targetHierarchyId = draggedRequirement!.hierarchyId;
+      
+      if (overHierarchy) {
+        // Dropped on a level 2 hierarchy
+        targetHierarchyId = overHierarchy.id;
+      } else if (overRequirement && level2HierarchiesInParent.some(h => h.id === overRequirement.hierarchyId)) {
+        // Dropped on another level 2 requirement
+        targetHierarchyId = overRequirement.hierarchyId;
+      } else if (overRequirement) {
+        // Dropped on a requirement that's not a level 2 requirement - abort
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const sourceHierarchyId = draggedRequirement!.hierarchyId;
+        
+        console.log('Level 2 requirement drag:', {
+          sourceHierarchyId,
+          targetHierarchyId,
+          isCrossHierarchy: sourceHierarchyId !== targetHierarchyId
+        });
+        
+        // Check if this is a cross-hierarchy move
+        if (sourceHierarchyId !== targetHierarchyId) {
+          // Cross-hierarchy move
+          const targetRequirements = requirements.filter(r => r.hierarchyId === targetHierarchyId);
+          const overRequirementInTarget = overRequirement && overRequirement.hierarchyId === targetHierarchyId ? overRequirement : null;
+          
+          let newOrder = 0;
+          if (overRequirementInTarget) {
+            // Insert at the position of the requirement we're hovering over
+            newOrder = overRequirementInTarget.order;
+          } else {
+            // Add to the end
+            newOrder = targetRequirements.length > 0 ? Math.max(...targetRequirements.map(r => r.order)) + 1 : 0;
+          }
+
+          await api.requirements.move(projectId, draggedRequirement!.id, {
+            hierarchyId: targetHierarchyId,
+            order: newOrder,
+          });
+        } else {
+          // Same hierarchy - just reorder
+          const hierarchyRequirements = requirements.filter(r => r.hierarchyId === targetHierarchyId).sort((a, b) => a.order - b.order);
+          const oldIndex = hierarchyRequirements.findIndex(r => r.id === active.id);
+          const newIndex = hierarchyRequirements.findIndex(r => r.id === over.id);
+
+          console.log('Reordering in same hierarchy:', {
+            hierarchyId: targetHierarchyId,
+            requirementCount: hierarchyRequirements.length,
+            oldIndex,
+            newIndex,
+            activeId: active.id,
+            overId: over.id,
+            requirementIds: hierarchyRequirements.map(r => r.id)
+          });
+
+          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+            const reordered = arrayMove(hierarchyRequirements, oldIndex, newIndex);
+            console.log('Calling reorder API with:', reordered.map(r => r.id));
+            await api.requirements.reorder(projectId, {
+              requirementIds: reordered.map(r => r.id),
+              hierarchyId: targetHierarchyId,
+            });
+          } else if (oldIndex === -1 || newIndex === -1) {
+            // If we can't find the indices, don't do anything
+            console.warn('Could not find requirement indices for reordering', { oldIndex, newIndex, active: active.id, over: over.id });
+            setLoading(false);
+            return;
+          } else {
+            console.log('No reorder needed - indices are the same');
+          }
+        }
+
+        // Reload data - expanded state is managed by parent and will persist
+        await onRequirementUpdate();
+      } catch (err: any) {
+        setError(err.message || "Failed to move requirement");
+      } finally {
+        setLoading(false);
+      }
+      
+      return;
+    }
+
+    // Check if dragging a level 1 requirement
+    const isDraggingLevel1Requirement = draggedRequirement && draggedRequirement.hierarchyId === parentId;
+    const subHierarchies = level2Hierarchies;
+    
+    if (isDraggingLevel1Requirement && subHierarchies.length > 0) {
+      setError("Cannot add requirements to a hierarchy that has sub-hierarchies");
+      return;
+    }
+
+    // Check if dragging a hierarchy where there are already requirements
+    const isDraggingHierarchy = hierarchies.find(h => h.id === active.id);
+    const level1Requirements = requirements.filter(r => r.hierarchyId === parentId);
+    
+    if (isDraggingHierarchy && level1Requirements.length > 0) {
+      setError("Cannot add sub-hierarchies to a hierarchy that has requirements");
+      return;
+    }
 
     // Get all children (both hierarchies and requirements)
     const children = getChildrenForLevel1(parentId);
@@ -512,17 +624,15 @@ export default function RequirementHierarchyComponent({
       
       await Promise.all(promises);
       
-      // Reload data
+      // Reload data - expanded state is managed by parent and will persist
       await Promise.all([onHierarchyUpdate(), onRequirementUpdate()]);
-      
-      // Restore all expanded states after data loads
-      setExpandedHierarchies(currentExpandedHierarchies);
     } catch (err: any) {
       setError(err.message || "Failed to reorder items");
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="space-y-4">
@@ -615,49 +725,36 @@ export default function RequirementHierarchyComponent({
                   </div>
                 </div>
               ) : (
-                <div className="group">
-                  <div className="flex items-start justify-between">
-                    {/* Drag handle */}
-                    <div
-                      {...attributes}
-                      {...listeners}
-                      className="flex flex-col items-center justify-center gap-0.5 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:opacity-100 flex-shrink-0 mr-2"
-                      style={{ paddingTop: '0.25rem' }}
-                      title="Drag to reorder"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex gap-0.5">
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                      </div>
-                      <div className="flex gap-0.5">
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                      </div>
-                      <div className="flex gap-0.5">
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                      </div>
-                      <div className="flex gap-0.5">
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                        <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                      </div>
-                    </div>
-                    <div
-                      className="flex-1 cursor-pointer min-w-0 flex items-start"
-                      onClick={() => toggleHierarchyExpansion(h1.id)}
-                    >
-                      <span className={`font-medium flex-shrink-0 mr-2 ${
-                        expandedHierarchies.has(h1.id)
-                          ? "text-primary-600"
-                          : "text-gray-900"
-                      }`}>
-                        {h1.number.endsWith('.') ? h1.number : `${h1.number}.`}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-2 flex-wrap">
+                <div className="border-2 border-primary-600 rounded-lg bg-white flex items-stretch overflow-hidden">
+                  {/* Left side: Number with drag handle and click to toggle */}
+                  <div 
+                    {...attributes}
+                    {...listeners}
+                    className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-700 transition-colors"
+                    title="Drag to reorder or click to expand/collapse"
+                    onClick={(e) => {
+                      // Allow click to toggle if not dragging
+                      if (!isDragging) {
+                        toggleHierarchyExpansion(h1.id);
+                      }
+                      e.stopPropagation();
+                    }}
+                  >
+                    <span className="font-semibold text-lg leading-none">
+                      {h1.number.endsWith('.') ? h1.number.slice(0, -1) : h1.number}
+                    </span>
+                  </div>
+
+                  {/* Right side: Hierarchy content */}
+                  <div className="flex-1 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div
+                        className="flex-1 cursor-pointer min-w-0"
+                        onClick={() => toggleHierarchyExpansion(h1.id)}
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className={`font-medium hover:text-primary-600 ${
+                            className={`font-medium text-lg leading-none hover:text-primary-600 ${
                               expandedHierarchies.has(h1.id)
                                 ? "text-primary-700"
                                 : "text-gray-900"
@@ -696,22 +793,22 @@ export default function RequirementHierarchyComponent({
                             </span>
                           )}
                         </div>
-                        {/* Description aligned with number */}
+                        {/* Description */}
                         {h1.description && expandedDescriptions.has(h1.id) && (
                           <p className="text-sm text-gray-600 mt-1">{h1.description}</p>
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-2" style={{ width: '120px', justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startEdit(h1);
-                        }}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit(h1);
+                          }}
+                          className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -732,9 +829,16 @@ export default function RequirementHierarchyComponent({
                   }}
                 >
                   <SortableContext
-                    items={getChildrenForLevel1(h1.id).map((child) => 
-                      child.type === 'hierarchy' ? child.item.id : child.item.id
-                    )}
+                    items={[
+                      // Level 1 children (both hierarchies and requirements)
+                      ...getChildrenForLevel1(h1.id).map((child) => 
+                        child.type === 'hierarchy' ? child.item.id : child.item.id
+                      ),
+                      // Include only VISIBLE level 2 requirements (from expanded hierarchies) for dragging
+                      ...level2Hierarchies
+                        .filter(h2 => h2.parentId === h1.id && expandedHierarchies.has(h2.id))
+                        .flatMap(h2 => requirements.filter(r => r.hierarchyId === h2.id).map(r => r.id))
+                    ]}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="mt-2 space-y-2">
@@ -748,7 +852,7 @@ export default function RequirementHierarchyComponent({
                         {({ attributes, listeners }) => (
                         <div>
                           {isEditing2 ? (
-                            <div className="space-y-3" style={{ marginLeft: 'calc(var(--h1-number-width, 3ch) + 0.5rem)' }}>
+                            <div className="space-y-3" style={{ marginLeft: '3.5rem' }}>
                               <input
                                 ref={(el) => {
                                   titleInputRefs.current[h2.id] = el;
@@ -804,49 +908,36 @@ export default function RequirementHierarchyComponent({
                               </div>
                             </div>
                           ) : (
-                            <div className="group relative" style={{ marginLeft: 'calc(var(--h1-number-width, 3ch) + 0.5rem)' }}>
-                              {/* Drag handle */}
-                              <div
+                            <div className="border-2 border-primary-500 rounded-lg bg-white flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
+                              {/* Left side: Number with drag handle and click to toggle */}
+                              <div 
                                 {...attributes}
                                 {...listeners}
-                                className="absolute -left-5 flex flex-col items-center justify-center gap-0.5 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:opacity-100 flex-shrink-0"
-                                style={{ paddingTop: '0.25rem' }}
-                                title="Drag to reorder"
-                                onClick={(e) => e.stopPropagation()}
+                                className="bg-primary-500 text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-600 transition-colors"
+                                title="Drag to reorder or click to expand/collapse"
+                                onClick={(e) => {
+                                  // Allow click to toggle if not dragging
+                                  if (!isDragging) {
+                                    toggleHierarchyExpansion(h2.id);
+                                  }
+                                  e.stopPropagation();
+                                }}
                               >
-                                <div className="flex gap-0.5">
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                </div>
-                                <div className="flex gap-0.5">
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                </div>
-                                <div className="flex gap-0.5">
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                </div>
-                                <div className="flex gap-0.5">
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                  <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-                                </div>
+                                <span className="font-semibold text-base leading-none">
+                                  {h2.number.endsWith('.') ? h2.number.slice(0, -1) : h2.number}
+                                </span>
                               </div>
-                              <div className="flex items-start justify-between">
-                                <div
-                                  className="flex-1 cursor-pointer min-w-0 flex items-start"
-                                  onClick={() => toggleHierarchyExpansion(h2.id)}
-                                >
-                                  <span className={`font-medium flex-shrink-0 mr-2 ${
-                                    expandedHierarchies.has(h2.id)
-                                      ? "text-primary-600"
-                                      : "text-gray-900"
-                                  }`}>
-                                    {h2.number.endsWith('.') ? h2.number : `${h2.number}.`}
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start gap-2 flex-wrap">
+
+                              {/* Right side: Hierarchy content */}
+                              <div className="flex-1 p-4">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div
+                                    className="flex-1 cursor-pointer min-w-0"
+                                    onClick={() => toggleHierarchyExpansion(h2.id)}
+                                  >
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <span
-                                        className={`font-medium hover:text-primary-600 ${
+                                        className={`font-medium text-base leading-none hover:text-primary-600 ${
                                           expandedHierarchies.has(h2.id)
                                             ? "text-primary-700"
                                             : "text-gray-900"
@@ -888,24 +979,24 @@ export default function RequirementHierarchyComponent({
                                         ) : null;
                                       })()}
                                     </div>
-                                    {/* Description aligned with number */}
+                                    {/* Description */}
                                     {h2.description && expandedDescriptions.has(h2.id) && (
                                       <p className="text-sm text-gray-600 mt-1">
                                         {h2.description}
                                       </p>
                                     )}
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-2 flex-shrink-0 ml-2" style={{ width: '120px', justifyContent: 'flex-end' }}>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEdit(h2);
-                                    }}
-                                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors opacity-0 group-hover:opacity-100"
-                                  >
-                                    Edit
-                                  </button>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEdit(h2);
+                                      }}
+                                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -914,19 +1005,37 @@ export default function RequirementHierarchyComponent({
                           {/* Requirements inline for Level 2 - only show if expanded */}
                           {expandedHierarchies.has(h2.id) && (
                             <>
-                              <div className="mt-2" style={{ marginLeft: 'calc(var(--h2-number-width, 5ch) + 0.5rem)' }}>
-                                <RequirementList
-                                  projectId={projectId}
-                                  hierarchyId={h2.id}
-                                  requirements={requirements.filter((r) => r.hierarchyId === h2.id)}
-                                  onRequirementUpdate={onRequirementUpdate}
-                                  shouldShowCreateForm={createForHierarchyId === h2.id}
-                                  onCreateFormClose={onCreateFormClose}
-                                  selectedHierarchyId={selectedHierarchyId}
-                                />
+                              <div className="mt-2 space-y-2" style={{ marginLeft: '7rem' }}>
+                                {requirements.filter((r) => r.hierarchyId === h2.id).sort((a, b) => a.order - b.order).map((req) => (
+                                  <SortableRequirementWrapper key={req.id} requirement={req}>
+                                    {({ attributes, listeners }) => (
+                                      <RequirementItem
+                                        projectId={projectId}
+                                        requirement={req}
+                                        onRequirementUpdate={handleRequirementUpdateWithState}
+                                        selectedHierarchyId={selectedHierarchyId}
+                                        hierarchyLevel={2}
+                                        dragAttributes={attributes}
+                                        dragListeners={listeners}
+                                      />
+                                    )}
+                                  </SortableRequirementWrapper>
+                                ))}
+                                
+                                {/* Create form */}
+                                {createForHierarchyId === h2.id && (
+                                  <RequirementCreateForm
+                                    projectId={projectId}
+                                    hierarchyId={h2.id}
+                                    onRequirementUpdate={handleRequirementUpdateWithState}
+                                    onClose={onCreateFormClose}
+                                    hierarchyLevel={2}
+                                  />
+                                )}
                               </div>
+                              
                               {onAddRequirement && createForHierarchyId !== h2.id && (
-                                <div className="mt-2" style={{ marginLeft: 'calc(var(--h2-number-width, 5ch) + 0.5rem)' }}>
+                                <div className="mt-2" style={{ marginLeft: '7rem' }}>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -949,14 +1058,19 @@ export default function RequirementHierarchyComponent({
                         const req = child.item;
                         return (
                           <SortableRequirementWrapper key={req.id} requirement={req}>
-                            <div style={{ marginLeft: 'calc(var(--h1-number-width, 3ch) + 0.5rem)' }}>
+                          {({ attributes, listeners }) => (
+                            <div style={{ marginLeft: '3.5rem' }}>
                               <RequirementItem
                                 projectId={projectId}
                                 requirement={req}
-                                onRequirementUpdate={onRequirementUpdate}
+                                onRequirementUpdate={handleRequirementUpdateWithState}
                                 selectedHierarchyId={selectedHierarchyId}
+                                hierarchyLevel={1}
+                                dragAttributes={attributes}
+                                dragListeners={listeners}
                               />
                             </div>
+                          )}
                           </SortableRequirementWrapper>
                         );
                       }
@@ -964,12 +1078,13 @@ export default function RequirementHierarchyComponent({
                     
                     {/* Create new requirement form */}
                     {createForHierarchyId === h1.id && (
-                      <div style={{ marginLeft: 'calc(var(--h1-number-width, 3ch) + 0.5rem)' }}>
+                      <div style={{ marginLeft: '3.5rem' }}>
                         <RequirementCreateForm
                           projectId={projectId}
                           hierarchyId={h1.id}
-                          onRequirementUpdate={onRequirementUpdate}
+                          onRequirementUpdate={handleRequirementUpdateWithState}
                           onClose={onCreateFormClose}
+                          hierarchyLevel={1}
                         />
                       </div>
                     )}
@@ -1055,7 +1170,7 @@ export default function RequirementHierarchyComponent({
                             </div>
                           </div>
                         ) : (
-                          <div className="group relative" style={{ marginLeft: 'calc(var(--h1-number-width, 3ch) + 0.5rem)' }}>
+                          <div className="group relative" style={{ marginLeft: '3.5rem' }}>
                             {/* Drag handle */}
                             <div
                               {...attributes}
@@ -1159,15 +1274,17 @@ export default function RequirementHierarchyComponent({
                                 </button>
                                 {onAddRequirement && (
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // Expand the hierarchy if not already expanded
-                                      if (!expandedHierarchies.has(h2.id)) {
-                                        setExpandedHierarchies((prev) => new Set(prev).add(h2.id));
-                                        onHierarchySelect(h2.id);
-                                      }
-                                      onAddRequirement(h2.id);
-                                    }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Expand the hierarchy if not already expanded
+                                        if (!expandedHierarchies.has(h2.id)) {
+                                          const newSet = new Set(expandedHierarchies);
+                                          newSet.add(h2.id);
+                                          onExpandedHierarchiesChange(newSet);
+                                          onHierarchySelect(h2.id);
+                                        }
+                                        onAddRequirement(h2.id);
+                                      }}
                                     className="w-6 h-6 bg-green-600 text-white rounded-full hover:bg-green-700 flex items-center justify-center transition-colors"
                                     title="New requirement"
                                   >
@@ -1183,7 +1300,7 @@ export default function RequirementHierarchyComponent({
 
                         {/* Requirements inline for Level 2 - only show if expanded */}
                         {expandedHierarchies.has(h2.id) && (
-                          <div className="mt-2" style={{ marginLeft: 'calc(var(--h2-number-width, 5ch) + 0.5rem)' }}>
+                          <div className="mt-2" style={{ marginLeft: '7rem' }}>
                             <RequirementList
                               projectId={projectId}
                               hierarchyId={h2.id}
@@ -1192,6 +1309,7 @@ export default function RequirementHierarchyComponent({
                               shouldShowCreateForm={createForHierarchyId === h2.id}
                               onCreateFormClose={onCreateFormClose}
                               selectedHierarchyId={selectedHierarchyId}
+                              hierarchyLevel={2}
                             />
                           </div>
                         )}
@@ -1207,7 +1325,7 @@ export default function RequirementHierarchyComponent({
 
               {/* Create Level 2 Hierarchy - only show if parent is expanded */}
               {expandedHierarchies.has(h1.id) && isCreatingChild && (
-                <div className="mt-2" style={{ marginLeft: 'calc(var(--h1-number-width, 3ch) + 0.5rem)' }}>
+                <div className="mt-2" style={{ marginLeft: '3.5rem' }}>
                   <div className="border border-gray-200 rounded p-3 bg-gray-50 space-y-3">
                     <input
                       ref={(el) => {
@@ -1249,32 +1367,43 @@ export default function RequirementHierarchyComponent({
               )}
 
               {/* Add Level 2 Hierarchy and Requirement Links - only show if parent is expanded */}
-              {expandedHierarchies.has(h1.id) && !isCreatingChild && (
-                <div className="mt-2 flex gap-4" style={{ marginLeft: 'calc(var(--h1-number-width, 3ch) + 0.5rem)' }}>
-                  <button
-                    onClick={() => startCreate(h1.id)}
-                    className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
-                  >
-                    + Add sub-hierarchy here
-                  </button>
-                  {onAddRequirement && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Expand the hierarchy if not already expanded
-                        if (!expandedHierarchies.has(h1.id)) {
-                          setExpandedHierarchies((prev) => new Set(prev).add(h1.id));
-                          onHierarchySelect(h1.id);
-                        }
-                        onAddRequirement(h1.id);
-                      }}
-                      className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
-                    >
-                      + Add requirement here
-                    </button>
-                  )}
-                </div>
-              )}
+              {expandedHierarchies.has(h1.id) && !isCreatingChild && (() => {
+                const subHierarchies = level2Hierarchies.filter((h2) => h2.parentId === h1.id);
+                const level1Requirements = requirements.filter((r) => r.hierarchyId === h1.id);
+                const hasSubHierarchies = subHierarchies.length > 0;
+                const hasRequirements = level1Requirements.length > 0;
+
+                return (
+                  <div className="mt-2 flex gap-4" style={{ marginLeft: '3.5rem' }}>
+                    {!hasRequirements && (
+                      <button
+                        onClick={() => startCreate(h1.id)}
+                        className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                      >
+                        + Add sub-hierarchy here
+                      </button>
+                    )}
+                    {onAddRequirement && !hasSubHierarchies && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Expand the hierarchy if not already expanded
+                          if (!expandedHierarchies.has(h1.id)) {
+                            const newSet = new Set(expandedHierarchies);
+                            newSet.add(h1.id);
+                            onExpandedHierarchiesChange(newSet);
+                            onHierarchySelect(h1.id);
+                          }
+                          onAddRequirement(h1.id);
+                        }}
+                        className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                      >
+                        + Add requirement here
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             )}
             </SortableHierarchyItem>

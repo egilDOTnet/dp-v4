@@ -17,6 +17,7 @@ export default function RequirementsPage() {
   const [selectedHierarchyId, setSelectedHierarchyId] = useState<string | null>(null);
   const [createForHierarchyId, setCreateForHierarchyId] = useState<string | null>(null);
   const [showHeroBanner, setShowHeroBanner] = useState(true);
+  const [expandedHierarchies, setExpandedHierarchies] = useState<Set<string>>(new Set());
 
 
   const loadData = async () => {
@@ -210,6 +211,8 @@ export default function RequirementsPage() {
             }}
             createForHierarchyId={createForHierarchyId}
             onCreateFormClose={() => setCreateForHierarchyId(null)}
+            expandedHierarchies={expandedHierarchies}
+            onExpandedHierarchiesChange={setExpandedHierarchies}
           />
         </div>
       </div>
