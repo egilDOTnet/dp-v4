@@ -64,3 +64,5 @@ describe('Card Component', () => {
     expect(card.className).toContain('cursor-pointer');
   });
 });
+
+

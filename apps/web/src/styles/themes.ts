@@ -35,22 +35,22 @@ export interface ThemeColors {
 
 export const lightTheme: ThemeColors = {
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#0066cc',
-    700: '#004c99',
-    800: '#1e40af',
-    900: '#1e3a8a',
-    950: '#172554',
+    50: '#f0fdf4',   // Lightest green tint
+    100: '#dcfce7',  // Very light green
+    200: '#c7ff82',  // Light green from brand manual (C=22 M=0 Y=49 K=0)
+    300: '#a8e85c',  // Light-medium green
+    400: '#89d136',  // Medium-light green
+    500: '#65d405',  // Main brand green from brand manual (C=60 M=16 Y=98 K=1)
+    600: '#4fa804',  // Medium-dark green
+    700: '#3d7c03',  // Dark green
+    800: '#2a5002',  // Very dark green
+    900: '#182401',  // Darkest green
+    950: '#0f1501',  // Almost black green
   },
   background: {
-    primary: '#ffffff',
-    secondary: '#f9fafb',
-    tertiary: '#f3f4f6',
+    primary: '#f3f4f6',  // Gray-100 - page background (darkest shade for depth)
+    secondary: '#f9fafb', // Gray-50 - cards/content (medium)
+    tertiary: '#ffffff',  // White - sidebar/elevated (lightest, most elevated)
   },
   text: {
     primary: '#111827',
@@ -61,29 +61,29 @@ export const lightTheme: ThemeColors = {
     primary: '#e5e7eb',
     secondary: '#d1d5db',
   },
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
+  success: '#65d405',  // Use primary green for success
+  warning: '#ffcf33',  // Alternative yellow from brand manual (C=0 M=19 Y=80 K=0)
+  error: '#b91c1c',    // Error red-700 for better contrast on light backgrounds (WCAG AA compliant)
 };
 
 export const darkTheme: ThemeColors = {
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
-    950: '#172554',
+    50: '#0f1501',   // Darkest - almost black green
+    100: '#182401',  // Very dark green
+    200: '#2a5002',  // Dark green
+    300: '#3d7c03',  // Medium-dark green
+    400: '#4fa804',  // Medium green
+    500: '#65d405',  // Main brand green from brand manual (C=60 M=16 Y=98 K=1)
+    600: '#89d136',  // Medium-light green
+    700: '#a8e85c',  // Light-medium green
+    800: '#c7ff82',  // Light green from brand manual (C=22 M=0 Y=49 K=0)
+    900: '#dcfce7',  // Very light green
+    950: '#f0fdf4',  // Lightest green tint
   },
   background: {
-    primary: '#030712',
-    secondary: '#111827',
-    tertiary: '#1f2937',
+    primary: '#0f172a',  // Gray-950 - page background (darkest at back)
+    secondary: '#1e293b', // Gray-900 - cards/content (medium, elevated)
+    tertiary: '#334155',  // Gray-800 - sidebar/elevated (lightest, most elevated)
   },
   text: {
     primary: '#f9fafb',
@@ -94,9 +94,9 @@ export const darkTheme: ThemeColors = {
     primary: '#374151',
     secondary: '#4b5563',
   },
-  success: '#34d399',
-  warning: '#fcd34d',
-  error: '#f87171',
+  success: '#65d405',  // Use primary green for success
+  warning: '#ffcf33',  // Alternative yellow from brand manual (C=0 M=19 Y=80 K=0)
+  error: '#f87171',    // Lighter red for dark mode (better contrast)
 };
 
 export const getThemeColors = (theme: Theme): ThemeColors => {
