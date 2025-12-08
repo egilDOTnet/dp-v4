@@ -109,23 +109,17 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
             // Check each field being edited and save if changed
             const fields = editingFields[questionId];
             fields.forEach((field) => {
-              let hasChanged = false;
-              
               if (field === "title" && data.title.trim() !== question.title.trim()) {
-                hasChanged = true;
                 handleFieldSave(questionId, field as "title", data.title);
               } else if (field === "description") {
                 const currentDesc = (data.description || "").trim();
                 const questionDesc = (question.description || "").trim();
                 if (currentDesc !== questionDesc) {
-                  hasChanged = true;
                   handleFieldSave(questionId, field as "description", data.description);
                 }
               } else if (field === "type" && data.type !== question.type) {
-                hasChanged = true;
                 handleFieldSave(questionId, field as "type", data.type);
               } else if (field === "required" && data.required !== (question.required ?? true)) {
-                hasChanged = true;
                 handleFieldSave(questionId, field as "required", data.required);
               }
             });
@@ -541,14 +535,11 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
 
   // New question form component with inline layout
   const NewQuestionForm = ({
-    projectId,
     insertAfterIndex,
     onSubmit,
     onCancel,
-    getTypeLabel,
     questions,
   }: {
-    projectId: string;
     insertAfterIndex: number;
     onSubmit: (data: {
       title: string;
@@ -558,7 +549,6 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       scaleLabels?: Record<string, string> | null;
     }) => Promise<void>;
     onCancel: () => void;
-    getTypeLabel: (type: RFIQuestionType) => string;
     questions: RFIQuestion[];
   }) => {
     const [title, setTitle] = useState("");
@@ -566,11 +556,10 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
     const [type, setType] = useState<RFIQuestionType>("SingleText");
     const [required, setRequired] = useState(true);
     const [scaleLabels, setScaleLabels] = useState<Record<string, string>>({});
-    const [submitting, setSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
     const formRef = React.useRef<HTMLDivElement>(null);
 
-    const needsOptions = type === "Dropdown" || type === "MultipleChoice";
     const needsScaleConfig = type === "Scale";
 
     const handleSubmit = React.useCallback(async () => {
@@ -581,7 +570,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
         return;
       }
 
-      setSubmitting(true);
+      setIsSubmitting(true);
       try {
         await onSubmit({
           title: title.trim(),
@@ -593,7 +582,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
         // Form will close via onCancel after successful submission
       } catch (err: any) {
         setError(err.message || "Failed to save question");
-        setSubmitting(false);
+        setIsSubmitting(false);
       }
     }, [title, description, type, required, scaleLabels, onSubmit]);
 
@@ -749,9 +738,10 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                 {/* Cancel button - always shown, on same line as toggle */}
                 <button
                   onClick={onCancel}
-                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                  disabled={isSubmitting}
+                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 >
-                  Cancel
+                  {isSubmitting ? "Saving..." : "Cancel"}
                 </button>
               </div>
 
@@ -819,13 +809,11 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
               {/* Show form at the beginning if insertAfterIndex is -1 */}
               {insertAfterIndex === -1 && (
                 <NewQuestionForm
-                  projectId={projectId}
                   insertAfterIndex={insertAfterIndex}
                   onSubmit={async (data) => {
                     await handleCreateQuestion(data, insertAfterIndex);
                   }}
                   onCancel={() => setInsertAfterIndex(null)}
-                  getTypeLabel={getTypeLabel}
                   questions={questions}
                 />
               )}
@@ -847,13 +835,11 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                   {/* Show form before this question if insertAfterIndex matches (but not if it's -1, as that's handled above) */}
                   {insertAfterIndex === index - 1 && insertAfterIndex !== -1 && (
                     <NewQuestionForm
-                      projectId={projectId}
                       insertAfterIndex={insertAfterIndex}
                       onSubmit={async (data) => {
                         await handleCreateQuestion(data, insertAfterIndex);
                       }}
                       onCancel={() => setInsertAfterIndex(null)}
-                      getTypeLabel={getTypeLabel}
                       questions={questions}
                     />
                   )}
@@ -873,29 +859,14 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                         required: question.required ?? true,
                       };
 
-                      const titleRef = React.useRef<HTMLHeadingElement>(null);
-                      const [titleWidth, setTitleWidth] = React.useState<number | undefined>(undefined);
-
                       const [lastFocusedField, setLastFocusedField] = React.useState<string | null>(null);
 
                       const handleTitleClick = () => {
-                        if (titleRef.current && !isEditingTitle) {
-                          const width = titleRef.current.offsetWidth;
-                          setTitleWidth(Math.max(width, 200)); // Minimum width of 200px
-                        }
                         // Put all fields in edit mode
                         handleFieldFocus(question.id, "title");
                         handleFieldFocus(question.id, "description");
                         handleFieldFocus(question.id, "type");
                         setLastFocusedField("title");
-                      };
-
-                      const handleDescriptionClick = () => {
-                        // Put all fields in edit mode
-                        handleFieldFocus(question.id, "title");
-                        handleFieldFocus(question.id, "description");
-                        handleFieldFocus(question.id, "type");
-                        setLastFocusedField("description");
                       };
 
                       const handleTypeClick = () => {
@@ -905,12 +876,6 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                         handleFieldFocus(question.id, "type");
                         setLastFocusedField("type");
                       };
-
-                      React.useEffect(() => {
-                        if (!isEditingTitle) {
-                          setTitleWidth(undefined);
-                        }
-                      }, [isEditingTitle]);
 
                       // Calculate display number accounting for active insert form
                       const getDisplayNumber = () => {
@@ -934,7 +899,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                           <div
                             {...attributes}
                             {...listeners}
-                            className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing"
+                            className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing"
                             title="Drag to reorder"
                           >
                             <span className="font-semibold text-lg">
@@ -943,9 +908,9 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                           </div>
 
                           {/* Right side: Question content */}
-                          <div className="flex-1 p-4">
+                          <div className="flex-1 px-4 py-3">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                              <div className={`flex items-center justify-between gap-2 flex-wrap ${isEditing ? 'mb-2' : ''}`}>
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                   {isEditingTitle ? (
                                     <input
@@ -964,7 +929,6 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                     />
                                   ) : (
                                     <h4
-                                      ref={titleRef}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleTitleClick();
@@ -973,15 +937,6 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                     >
                                       {question.title}
                                     </h4>
-                                  )}
-                                  {question.required && (
-                                    <span 
-                                      className={`px-2 py-1 text-xs bg-red-100 text-red-700 rounded transition-opacity duration-200 ${
-                                        isEditing ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                                      }`}
-                                    >
-                                      Required
-                                    </span>
                                   )}
                                   {question.description && !isEditing && (
                                     <button
@@ -1007,6 +962,15 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                         />
                                       </svg>
                                     </button>
+                                  )}
+                                  {question.required && (
+                                    <span 
+                                      className={`px-2 py-1 text-xs bg-red-100 text-red-700 rounded transition-opacity duration-200 ${
+                                        isEditing ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                                      }`}
+                                    >
+                                      Required
+                                    </span>
                                   )}
                                 </div>
                                 {isEditingType ? (
@@ -1076,26 +1040,10 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                   autoFocus={lastFocusedField === "description"}
                                 />
                               ) : question.description && expandedDescriptions.has(question.id) ? (
-                                <p className="text-sm text-gray-600 mb-2">
+                                <p className="text-sm text-gray-600 mt-1">
                                   {question.description}
                                 </p>
-                              ) : question.description ? (
-                                <button
-                                  type="button"
-                                  onClick={handleDescriptionClick}
-                                  className="text-sm text-gray-400 hover:text-primary-600 transition-colors text-left"
-                                >
-                                  {question.description}
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={handleDescriptionClick}
-                                  className="text-sm text-gray-400 hover:text-primary-600 transition-colors"
-                                >
-                                  + Add description
-                                </button>
-                              )}
+                              ) : null}
 
                               {/* Required toggle and Options manager - shown when editing */}
                               {isEditing && (
@@ -1181,13 +1129,11 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
               {/* Show form at the end if insertAfterIndex is the last index */}
               {insertAfterIndex === questions.length - 1 && (
                 <NewQuestionForm
-                  projectId={projectId}
                   insertAfterIndex={insertAfterIndex}
                   onSubmit={async (data) => {
                     await handleCreateQuestion(data, insertAfterIndex);
                   }}
                   onCancel={() => setInsertAfterIndex(null)}
-                  getTypeLabel={getTypeLabel}
                   questions={questions}
                 />
               )}

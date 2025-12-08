@@ -27,6 +27,12 @@ interface TaskListProps {
   projectMembers: Project["members"];
   onTaskUpdate: () => void;
   phaseTitle?: string;
+  /** Hide the internal "New Task" button (use when providing external button) */
+  hideNewTaskButton?: boolean;
+  /** Controlled mode: external state for creating new task */
+  isCreatingNewTaskExternal?: boolean;
+  /** Callback when internal isCreatingNewTask state changes */
+  onIsCreatingNewTaskChange?: (value: boolean) => void;
 }
 
 type FilterType = "all" | "completed" | "remaining";
@@ -43,7 +49,7 @@ interface SortableTaskItemProps {
   task: Task;
   isCompleted: boolean;
   isDraggable: boolean;
-  children: React.ReactNode;
+  children: (props: { attributes: any; listeners: any }) => React.ReactNode;
 }
 
 function SortableTaskItem({
@@ -73,37 +79,12 @@ function SortableTaskItem({
 
   // For non-draggable tasks, just return the children without drag functionality
   if (!isDraggable || isCompleted) {
-    return <div>{children}</div>;
+    return <div>{children({ attributes: {}, listeners: {} })}</div>;
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="relative group">
-      {/* Drag handle - grip pattern (::), appears on hover */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute -left-5 top-1/2 -translate-y-1/2 w-2.5 flex flex-col items-center justify-center gap-0.5 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:opacity-100"
-        title="Drag to reorder"
-      >
-        {/* Four rows of two dots each (2x4 grid) */}
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-        <div className="flex gap-0.5">
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-          <div className="w-0.5 h-0.5 bg-gray-400 rounded-full"></div>
-        </div>
-      </div>
-      {children}
+    <div ref={setNodeRef} style={style} className="relative">
+      {children({ attributes, listeners })}
     </div>
   );
 }
@@ -115,9 +96,24 @@ export default function TaskList({
   projectMembers,
   onTaskUpdate,
   phaseTitle,
+  hideNewTaskButton = false,
+  isCreatingNewTaskExternal,
+  onIsCreatingNewTaskChange,
 }: TaskListProps) {
   const [filter, setFilter] = useState<FilterType>("remaining");
-  const [isCreatingNewTask, setIsCreatingNewTask] = useState(false);
+  const [isCreatingNewTaskInternal, setIsCreatingNewTaskInternal] = useState(false);
+  
+  // Use external state if provided, otherwise use internal state
+  const isCreatingNewTask = isCreatingNewTaskExternal !== undefined 
+    ? isCreatingNewTaskExternal 
+    : isCreatingNewTaskInternal;
+  
+  const setIsCreatingNewTask = (value: boolean) => {
+    if (onIsCreatingNewTaskChange) {
+      onIsCreatingNewTaskChange(value);
+    }
+    setIsCreatingNewTaskInternal(value);
+  };
   const [newTaskName, setNewTaskName] = useState("");
   const [newlyCreatedTaskId, setNewlyCreatedTaskId] = useState<string | null>(null);
   const [editingFields, setEditingFields] = useState<Record<string, Set<string>>>({});
@@ -156,6 +152,23 @@ export default function TaskList({
       });
     };
   }, []);
+
+  // Handle external new task trigger
+  useEffect(() => {
+    if (isCreatingNewTaskExternal && !isNewTaskAnimating) {
+      setNewTaskName("");
+      // Trigger animation after element is in DOM
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsNewTaskAnimating(true);
+          // Focus the input after animation starts
+          setTimeout(() => {
+            newTaskInputRef.current?.focus();
+          }, 50);
+        });
+      });
+    }
+  }, [isCreatingNewTaskExternal, isNewTaskAnimating]);
 
   // Scroll to and animate newly created task when it appears in the list
   useEffect(() => {
@@ -816,13 +829,15 @@ export default function TaskList({
               All Tasks
             </button>
           </div>
-          <button
-            onClick={handleStartNewTask}
-            disabled={isCreatingNewTask}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm disabled:opacity-50"
-          >
-            New Task
-          </button>
+          {!hideNewTaskButton && (
+            <button
+              onClick={handleStartNewTask}
+              disabled={isCreatingNewTask}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm disabled:opacity-50"
+            >
+              New Task
+            </button>
+          )}
         </div>
       </div>
 
@@ -832,123 +847,133 @@ export default function TaskList({
         {/* New Task - Inline Edit Mode */}
         {isCreatingNewTask && (
           <div
-            className={`border rounded-lg p-4 border-gray-200 transition-all duration-300 ease-out ${
+            className={`border-2 border-primary-500 rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-300 ease-out ${
               isNewTaskAnimating
                 ? "opacity-100 translate-y-0"
                 : "opacity-0 -translate-y-4"
             }`}
           >
-            <div className="flex items-center gap-3 mb-1">
-              {/* Checkmark button for marking as done */}
-              <button
-                disabled
-                className="flex-shrink-0 w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-gray-400 opacity-50 cursor-not-allowed"
-                title="Save task to enable"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
+            {/* Left side: Plus indicator */}
+            <div className="bg-primary-500 text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
 
-              {/* Owner Avatar */}
-              <div className="flex-shrink-0 relative">
+            {/* Right side: Task form */}
+            <div className="flex-1 px-4 py-3">
+              <div className="flex items-center gap-3 mb-1">
+                {/* Checkmark button for marking as done */}
                 <button
-                  type="button"
                   disabled
-                  className="w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-600 cursor-not-allowed opacity-50"
-                  title="Save task to assign owner"
+                  className="flex-shrink-0 w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-gray-400 opacity-50 cursor-not-allowed"
+                  title="Save task to enable"
                 >
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </button>
-              </div>
 
-              {/* Task Name - In Edit Mode */}
-              <input
-                ref={newTaskInputRef}
-                type="text"
-                value={newTaskName}
-                onChange={(e) => setNewTaskName(e.target.value)}
-                onBlur={handleNewTaskBlur}
-                onKeyDown={handleNewTaskKeyDown}
-                placeholder="Enter task name..."
-                className="flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                autoFocus
-              />
-
-              {/* Right-aligned icons: Description and Dates */}
-              <div className="flex items-center gap-3 flex-shrink-0">
-                {/* Description icon */}
-                <button
-                  type="button"
-                  disabled
-                  className="flex-shrink-0 text-gray-500 opacity-50 cursor-not-allowed"
-                  title="Save task to add description"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                {/* Owner Avatar */}
+                <div className="flex-shrink-0 relative">
+                  <button
+                    type="button"
+                    disabled
+                    className="w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-600 cursor-not-allowed opacity-50"
+                    title="Save task to assign owner"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 6h16M4 12h16M4 18h16"
-                    />
-                  </svg>
-                </button>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </button>
+                </div>
 
-                {/* Date icons */}
-                <div className="flex items-center gap-3 text-sm">
-                  {/* Start Date */}
-                  <div className="relative flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled
-                      className="flex items-center gap-1.5 cursor-not-allowed opacity-50"
-                    >
-                      <svg
-                        className="w-4 h-4 text-gray-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <span className="text-gray-500 whitespace-nowrap">Start date</span>
-                    </button>
-                  </div>
+                {/* Task Name - In Edit Mode */}
+                <input
+                  ref={newTaskInputRef}
+                  type="text"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  onBlur={handleNewTaskBlur}
+                  onKeyDown={handleNewTaskKeyDown}
+                  placeholder="Enter task name..."
+                  className="flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  autoFocus
+                />
 
-                  {/* End Date (Planned Completion) */}
-                  <div className="relative flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled
-                      className="flex items-center gap-1.5 cursor-not-allowed opacity-50"
+                {/* Right-aligned icons: Description and Dates */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {/* Description icon */}
+                  <button
+                    type="button"
+                    disabled
+                    className="flex-shrink-0 text-gray-500 opacity-50 cursor-not-allowed"
+                    title="Save task to add description"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <svg
-                        className="w-4 h-4 text-gray-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 6h16M4 12h16M4 18h16"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Date icons */}
+                  <div className="flex items-center gap-3 text-sm">
+                    {/* Start Date */}
+                    <div className="relative flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled
+                        className="flex items-center gap-1.5 cursor-not-allowed opacity-50"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <span className="text-gray-500 whitespace-nowrap">End date</span>
-                    </button>
+                        <svg
+                          className="w-4 h-4 text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <span className="text-gray-500 whitespace-nowrap">Start date</span>
+                      </button>
+                    </div>
+
+                    {/* End Date (Planned Completion) */}
+                    <div className="relative flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled
+                        className="flex items-center gap-1.5 cursor-not-allowed opacity-50"
+                      >
+                        <svg
+                          className="w-4 h-4 text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <span className="text-gray-500 whitespace-nowrap">End date</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1010,336 +1035,380 @@ export default function TaskList({
                     isCompleted={isCompleted}
                     isDraggable={isDraggable}
                   >
+                    {({ attributes, listeners }) => (
                     <div
                       ref={(el) => {
                         taskRefs.current[task.id] = el;
                       }}
                       className={`
-                        border rounded-lg p-4 transition-all duration-300 ease-out
+                        border-2 border-primary-500 rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-300 ease-out
                         ${isCompleting ? "opacity-0 scale-95" : ""}
-                        ${isNewlyCreated ? "border-primary-500 bg-primary-50 shadow-lg scale-105" : ""}
+                        ${isNewlyCreated ? "shadow-lg scale-105" : ""}
                         ${isDragging ? "opacity-50 shadow-md" : ""}
-                        ${isDelayed && !isNewlyCreated && !isDragging && !isCompleting ? "border-red-300 bg-red-50" : ""}
-                        ${isCompleted && !isNewlyCreated && !isDragging ? "border-green-300 bg-green-50" : ""}
-                        ${!isNewlyCreated && !isDelayed && !isCompleted && !isDragging && !isCompleting ? "border-gray-200" : ""}
+                        ${isDelayed && !isNewlyCreated && !isDragging && !isCompleting ? "border-red-400" : ""}
+                        ${isCompleted && !isNewlyCreated && !isDragging ? "border-green-400" : ""}
                       `}
                     >
-                <div className="flex items-center gap-3 mb-1">
-                  {/* Checkmark button for marking as done */}
-                  {!isCompleted && (
-                    <button
-                      onClick={() => handleMarkAsDone(task.id)}
-                      disabled={loading}
-                      className="flex-shrink-0 w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-gray-400 hover:border-green-500 hover:bg-green-50 disabled:opacity-50 transition-colors"
-                      title="Mark as done"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </button>
-                  )}
-                  {isCompleted && (
-                    <button
-                      onClick={() => handleReopen(task.id)}
-                      disabled={loading}
-                      className="flex-shrink-0 w-7 h-7 rounded-full border border-green-300 bg-green-100 flex items-center justify-center text-green-600 hover:border-green-500 hover:bg-green-200 disabled:opacity-50 transition-colors"
-                      title="Reopen task"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </button>
-                  )}
-
-                  {/* Owner Avatar */}
-                  <div 
-                    className="flex-shrink-0 relative"
-                    onMouseEnter={() => setHoveredOwnerButtonId(task.id)}
-                    onMouseLeave={() => setHoveredOwnerButtonId(null)}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const select = document.getElementById(`owner-select-${task.id}`);
-                        select?.click();
-                      }}
-                      className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors relative z-10 ${
-                        hoveredOwnerButtonId === task.id
-                          ? "border-primary-500 bg-primary-50 text-gray-600"
-                          : "border-gray-300 bg-gray-100 text-gray-600"
-                      }`}
-                      title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
-                    >
-                      {owner ? (
-                        <span className="text-[10px]">{getInitials(owner)}</span>
+                      {/* Left side: Drag handle panel */}
+                      {isDraggable && !isCompleted ? (
+                        <div 
+                          {...attributes}
+                          {...listeners}
+                          className="bg-primary-500 text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all"
+                          title="Drag to reorder"
+                        >
+                          {/* White grip dots (2x4 pattern) - smaller size */}
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <div className="flex gap-0.5">
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                            </div>
+                            <div className="flex gap-0.5">
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                            </div>
+                            <div className="flex gap-0.5">
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                            </div>
+                            <div className="flex gap-0.5">
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                              <div className="w-0.5 h-0.5 bg-white rounded-full opacity-80"></div>
+                            </div>
+                          </div>
+                        </div>
                       ) : (
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+                        <div className={`${isCompleted ? 'bg-green-500' : 'bg-primary-500'} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                          {isCompleted ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <div className="w-4 h-4"></div>
+                          )}
+                        </div>
                       )}
-                    </button>
-                    <select
-                      id={`owner-select-${task.id}`}
-                      value={taskFormData.ownerId ?? ""}
-                      onChange={(e) => {
-                        updateFormField(task.id, "ownerId", e.target.value || null);
-                        handleFieldSave(task.id, "ownerId", e.target.value || null);
-                      }}
-                      className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                    >
-                      <option value="">No owner</option>
-                      {projectMembers?.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.firstName && member.lastName
-                            ? `${member.firstName} ${member.lastName}`
-                            : member.firstName || member.lastName || member.name || member.email}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
-                  {/* Task Name */}
-                  <input
-                    type="text"
-                    value={taskFormData.name}
-                    onChange={(e) => updateFormField(task.id, "name", e.target.value)}
-                    onFocus={() => handleFieldFocus(task.id, "name", task)}
-                    onBlur={(e) => handleFieldBlur(task.id, "name", e)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        e.currentTarget.blur();
-                      }
-                    }}
-                    className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
-                      editingFields[task.id]?.has("name")
-                        ? "border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-gray-300 focus:bg-white"
-                    } ${
-                      isCompleted ? "line-through" : ""
-                    }`}
-                  />
-
-                  {/* Right-aligned icons: Description and Dates */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* Description icon */}
-                    <button
-                      type="button"
-                      onClick={() => handleDescriptionClick(task)}
-                      className="flex-shrink-0 text-gray-500 hover:text-gray-700"
-                      title="Description"
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 6h16M4 12h16M4 18h16"
-                        />
-                      </svg>
-                    </button>
-
-                    {/* Date icons */}
-                    <div className="flex items-center gap-3 text-sm">
-                      {/* Start Date */}
-                      <div className="relative flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const input = startDateInputRefs.current[task.id];
-                            if (input) {
-                              // Try showPicker() first (modern browsers)
-                              if (typeof (input as any).showPicker === 'function') {
-                                try {
-                                  const pickerResult = (input as any).showPicker();
-                                  // Check if it returns a Promise
-                                  if (pickerResult && typeof pickerResult.catch === 'function') {
-                                    pickerResult.catch(() => {
-                                      // Fallback to click if showPicker fails
-                                      input.click();
-                                    });
-                                  } else {
-                                    // If showPicker doesn't return a Promise, just use click
-                                    input.click();
-                                  }
-                                } catch (error) {
-                                  // If showPicker throws, fallback to click
-                                  input.click();
-                                }
-                              } else {
-                                // Fallback to click
-                                input.click();
-                              }
-                            }
-                          }}
-                          className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity relative z-10"
-                        >
-                          <svg
-                            className="w-4 h-4 text-gray-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                          {task.startDate ? (
-                            <span className="text-gray-900 whitespace-nowrap">{formatDateDisplay(task.startDate)}</span>
-                          ) : (
-                            <span className="text-gray-500 whitespace-nowrap">Start date</span>
+                      {/* Right side: Task content */}
+                      <div className="flex-1 px-4 py-3">
+                        <div className="flex items-center gap-3 mb-1">
+                          {/* Checkmark button for marking as done */}
+                          {!isCompleted && (
+                            <button
+                              onClick={() => handleMarkAsDone(task.id)}
+                              disabled={loading}
+                              className="flex-shrink-0 w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-gray-400 hover:border-green-500 hover:bg-green-50 disabled:opacity-50 transition-colors"
+                              title="Mark as done"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
                           )}
-                        </button>
-                        <input
-                          ref={(el) => {
-                            startDateInputRefs.current[task.id] = el;
-                          }}
-                          type="date"
-                          value={taskFormData.startDate || ""}
-                          onChange={(e) => {
-                            updateFormField(task.id, "startDate", e.target.value || null);
-                            handleFieldSave(task.id, "startDate", e.target.value || null);
-                          }}
-                          className="absolute top-full left-0 mt-1 opacity-0 pointer-events-none"
-                          id={`start-date-${task.id}`}
-                          tabIndex={-1}
-                          style={{ width: '200px', height: '40px' }}
-                        />
-                      </div>
-
-                      {/* End Date (Planned Completion) */}
-                      <div className="relative flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const input = endDateInputRefs.current[task.id];
-                            if (input) {
-                              // Try showPicker() first (modern browsers)
-                              if (typeof (input as any).showPicker === 'function') {
-                                try {
-                                  const pickerResult = (input as any).showPicker();
-                                  // Check if it returns a Promise
-                                  if (pickerResult && typeof pickerResult.catch === 'function') {
-                                    pickerResult.catch(() => {
-                                      // Fallback to click if showPicker fails
-                                      input.click();
-                                    });
-                                  } else {
-                                    // If showPicker doesn't return a Promise, just use click
-                                    input.click();
-                                  }
-                                } catch (error) {
-                                  // If showPicker throws, fallback to click
-                                  input.click();
-                                }
-                              } else {
-                                // Fallback to click
-                                input.click();
-                              }
-                            }
-                          }}
-                          className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity relative z-10"
-                        >
-                          <svg
-                            className="w-4 h-4 text-gray-500"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
-                          {task.plannedCompletionDate ? (
-                            <span className="text-gray-900 whitespace-nowrap">{formatDateDisplay(task.plannedCompletionDate)}</span>
-                          ) : (
-                            <span className="text-gray-500 whitespace-nowrap">End date</span>
+                          {isCompleted && (
+                            <button
+                              onClick={() => handleReopen(task.id)}
+                              disabled={loading}
+                              className="flex-shrink-0 w-7 h-7 rounded-full border border-green-300 bg-green-100 flex items-center justify-center text-green-600 hover:border-green-500 hover:bg-green-200 disabled:opacity-50 transition-colors"
+                              title="Reopen task"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
                           )}
-                        </button>
-                        <input
-                          ref={(el) => {
-                            endDateInputRefs.current[task.id] = el;
-                          }}
-                          type="date"
-                          value={taskFormData.plannedCompletionDate || ""}
-                          onChange={(e) => {
-                            updateFormField(task.id, "plannedCompletionDate", e.target.value || null);
-                            handleFieldSave(task.id, "plannedCompletionDate", e.target.value || null);
-                          }}
-                          className="absolute top-full left-0 mt-1 opacity-0 pointer-events-none"
-                          id={`end-date-${task.id}`}
-                          tabIndex={-1}
-                          style={{ width: '200px', height: '40px' }}
-                        />
+
+                          {/* Owner Avatar */}
+                          <div 
+                            className="flex-shrink-0 relative"
+                            onMouseEnter={() => setHoveredOwnerButtonId(task.id)}
+                            onMouseLeave={() => setHoveredOwnerButtonId(null)}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const select = document.getElementById(`owner-select-${task.id}`);
+                                select?.click();
+                              }}
+                              className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors relative z-10 ${
+                                hoveredOwnerButtonId === task.id
+                                  ? "border-primary-500 bg-primary-50 text-gray-600"
+                                  : "border-gray-300 bg-gray-100 text-gray-600"
+                              }`}
+                              title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
+                            >
+                              {owner ? (
+                                <span className="text-[10px]">{getInitials(owner)}</span>
+                              ) : (
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                              )}
+                            </button>
+                            <select
+                              id={`owner-select-${task.id}`}
+                              value={taskFormData.ownerId ?? ""}
+                              onChange={(e) => {
+                                updateFormField(task.id, "ownerId", e.target.value || null);
+                                handleFieldSave(task.id, "ownerId", e.target.value || null);
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                            >
+                              <option value="">No owner</option>
+                              {projectMembers?.map((member) => (
+                                <option key={member.id} value={member.id}>
+                                  {member.firstName && member.lastName
+                                    ? `${member.firstName} ${member.lastName}`
+                                    : member.firstName || member.lastName || member.name || member.email}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Task Name */}
+                          <input
+                            type="text"
+                            value={taskFormData.name}
+                            onChange={(e) => updateFormField(task.id, "name", e.target.value)}
+                            onFocus={() => handleFieldFocus(task.id, "name", task)}
+                            onBlur={(e) => handleFieldBlur(task.id, "name", e)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                            className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
+                              editingFields[task.id]?.has("name")
+                                ? "border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-gray-300 focus:bg-white"
+                            } ${
+                              isCompleted ? "line-through" : ""
+                            }`}
+                          />
+
+                          {/* Right-aligned icons: Description and Dates */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {/* Description icon */}
+                            <button
+                              type="button"
+                              onClick={() => handleDescriptionClick(task)}
+                              className="flex-shrink-0 text-gray-500 hover:text-gray-700"
+                              title="Description"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 6h16M4 12h16M4 18h16"
+                                />
+                              </svg>
+                            </button>
+
+                            {/* Date icons */}
+                            <div className="flex items-center gap-3 text-sm">
+                              {/* Start Date */}
+                              <div className="relative flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const input = startDateInputRefs.current[task.id];
+                                    if (input) {
+                                      // Try showPicker() first (modern browsers)
+                                      if (typeof (input as any).showPicker === 'function') {
+                                        try {
+                                          const pickerResult = (input as any).showPicker();
+                                          // Check if it returns a Promise
+                                          if (pickerResult && typeof pickerResult.catch === 'function') {
+                                            pickerResult.catch(() => {
+                                              // Fallback to click if showPicker fails
+                                              input.click();
+                                            });
+                                          } else {
+                                            // If showPicker doesn't return a Promise, just use click
+                                            input.click();
+                                          }
+                                        } catch (error) {
+                                          // If showPicker throws, fallback to click
+                                          input.click();
+                                        }
+                                      } else {
+                                        // Fallback to click
+                                        input.click();
+                                      }
+                                    }
+                                  }}
+                                  className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity relative z-10"
+                                >
+                                  <svg
+                                    className="w-4 h-4 text-gray-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                  {task.startDate ? (
+                                    <span className="text-gray-900 whitespace-nowrap">{formatDateDisplay(task.startDate)}</span>
+                                  ) : (
+                                    <span className="text-gray-500 whitespace-nowrap">Start date</span>
+                                  )}
+                                </button>
+                                <input
+                                  ref={(el) => {
+                                    startDateInputRefs.current[task.id] = el;
+                                  }}
+                                  type="date"
+                                  value={taskFormData.startDate || ""}
+                                  onChange={(e) => {
+                                    updateFormField(task.id, "startDate", e.target.value || null);
+                                    handleFieldSave(task.id, "startDate", e.target.value || null);
+                                  }}
+                                  className="absolute top-full left-0 mt-1 opacity-0 pointer-events-none"
+                                  id={`start-date-${task.id}`}
+                                  tabIndex={-1}
+                                  style={{ width: '200px', height: '40px' }}
+                                />
+                              </div>
+
+                              {/* End Date (Planned Completion) */}
+                              <div className="relative flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const input = endDateInputRefs.current[task.id];
+                                    if (input) {
+                                      // Try showPicker() first (modern browsers)
+                                      if (typeof (input as any).showPicker === 'function') {
+                                        try {
+                                          const pickerResult = (input as any).showPicker();
+                                          // Check if it returns a Promise
+                                          if (pickerResult && typeof pickerResult.catch === 'function') {
+                                            pickerResult.catch(() => {
+                                              // Fallback to click if showPicker fails
+                                              input.click();
+                                            });
+                                          } else {
+                                            // If showPicker doesn't return a Promise, just use click
+                                            input.click();
+                                          }
+                                        } catch (error) {
+                                          // If showPicker throws, fallback to click
+                                          input.click();
+                                        }
+                                      } else {
+                                        // Fallback to click
+                                        input.click();
+                                      }
+                                    }
+                                  }}
+                                  className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity relative z-10"
+                                >
+                                  <svg
+                                    className="w-4 h-4 text-gray-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                  {task.plannedCompletionDate ? (
+                                    <span className="text-gray-900 whitespace-nowrap">{formatDateDisplay(task.plannedCompletionDate)}</span>
+                                  ) : (
+                                    <span className="text-gray-500 whitespace-nowrap">End date</span>
+                                  )}
+                                </button>
+                                <input
+                                  ref={(el) => {
+                                    endDateInputRefs.current[task.id] = el;
+                                  }}
+                                  type="date"
+                                  value={taskFormData.plannedCompletionDate || ""}
+                                  onChange={(e) => {
+                                    updateFormField(task.id, "plannedCompletionDate", e.target.value || null);
+                                    handleFieldSave(task.id, "plannedCompletionDate", e.target.value || null);
+                                  }}
+                                  className="absolute top-full left-0 mt-1 opacity-0 pointer-events-none"
+                                  id={`end-date-${task.id}`}
+                                  tabIndex={-1}
+                                  style={{ width: '200px', height: '40px' }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Status badges */}
+                            <div className="flex items-center gap-2">
+                              {isDelayed && (
+                                <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded whitespace-nowrap">
+                                  Delayed
+                                </span>
+                              )}
+                              {isCompleted && (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded whitespace-nowrap">
+                                  Completed
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Description content (shown when expanded) */}
+                        {isDescriptionExpanded && (
+                          <div className="mb-3 ml-10">
+                            {isDescriptionEditing ? (
+                              <textarea
+                                value={formData[task.id]?.description ?? task.description ?? ""}
+                                onChange={(e) => updateFormField(task.id, "description", e.target.value)}
+                                onFocus={() => {
+                                  ensureFormData(task);
+                                  setEditingDescriptions((prev) => new Set(prev).add(task.id));
+                                }}
+                                onBlur={(e) => handleDescriptionBlur(task.id, e)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") {
+                                    e.currentTarget.blur();
+                                  }
+                                }}
+                                rows={3}
+                                placeholder="Add a description..."
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                autoFocus
+                              />
+                            ) : (
+                              <p
+                                className="text-sm text-gray-700 whitespace-pre-wrap cursor-pointer hover:text-gray-900"
+                                onClick={() => {
+                                  ensureFormData(task);
+                                  setEditingDescriptions((prev) => new Set(prev).add(task.id));
+                                }}
+                              >
+                                {task.description || "Click to add description"}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    {/* Status badges */}
-                    <div className="flex items-center gap-2">
-                      {isDelayed && (
-                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded whitespace-nowrap">
-                          Delayed
-                        </span>
-                      )}
-                      {isCompleted && (
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded whitespace-nowrap">
-                          Completed
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description content (shown when expanded) */}
-                {isDescriptionExpanded && (
-                  <div className="mb-3 ml-10">
-                    {isDescriptionEditing ? (
-                      <textarea
-                        value={formData[task.id]?.description ?? task.description ?? ""}
-                        onChange={(e) => updateFormField(task.id, "description", e.target.value)}
-                        onFocus={() => {
-                          ensureFormData(task);
-                          setEditingDescriptions((prev) => new Set(prev).add(task.id));
-                        }}
-                        onBlur={(e) => handleDescriptionBlur(task.id, e)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") {
-                            e.currentTarget.blur();
-                          }
-                        }}
-                        rows={3}
-                        placeholder="Add a description..."
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        autoFocus
-                      />
-                    ) : (
-                      <p
-                        className="text-sm text-gray-700 whitespace-pre-wrap cursor-pointer hover:text-gray-900"
-                        onClick={() => {
-                          ensureFormData(task);
-                          setEditingDescriptions((prev) => new Set(prev).add(task.id));
-                        }}
-                      >
-                        {task.description || "Click to add description"}
-                      </p>
                     )}
-                  </div>
-                )}
-                    </div>
                   </SortableTaskItem>
                 );
                   })}
@@ -1370,97 +1439,113 @@ export default function TaskList({
                     isCompleted={isCompleted}
                     isDraggable={false}
                   >
+                    {({ attributes: _attributes, listeners: _listeners }) => (
                     <div
                       ref={(el) => {
                         taskRefs.current[task.id] = el;
                       }}
                       className={`
-                        border rounded-lg p-4 transition-all duration-500 ease-out
-                        ${isNewlyCreated ? "border-primary-500 bg-primary-50 shadow-lg scale-105" : ""}
-                        ${isDelayed && !isNewlyCreated ? "border-red-300 bg-red-50" : ""}
-                        ${isCompleted && !isNewlyCreated ? "border-green-300 bg-green-50" : ""}
+                        border-2 rounded-lg bg-white flex items-stretch overflow-hidden transition-all duration-500 ease-out
+                        ${isNewlyCreated ? "border-primary-500 shadow-lg scale-105" : ""}
+                        ${isDelayed && !isNewlyCreated ? "border-red-400" : ""}
+                        ${isCompleted && !isNewlyCreated ? "border-green-400" : ""}
                         ${!isNewlyCreated && !isDelayed && !isCompleted ? "border-gray-200" : ""}
                       `}
                     >
-                      <div className="flex items-center gap-3 mb-1">
-                        {isCompleted && (
-                          <button
-                            onClick={() => handleReopen(task.id)}
-                            disabled={loading}
-                            className="flex-shrink-0 w-7 h-7 rounded-full border border-green-300 bg-green-100 flex items-center justify-center text-green-600 hover:border-green-500 hover:bg-green-200 disabled:opacity-50 transition-colors"
-                            title="Reopen task"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </button>
+                      {/* Left side panel - shows checkmark for completed */}
+                      <div className={`${isCompleted ? 'bg-green-500' : 'bg-primary-500'} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                        {isCompleted ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <div className="w-4 h-4"></div>
                         )}
+                      </div>
 
-                        <div 
-                          className="flex-shrink-0 relative"
-                          onMouseEnter={() => setHoveredOwnerButtonId(task.id)}
-                          onMouseLeave={() => setHoveredOwnerButtonId(null)}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const select = document.getElementById(`owner-select-${task.id}`);
-                              select?.click();
-                            }}
-                            className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors relative z-10 ${
-                              hoveredOwnerButtonId === task.id
-                                ? "border-primary-500 bg-primary-50 text-gray-600"
-                                : "border-gray-300 bg-gray-100 text-gray-600"
-                            }`}
-                            title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
-                          >
-                            {owner ? (
-                              <span className="text-[10px]">{getInitials(owner)}</span>
-                            ) : (
-                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      {/* Right side: Task content */}
+                      <div className="flex-1 px-4 py-3">
+                        <div className="flex items-center gap-3 mb-1">
+                          {isCompleted && (
+                            <button
+                              onClick={() => handleReopen(task.id)}
+                              disabled={loading}
+                              className="flex-shrink-0 w-7 h-7 rounded-full border border-green-300 bg-green-100 flex items-center justify-center text-green-600 hover:border-green-500 hover:bg-green-200 disabled:opacity-50 transition-colors"
+                              title="Reopen task"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
-                            )}
-                          </button>
-                          <select
-                            id={`owner-select-${task.id}`}
-                            value={taskFormData.ownerId ?? ""}
-                            onChange={(e) => {
-                              updateFormField(task.id, "ownerId", e.target.value || null);
-                              handleFieldSave(task.id, "ownerId", e.target.value || null);
-                            }}
-                            className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                          >
-                            <option value="">No owner</option>
-                            {projectMembers?.map((member) => (
-                              <option key={member.id} value={member.id}>
-                                {member.firstName && member.lastName
-                                  ? `${member.firstName} ${member.lastName}`
-                                  : member.firstName || member.lastName || member.name || member.email}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                            </button>
+                          )}
 
-                        <input
-                          type="text"
-                          value={taskFormData.name}
-                          onChange={(e) => updateFormField(task.id, "name", e.target.value)}
-                          onFocus={() => handleFieldFocus(task.id, "name", task)}
-                          onBlur={(e) => handleFieldBlur(task.id, "name", e)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") {
-                              e.currentTarget.blur();
-                            }
-                          }}
-                          className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
-                            editingFields[task.id]?.has("name")
-                              ? "border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                              : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-gray-300 focus:bg-white"
-                          } ${isCompleted ? "line-through" : ""}`}
-                        />
+                          <div 
+                            className="flex-shrink-0 relative"
+                            onMouseEnter={() => setHoveredOwnerButtonId(task.id)}
+                            onMouseLeave={() => setHoveredOwnerButtonId(null)}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const select = document.getElementById(`owner-select-${task.id}`);
+                                select?.click();
+                              }}
+                              className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors relative z-10 ${
+                                hoveredOwnerButtonId === task.id
+                                  ? "border-primary-500 bg-primary-50 text-gray-600"
+                                  : "border-gray-300 bg-gray-100 text-gray-600"
+                              }`}
+                              title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
+                            >
+                              {owner ? (
+                                <span className="text-[10px]">{getInitials(owner)}</span>
+                              ) : (
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                              )}
+                            </button>
+                            <select
+                              id={`owner-select-${task.id}`}
+                              value={taskFormData.ownerId ?? ""}
+                              onChange={(e) => {
+                                updateFormField(task.id, "ownerId", e.target.value || null);
+                                handleFieldSave(task.id, "ownerId", e.target.value || null);
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                            >
+                              <option value="">No owner</option>
+                              {projectMembers?.map((member) => (
+                                <option key={member.id} value={member.id}>
+                                  {member.firstName && member.lastName
+                                    ? `${member.firstName} ${member.lastName}`
+                                    : member.firstName || member.lastName || member.name || member.email}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <input
+                            type="text"
+                            value={taskFormData.name}
+                            onChange={(e) => updateFormField(task.id, "name", e.target.value)}
+                            onFocus={() => handleFieldFocus(task.id, "name", task)}
+                            onBlur={(e) => handleFieldBlur(task.id, "name", e)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") {
+                                e.currentTarget.blur();
+                              }
+                            }}
+                            className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
+                              editingFields[task.id]?.has("name")
+                                ? "border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-gray-300 focus:bg-white"
+                            } ${isCompleted ? "line-through" : ""}`}
+                          />
+                        </div>
                       </div>
                     </div>
+                    )}
                   </SortableTaskItem>
                 );
               })

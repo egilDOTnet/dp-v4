@@ -217,6 +217,49 @@ All components are mobile-first responsive:
 - Touch-friendly tap targets (min 44x44px)
 - Responsive navigation and menus
 
+### Create/Add Actions
+All buttons that create or add new items use **success green** color for visual consistency:
+- **Light mode**: `bg-green-600 hover:bg-green-700` (#16A34A)
+- **Dark mode**: `bg-green-600 hover:bg-green-700` (same)
+
+This applies to:
+- "Add Vendor" buttons
+- "New Task" buttons
+- "Add Requirement" links
+- Any other create/new/add action
+
+**Placement & Alignment**: 
+- Create buttons should be placed next to the SearchBar (if present) rather than in the page header
+- **Create buttons should always be right-aligned** within their container using `ml-auto`
+- Search result counts (e.g., "5 of 10 vendors") appear between the search bar and the right-aligned button
+
+```tsx
+// Correct pattern - search left, button right-aligned
+<div className="flex items-center gap-4">
+  <div className="flex-1 max-w-md">
+    <SearchBar ... />
+  </div>
+  {isSearching && (
+    <span className="text-sm text-gray-500">
+      {filteredItems.length} of {items.length} items
+    </span>
+  )}
+  <button className="ml-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+    Add Item
+  </button>
+</div>
+```
+
+For sections with title + actions (no search bar), use `justify-between`:
+```tsx
+<div className="flex items-center justify-between">
+  <h2 className="text-xl font-semibold">Section Title</h2>
+  <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+    New Item
+  </button>
+</div>
+```
+
 ## Keyboard Shortcuts
 
 ### Global

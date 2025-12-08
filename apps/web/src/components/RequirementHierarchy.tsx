@@ -34,6 +34,7 @@ interface RequirementHierarchyProps {
   onCreateFormClose?: () => void;
   expandedHierarchies: Set<string>;
   onExpandedHierarchiesChange: (hierarchies: Set<string>) => void;
+  disableDragAndDrop?: boolean;
 }
 
 
@@ -171,6 +172,7 @@ export default function RequirementHierarchyComponent({
   onCreateFormClose,
   expandedHierarchies,
   onExpandedHierarchiesChange,
+  disableDragAndDrop = false,
 }: RequirementHierarchyProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingParentId, setCreatingParentId] = useState<string | null>(null);
@@ -804,11 +806,13 @@ export default function RequirementHierarchyComponent({
                   }}
                 >
                   {/* Left side: Number with drag handle */}
-                  <div 
-                    {...attributes}
-                    {...listeners}
-                    className="bg-primary-900 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-950 transition-colors"
-                    title="Drag to reorder or click to expand/collapse"
+                  <div
+                    {...(disableDragAndDrop ? {} : attributes)}
+                    {...(disableDragAndDrop ? {} : listeners)}
+                    className={`bg-primary-900 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg transition-colors ${
+                      disableDragAndDrop ? '' : 'cursor-grab active:cursor-grabbing hover:bg-primary-950'
+                    }`}
+                    title={disableDragAndDrop ? "Click to expand/collapse" : "Drag to reorder or click to expand/collapse"}
                   >
                     <span className="font-semibold text-lg leading-none">
                       {h1.number.endsWith('.') ? h1.number.slice(0, -1) : h1.number}
@@ -1005,11 +1009,13 @@ export default function RequirementHierarchyComponent({
                               }}
                             >
                               {/* Left side: Number with drag handle */}
-                              <div 
-                                {...attributes}
-                                {...listeners}
-                                className="bg-primary-800 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-900 transition-colors"
-                                title="Drag to reorder or click to expand/collapse"
+                              <div
+                                {...(disableDragAndDrop ? {} : attributes)}
+                                {...(disableDragAndDrop ? {} : listeners)}
+                                className={`bg-primary-800 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg transition-colors ${
+                                  disableDragAndDrop ? '' : 'cursor-grab active:cursor-grabbing hover:bg-primary-900'
+                                }`}
+                                title={disableDragAndDrop ? "Click to expand/collapse" : "Drag to reorder or click to expand/collapse"}
                               >
                                 <span className="font-semibold text-base leading-none">
                                   {h2.number.endsWith('.') ? h2.number.slice(0, -1) : h2.number}
@@ -1093,8 +1099,8 @@ export default function RequirementHierarchyComponent({
                                         onRequirementUpdate={handleRequirementUpdateWithState}
                                         selectedHierarchyId={selectedHierarchyId}
                                         hierarchyLevel={2}
-                                        dragAttributes={attributes}
-                                        dragListeners={listeners}
+                                        dragAttributes={disableDragAndDrop ? undefined : attributes}
+                                        dragListeners={disableDragAndDrop ? undefined : listeners}
                                       />
                                     )}
                                   </SortableRequirementWrapper>
@@ -1144,8 +1150,8 @@ export default function RequirementHierarchyComponent({
                                 onRequirementUpdate={handleRequirementUpdateWithState}
                                 selectedHierarchyId={selectedHierarchyId}
                                 hierarchyLevel={1}
-                                dragAttributes={attributes}
-                                dragListeners={listeners}
+                                dragAttributes={disableDragAndDrop ? undefined : attributes}
+                                dragListeners={disableDragAndDrop ? undefined : listeners}
                               />
                             </div>
                           )}

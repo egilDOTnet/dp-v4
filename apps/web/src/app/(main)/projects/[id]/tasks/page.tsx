@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, Phase, Task } from "@/lib/api";
 import PhaseTimeline from "@/components/PhaseTimeline";
 import TaskList from "@/components/TaskList";
+import { useSearch } from "@/hooks/useSearch";
+import { SearchBar } from "@/components/ui";
 
 export default function TasksPage() {
   const params = useParams();
@@ -22,6 +24,16 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showHeroBanner, setShowHeroBanner] = useState(true);
+  const [isCreatingNewTask, setIsCreatingNewTask] = useState(false);
+
+  // Search functionality for tasks
+  const { searchTerm, setSearchTerm, filteredItems: filteredTasks, clearSearch, isSearching } =
+    useSearch(tasks, {
+      searchKeys: ["name", "description"],
+    });
+
+  // Display items - use tasks directly if not searching, otherwise use filteredItems
+  const displayTasks = isSearching ? filteredTasks : tasks;
 
   const loadProject = () => {
     api.projects
@@ -204,16 +216,58 @@ export default function TasksPage() {
         />
       </div>
 
+      {/* Search Bar and New Task Button */}
+      {selectedPhaseId && selectedPhase && (
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex-1 max-w-md">
+            <SearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              onClear={clearSearch}
+              placeholder="Search tasks..."
+            />
+          </div>
+          {isSearching && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {filteredTasks.length} of {tasks.length} tasks
+            </span>
+          )}
+          <button
+            onClick={() => setIsCreatingNewTask(true)}
+            disabled={isCreatingNewTask}
+            className="ml-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            New Task
+          </button>
+        </div>
+      )}
+
       {/* Task List - Shown when phase is selected */}
       {selectedPhaseId && selectedPhase && (
         <div className="mb-6">
           <TaskList
             projectId={projectId}
             phaseId={selectedPhaseId}
-            tasks={tasks}
+            tasks={displayTasks}
             projectMembers={project.members || []}
             onTaskUpdate={handleTaskUpdate}
             phaseTitle={`${selectedPhase.order}. ${selectedPhase.name}`}
+            hideNewTaskButton
+            isCreatingNewTaskExternal={isCreatingNewTask}
+            onIsCreatingNewTaskChange={setIsCreatingNewTask}
           />
         </div>
       )}

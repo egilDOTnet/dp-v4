@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme, ThemePreference } from "@/contexts/ThemeContext";
 import { api, User } from "@/lib/api";
+import {
+  Card,
+  CardBody,
+  FormField,
+  Input,
+  Button,
+  LoadingSpinner,
+  PageHeader,
+} from "@/components/ui";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user: authUser, refreshUser } = useAuth();
+  const { preference, setPreference } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState("");
@@ -15,6 +26,7 @@ export default function ProfilePage() {
   const [companyName, setCompanyName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const firstInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!authUser) return;
@@ -36,16 +48,28 @@ export default function ProfilePage() {
       });
   }, [authUser]);
 
+  // Auto-focus first editable input on load
+  useEffect(() => {
+    if (!loading && firstInputRef.current) {
+      firstInputRef.current.focus();
+    }
+  }, [loading]);
+
   const isAdmin =
-    authUser?.role === "CompanyAdministrator" || authUser?.role === "GlobalAdministrator";
+    authUser?.role === "CompanyAdministrator" ||
+    authUser?.role === "GlobalAdministrator";
 
   const handleSave = async () => {
     setSaving(true);
     setError("");
 
     try {
-      const updateData: { firstName?: string; lastName?: string; companyName?: string } = {};
-      
+      const updateData: {
+        firstName?: string;
+        lastName?: string;
+        companyName?: string;
+      } = {};
+
       // Only send fields that have changed
       if (firstName !== (user?.firstName || "")) {
         updateData.firstName = firstName;
@@ -53,7 +77,7 @@ export default function ProfilePage() {
       if (lastName !== (user?.lastName || "")) {
         updateData.lastName = lastName;
       }
-      
+
       // Only include companyName if user is admin and it has changed
       if (isAdmin && companyName !== (user?.companyName || "")) {
         updateData.companyName = companyName || undefined;
@@ -62,6 +86,7 @@ export default function ProfilePage() {
       // If nothing changed, just return early
       if (Object.keys(updateData).length === 0) {
         setSaving(false);
+        router.push("/dashboard");
         return;
       }
 
@@ -73,7 +98,7 @@ export default function ProfilePage() {
         setCompanyName(updated.companyName);
       }
       await refreshUser();
-      
+
       // Redirect to dashboard after successful save
       router.push("/dashboard");
     } catch (err: any) {
@@ -96,102 +121,151 @@ export default function ProfilePage() {
       setCompanyName(user.companyName || "");
     }
     setError("");
-    
-    // Redirect to dashboard
     router.push("/dashboard");
   };
 
+  const themeOptions: { value: ThemePreference; label: string; icon: string }[] =
+    [
+      { value: "light", label: "Light", icon: "☀️" },
+      { value: "dark", label: "Dark", icon: "🌙" },
+      { value: "system", label: "System", icon: "💻" },
+    ];
+
   if (loading) {
     return (
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading profile...</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" />
+        <p className="mt-4 text-gray-600 dark:text-gray-400">
+          Loading profile...
+        </p>
       </div>
     );
   }
 
   if (!user) {
-    return <div className="text-red-600">Failed to load profile</div>;
+    return (
+      <div className="text-red-600 dark:text-red-400">
+        Failed to load profile
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6">Profile</h1>
+    <div className="max-w-2xl mx-auto">
+      <PageHeader title="Profile" className="mb-6" />
 
-      <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input
-            type="email"
-            value={user.email}
-            disabled
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-          />
-        </div>
+      <div className="space-y-6">
+        {/* Profile Information Card */}
+        <Card>
+          <CardBody className="space-y-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Personal Information
+            </h2>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              disabled={saving}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-            />
+            <FormField label="Email">
+              <Input value={user.email} disabled />
+            </FormField>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="First Name">
+                <Input
+                  ref={firstInputRef}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  disabled={saving}
+                  placeholder="Enter your first name"
+                />
+              </FormField>
+
+              <FormField label="Last Name">
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  disabled={saving}
+                  placeholder="Enter your last name"
+                />
+              </FormField>
+            </div>
+
+            <FormField
+              label="Company Name"
+              helperText={
+                !isAdmin ? "Only administrators can edit company name" : undefined
+              }
+            >
+              <Input
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                disabled={!isAdmin || saving}
+                placeholder="Company name"
+              />
+            </FormField>
+
+            <FormField label="Role">
+              <Input value={user.role} disabled />
+            </FormField>
+          </CardBody>
+        </Card>
+
+        {/* Theme Selection Card */}
+        <Card>
+          <CardBody className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Appearance
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Choose how the application looks to you
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              {themeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setPreference(option.value)}
+                  className={`
+                    flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all
+                    ${
+                      preference === option.value
+                        ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-300"
+                    }
+                  `}
+                >
+                  <span className="text-xl">{option.icon}</span>
+                  <span className="font-medium">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              disabled={saving}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-          <input
-            type="text"
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            disabled={!isAdmin || saving}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:bg-gray-50"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-          <input
-            type="text"
-            value={user.role}
-            disabled
-            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-          />
-        </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <div className="flex gap-2 pt-4">
-          <button
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="primary"
             onClick={handleSave}
+            loading={saving}
             disabled={saving}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save"}
-          </button>
-          <button
-            onClick={handleCancel}
-            disabled={saving}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-          >
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
+          <Button variant="secondary" onClick={handleCancel} disabled={saving}>
             Cancel
-          </button>
+          </Button>
         </div>
+
+        {/* Keyboard hints */}
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Theme changes are applied immediately and saved locally
+        </p>
       </div>
     </div>
   );

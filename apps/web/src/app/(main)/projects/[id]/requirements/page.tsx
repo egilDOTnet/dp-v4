@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
+import { useSearch } from "@/hooks/useSearch";
+import { SearchBar } from "@/components/ui";
 
 export default function RequirementsPage() {
   const params = useParams();
@@ -19,6 +21,31 @@ export default function RequirementsPage() {
   const [showHeroBanner, setShowHeroBanner] = useState(true);
   const [expandedHierarchies, setExpandedHierarchies] = useState<Set<string>>(new Set());
 
+  // Search functionality
+  const { searchTerm, setSearchTerm, filteredItems: filteredRequirements, clearSearch, isSearching } =
+    useSearch(requirements, {
+      searchKeys: ["description"],
+    });
+
+  // When searching, auto-expand all hierarchies that contain matching requirements
+  const searchExpandedHierarchies = useMemo(() => {
+    if (!isSearching) return expandedHierarchies;
+    
+    const hierarchiesWithMatches = new Set<string>();
+    filteredRequirements.forEach((req) => {
+      // Add the requirement's direct hierarchy
+      hierarchiesWithMatches.add(req.hierarchyId);
+      // Also add parent hierarchies
+      const hierarchy = hierarchies.find(h => h.id === req.hierarchyId);
+      if (hierarchy?.parentId) {
+        hierarchiesWithMatches.add(hierarchy.parentId);
+      }
+    });
+    return hierarchiesWithMatches;
+  }, [isSearching, filteredRequirements, hierarchies, expandedHierarchies]);
+
+  // Filter requirements to only show matches when searching
+  const displayRequirements = isSearching ? filteredRequirements : requirements;
 
   const loadData = async () => {
     try {
@@ -148,6 +175,23 @@ export default function RequirementsPage() {
         <h1 className="text-3xl font-bold">Requirements</h1>
       </div>
 
+      {/* Search Bar */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex-1 max-w-md">
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            onClear={clearSearch}
+            placeholder="Search requirements..."
+          />
+        </div>
+        {isSearching && (
+          <span className="text-sm text-gray-500">
+            {filteredRequirements.length} of {requirements.length} requirements
+          </span>
+        )}
+      </div>
+
       {/* Hero Banner */}
       {showHeroBanner && (
         <div className="mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6 shadow-sm">
@@ -200,7 +244,7 @@ export default function RequirementsPage() {
           <RequirementHierarchyComponent
             projectId={projectId}
             hierarchies={hierarchies}
-            requirements={requirements}
+            requirements={displayRequirements}
             selectedHierarchyId={selectedHierarchyId}
             onHierarchySelect={handleHierarchySelect}
             onHierarchyUpdate={handleHierarchyUpdate}
@@ -211,8 +255,9 @@ export default function RequirementsPage() {
             }}
             createForHierarchyId={createForHierarchyId}
             onCreateFormClose={() => setCreateForHierarchyId(null)}
-            expandedHierarchies={expandedHierarchies}
+            expandedHierarchies={isSearching ? searchExpandedHierarchies : expandedHierarchies}
             onExpandedHierarchiesChange={setExpandedHierarchies}
+            disableDragAndDrop={isSearching}
           />
         </div>
       </div>

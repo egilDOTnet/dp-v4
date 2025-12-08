@@ -16,26 +16,36 @@ interface VendorListProps {
     additionalData?: any;
     status?: VendorStatus;
   }) => Promise<void>;
-  onUpdateVendor: (vendorId: string, data: {
-    name: string;
-    organizationNumber?: string;
-    emailDomain?: string;
-    additionalData?: any;
-    status?: VendorStatus;
-  }) => Promise<void>;
+  onUpdateVendor: (
+    vendorId: string,
+    data: {
+      name: string;
+      organizationNumber?: string;
+      emailDomain?: string;
+      additionalData?: any;
+      status?: VendorStatus;
+    }
+  ) => Promise<void>;
   onDeleteVendor: (vendorId: string) => Promise<void>;
-  onAddContact: (vendorId: string, data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    isMainContact?: boolean;
-  }) => Promise<void>;
-  onEditContact: (vendorId: string, contactId: string, data: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    isMainContact?: boolean;
-  }) => Promise<void>;
+  onAddContact: (
+    vendorId: string,
+    data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      isMainContact?: boolean;
+    }
+  ) => Promise<void>;
+  onEditContact: (
+    vendorId: string,
+    contactId: string,
+    data: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      isMainContact?: boolean;
+    }
+  ) => Promise<void>;
   onDeleteContact: (vendorId: string, contactId: string) => Promise<void>;
   showAddVendorForm?: boolean;
   onAddVendorFormChange?: (show: boolean) => void;
@@ -56,7 +66,7 @@ const STATUS_OPTIONS: { value: VendorStatus; label: string }[] = [
 
 export default function VendorList({
   projectId,
-  vendors,
+  vendors = [],
   onStatusChange,
   onAddVendor,
   onUpdateVendor,
@@ -67,21 +77,29 @@ export default function VendorList({
   showAddVendorForm = false,
   onAddVendorFormChange,
 }: VendorListProps) {
+  // Ensure vendors is always an array
+  const safeVendors = vendors ?? [];
   const [expandedVendorId, setExpandedVendorId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
-  const [addingContactVendorId, setAddingContactVendorId] = useState<string | null>(null);
+  const [addingContactVendorId, setAddingContactVendorId] = useState<
+    string | null
+  >(null);
   const [addingVendor, setAddingVendor] = useState(showAddVendorForm);
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [isVendorFormAnimating, setIsVendorFormAnimating] = useState(false);
-  const [isContactFormAnimating, setIsContactFormAnimating] = useState<Record<string, boolean>>({});
+  const [isContactFormAnimating, setIsContactFormAnimating] = useState<
+    Record<string, boolean>
+  >({});
 
   // Sync external showAddVendorForm prop and trigger animation
   useEffect(() => {
     if (showAddVendorForm && !addingVendor) {
-      // Close any edit vendor form when opening add form
       if (editingVendorId) {
-        setIsContactFormAnimating((prev) => ({ ...prev, [`edit-vendor-${editingVendorId}`]: false }));
+        setIsContactFormAnimating((prev) => ({
+          ...prev,
+          [`edit-vendor-${editingVendorId}`]: false,
+        }));
         setTimeout(() => {
           setEditingVendorId(null);
           setIsContactFormAnimating((prev) => {
@@ -91,13 +109,11 @@ export default function VendorList({
           });
         }, 300);
       }
-      // Collapse any expanded vendor row
       setExpandedVendorId(null);
       setEditingContactId(null);
       setAddingContactVendorId(null);
       setAddingVendor(true);
       setIsVendorFormAnimating(false);
-      // Trigger animation after element is in DOM
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setIsVendorFormAnimating(true);
@@ -132,7 +148,6 @@ export default function VendorList({
   };
 
   const toggleExpand = (vendorId: string) => {
-    // If closing, also clear any editing/adding state
     if (expandedVendorId === vendorId) {
       setExpandedVendorId(null);
       setEditingContactId(null);
@@ -140,7 +155,6 @@ export default function VendorList({
       setEditingVendorId(null);
     } else {
       setExpandedVendorId(vendorId);
-      // Clear editing/adding state when switching vendors
       setEditingContactId(null);
       setAddingContactVendorId(null);
       setEditingVendorId(null);
@@ -148,7 +162,6 @@ export default function VendorList({
   };
 
   const handleEditVendorClick = (vendor: ProjectVendor) => {
-    // Close add vendor form if open
     if (addingVendor) {
       setIsVendorFormAnimating(false);
       setTimeout(() => {
@@ -156,29 +169,38 @@ export default function VendorList({
         if (onAddVendorFormChange) {
           onAddVendorFormChange(false);
         }
-        // Now open edit form
         setEditingVendorId(vendor.vendor.id);
-        setIsContactFormAnimating((prev) => ({ ...prev, [`edit-vendor-${vendor.vendor.id}`]: false }));
+        setIsContactFormAnimating((prev) => ({
+          ...prev,
+          [`edit-vendor-${vendor.vendor.id}`]: false,
+        }));
         if (expandedVendorId !== vendor.vendor.id) {
           setExpandedVendorId(vendor.vendor.id);
         }
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setIsContactFormAnimating((prev) => ({ ...prev, [`edit-vendor-${vendor.vendor.id}`]: true }));
+            setIsContactFormAnimating((prev) => ({
+              ...prev,
+              [`edit-vendor-${vendor.vendor.id}`]: true,
+            }));
           });
         });
       }, 300);
     } else {
       setEditingVendorId(vendor.vendor.id);
-      setIsContactFormAnimating((prev) => ({ ...prev, [`edit-vendor-${vendor.vendor.id}`]: false }));
-      // Ensure vendor is expanded
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`edit-vendor-${vendor.vendor.id}`]: false,
+      }));
       if (expandedVendorId !== vendor.vendor.id) {
         setExpandedVendorId(vendor.vendor.id);
       }
-      // Trigger animation after element is in DOM
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setIsContactFormAnimating((prev) => ({ ...prev, [`edit-vendor-${vendor.vendor.id}`]: true }));
+          setIsContactFormAnimating((prev) => ({
+            ...prev,
+            [`edit-vendor-${vendor.vendor.id}`]: true,
+          }));
         });
       });
     }
@@ -194,8 +216,10 @@ export default function VendorList({
     try {
       if (editingVendorId) {
         await onUpdateVendor(editingVendorId, data);
-        // Only animate out and close form on success
-        setIsContactFormAnimating((prev) => ({ ...prev, [`edit-vendor-${editingVendorId}`]: false }));
+        setIsContactFormAnimating((prev) => ({
+          ...prev,
+          [`edit-vendor-${editingVendorId}`]: false,
+        }));
         setTimeout(() => {
           setEditingVendorId(null);
           setIsContactFormAnimating((prev) => {
@@ -206,7 +230,6 @@ export default function VendorList({
         }, 300);
       } else if (addingVendor) {
         await onAddVendor(data);
-        // Only animate out and close form on success
         setIsVendorFormAnimating(false);
         setTimeout(() => {
           setAddingVendor(false);
@@ -216,8 +239,6 @@ export default function VendorList({
         }, 300);
       }
     } catch (error: any) {
-      // Error will be handled by VendorForm component
-      // Re-throw so VendorForm can display it
       throw error;
     }
   };
@@ -232,7 +253,10 @@ export default function VendorList({
         }
       }, 300);
     } else if (editingVendorId) {
-      setIsContactFormAnimating((prev) => ({ ...prev, [`edit-vendor-${editingVendorId}`]: false }));
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`edit-vendor-${editingVendorId}`]: false,
+      }));
       setTimeout(() => {
         setEditingVendorId(null);
         setIsContactFormAnimating((prev) => {
@@ -253,9 +277,11 @@ export default function VendorList({
   };
 
   const handleAddContactClick = (vendorId: string) => {
-    // Close any edit contact form if open
     if (editingContactId) {
-      setIsContactFormAnimating((prev) => ({ ...prev, [`edit-${editingContactId}`]: false }));
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`edit-${editingContactId}`]: false,
+      }));
       setTimeout(() => {
         setEditingContactId(null);
         setIsContactFormAnimating((prev) => {
@@ -263,38 +289,49 @@ export default function VendorList({
           delete newState[`edit-${editingContactId}`];
           return newState;
         });
-        // Now open add form
         setAddingContactVendorId(vendorId);
-        setIsContactFormAnimating((prev) => ({ ...prev, [`add-${vendorId}`]: false }));
+        setIsContactFormAnimating((prev) => ({
+          ...prev,
+          [`add-${vendorId}`]: false,
+        }));
         if (expandedVendorId !== vendorId) {
           setExpandedVendorId(vendorId);
         }
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setIsContactFormAnimating((prev) => ({ ...prev, [`add-${vendorId}`]: true }));
+            setIsContactFormAnimating((prev) => ({
+              ...prev,
+              [`add-${vendorId}`]: true,
+            }));
           });
         });
       }, 300);
     } else {
       setAddingContactVendorId(vendorId);
-      setIsContactFormAnimating((prev) => ({ ...prev, [`add-${vendorId}`]: false }));
-      // Ensure vendor is expanded
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`add-${vendorId}`]: false,
+      }));
       if (expandedVendorId !== vendorId) {
         setExpandedVendorId(vendorId);
       }
-      // Trigger animation after element is in DOM
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setIsContactFormAnimating((prev) => ({ ...prev, [`add-${vendorId}`]: true }));
+          setIsContactFormAnimating((prev) => ({
+            ...prev,
+            [`add-${vendorId}`]: true,
+          }));
         });
       });
     }
   };
 
   const handleEditContactClick = (vendorId: string, contactId: string) => {
-    // Close any add contact form if open
     if (addingContactVendorId) {
-      setIsContactFormAnimating((prev) => ({ ...prev, [`add-${addingContactVendorId}`]: false }));
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`add-${addingContactVendorId}`]: false,
+      }));
       setTimeout(() => {
         setAddingContactVendorId(null);
         setIsContactFormAnimating((prev) => {
@@ -302,29 +339,38 @@ export default function VendorList({
           delete newState[`add-${addingContactVendorId}`];
           return newState;
         });
-        // Now open edit form
         setEditingContactId(contactId);
-        setIsContactFormAnimating((prev) => ({ ...prev, [`edit-${contactId}`]: false }));
+        setIsContactFormAnimating((prev) => ({
+          ...prev,
+          [`edit-${contactId}`]: false,
+        }));
         if (expandedVendorId !== vendorId) {
           setExpandedVendorId(vendorId);
         }
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setIsContactFormAnimating((prev) => ({ ...prev, [`edit-${contactId}`]: true }));
+            setIsContactFormAnimating((prev) => ({
+              ...prev,
+              [`edit-${contactId}`]: true,
+            }));
           });
         });
       }, 300);
     } else {
       setEditingContactId(contactId);
-      setIsContactFormAnimating((prev) => ({ ...prev, [`edit-${contactId}`]: false }));
-      // Ensure vendor is expanded
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`edit-${contactId}`]: false,
+      }));
       if (expandedVendorId !== vendorId) {
         setExpandedVendorId(vendorId);
       }
-      // Trigger animation after element is in DOM
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          setIsContactFormAnimating((prev) => ({ ...prev, [`edit-${contactId}`]: true }));
+          setIsContactFormAnimating((prev) => ({
+            ...prev,
+            [`edit-${contactId}`]: true,
+          }));
         });
       });
     }
@@ -337,8 +383,10 @@ export default function VendorList({
     isMainContact?: boolean;
   }) => {
     if (editingContactId && expandedVendorId) {
-      // Animate out before submitting
-      setIsContactFormAnimating((prev) => ({ ...prev, [`edit-${editingContactId}`]: false }));
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`edit-${editingContactId}`]: false,
+      }));
       await onEditContact(expandedVendorId, editingContactId, data);
       setTimeout(() => {
         setEditingContactId(null);
@@ -349,8 +397,10 @@ export default function VendorList({
         });
       }, 300);
     } else if (addingContactVendorId) {
-      // Animate out before submitting
-      setIsContactFormAnimating((prev) => ({ ...prev, [`add-${addingContactVendorId}`]: false }));
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`add-${addingContactVendorId}`]: false,
+      }));
       await onAddContact(addingContactVendorId, data);
       setTimeout(() => {
         setAddingContactVendorId(null);
@@ -364,9 +414,11 @@ export default function VendorList({
   };
 
   const handleContactCancel = () => {
-    // Animate out before removing
     if (editingContactId) {
-      setIsContactFormAnimating((prev) => ({ ...prev, [`edit-${editingContactId}`]: false }));
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`edit-${editingContactId}`]: false,
+      }));
       setTimeout(() => {
         setEditingContactId(null);
         setIsContactFormAnimating((prev) => {
@@ -377,7 +429,10 @@ export default function VendorList({
       }, 300);
     }
     if (addingContactVendorId) {
-      setIsContactFormAnimating((prev) => ({ ...prev, [`add-${addingContactVendorId}`]: false }));
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`add-${addingContactVendorId}`]: false,
+      }));
       setTimeout(() => {
         setAddingContactVendorId(null);
         setIsContactFormAnimating((prev) => {
@@ -389,184 +444,61 @@ export default function VendorList({
     }
   };
 
-
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
       {/* Empty state message */}
-      {!addingVendor && vendors.length === 0 && (
+      {!addingVendor && safeVendors.length === 0 && (
         <div className="p-6 text-center">
-          <p className="text-gray-600">No vendors added yet</p>
+          <p className="text-gray-600 dark:text-gray-400">No vendors added yet</p>
         </div>
       )}
 
-      {vendors.length > 0 && (
+      {safeVendors.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
-              Name
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
-              Org Number
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-              Email Domain
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">
-              Status
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
-              Contacts
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {vendors.map((projectVendor) => {
-            const vendor = projectVendor.vendor;
-            const isExpanded = expandedVendorId === vendor.id;
-            const contactCount = vendor.contacts?.length || 0;
-            const mainContact = vendor.contacts?.find((c) => c.isMainContact);
+          <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[25%]">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
+                  Org Number
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
+                  Email Domain
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[18%]">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
+                  Contacts
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[20%]">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {safeVendors.map((projectVendor) => {
+                const vendor = projectVendor.vendor;
+                const isExpanded = expandedVendorId === vendor.id;
+                const contactCount = vendor.contacts?.length || 0;
+                const mainContact = vendor.contacts?.find(
+                  (c) => c.isMainContact
+                );
 
-            return (
-              <Fragment key={projectVendor.id}>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center">
-                      <button
-                        onClick={() => toggleExpand(vendor.id)}
-                        className="mr-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
-                      >
-                        {isExpanded ? (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                return (
+                  <Fragment key={projectVendor.id}>
+                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => toggleExpand(vendor.id)}
+                            className="mr-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5l7 7-7 7"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                      <div 
-                        className="min-w-0 flex-1 cursor-pointer"
-                        onClick={() => toggleExpand(vendor.id)}
-                      >
-                        <div className="text-sm font-medium text-gray-900 truncate hover:text-primary-600">{vendor.name}</div>
-                        {mainContact && (
-                          <div className="text-xs text-gray-500 truncate">
-                            Main: {mainContact.firstName} {mainContact.lastName}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-500">
-                    <div className="truncate">{vendor.organizationNumber || "-"}</div>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-500">
-                    <div className="truncate">{vendor.emailDomain || "-"}</div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <select
-                      value={projectVendor.status}
-                      onChange={(e) =>
-                        handleStatusChange(vendor.id, e.target.value as VendorStatus)
-                      }
-                      disabled={updatingStatus === vendor.id}
-                      className="w-full text-sm border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
-                    >
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-500">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {contactCount}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-right text-sm font-medium">
-                    <div className="flex items-center justify-end gap-2">
-                      {editingVendorId !== vendor.id && (
-                        <button
-                          onClick={() => handleEditVendorClick(projectVendor)}
-                          className="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-md hover:bg-primary-700 whitespace-nowrap"
-                          title="Edit vendor details"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-
-                {/* Inline Edit Vendor Form */}
-                {editingVendorId === vendor.id && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-4 bg-gray-50">
-                      <div
-                        className={`transition-all duration-300 ease-out ${
-                          isContactFormAnimating[`edit-vendor-${vendor.id}`]
-                            ? "opacity-100 translate-y-0"
-                            : "opacity-0 -translate-y-4"
-                        }`}
-                      >
-                        <VendorForm
-                          projectId={projectId}
-                          existingVendor={{
-                            id: vendor.id,
-                            name: vendor.name,
-                            organizationNumber: vendor.organizationNumber,
-                            emailDomain: vendor.emailDomain,
-                          }}
-                          onSubmit={handleVendorSubmit}
-                          onCancel={handleVendorCancel}
-                          onDelete={handleVendorDelete}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                )}
-
-                {/* Expanded row showing contacts */}
-                {isExpanded && editingVendorId !== vendor.id && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-4 bg-gray-50">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium text-sm text-gray-900">Contact Persons</h4>
-                          {!addingContactVendorId && (
-                            <button
-                              onClick={() => handleAddContactClick(vendor.id)}
-                              className="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center gap-1"
-                            >
+                            {isExpanded ? (
                               <svg
-                                className="w-4 h-4"
+                                className="w-5 h-5"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -575,140 +507,310 @@ export default function VendorList({
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   strokeWidth={2}
-                                  d="M12 4v16m8-8H4"
+                                  d="M19 9l-7 7-7-7"
                                 />
                               </svg>
-                              Add Contact
+                            ) : (
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 5l7 7-7 7"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                          <div
+                            className="min-w-0 flex-1 cursor-pointer"
+                            onClick={() => toggleExpand(vendor.id)}
+                          >
+                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate hover:text-primary-600 dark:hover:text-primary-400">
+                              {vendor.name}
+                            </div>
+                            {mainContact && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                Main: {mainContact.firstName}{" "}
+                                {mainContact.lastName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="truncate">
+                          {vendor.organizationNumber || "-"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="truncate">
+                          {vendor.emailDomain || "-"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <select
+                          value={projectVendor.status}
+                          onChange={(e) =>
+                            handleStatusChange(
+                              vendor.id,
+                              e.target.value as VendorStatus
+                            )
+                          }
+                          disabled={updatingStatus === vendor.id}
+                          className="w-full text-sm border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
+                        >
+                          {STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                          {contactCount}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          {editingVendorId !== vendor.id && (
+                            <button
+                              onClick={() =>
+                                handleEditVendorClick(projectVendor)
+                              }
+                              className="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-md hover:bg-primary-700 whitespace-nowrap"
+                              title="Edit vendor details"
+                            >
+                              Edit
                             </button>
                           )}
                         </div>
+                      </td>
+                    </tr>
 
-                        {/* Inline Add Contact Form */}
-                        {addingContactVendorId === vendor.id && (
+                    {/* Inline Edit Vendor Form */}
+                    {editingVendorId === vendor.id && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50"
+                        >
                           <div
-                            className={`mb-3 transition-all duration-300 ease-out ${
-                              isContactFormAnimating[`add-${vendor.id}`]
+                            className={`transition-all duration-300 ease-out ${
+                              isContactFormAnimating[`edit-vendor-${vendor.id}`]
                                 ? "opacity-100 translate-y-0"
                                 : "opacity-0 -translate-y-4"
                             }`}
                           >
-                            <ContactPersonForm
-                              vendorId={vendor.id}
-                              vendorName={vendor.name}
-                              isFirstContact={!vendor.contacts || vendor.contacts.length === 0}
-                              onSubmit={handleContactSubmit}
-                              onCancel={handleContactCancel}
+                            <VendorForm
+                              projectId={projectId}
+                              existingVendor={{
+                                id: vendor.id,
+                                name: vendor.name,
+                                organizationNumber: vendor.organizationNumber,
+                                emailDomain: vendor.emailDomain,
+                              }}
+                              onSubmit={handleVendorSubmit}
+                              onCancel={handleVendorCancel}
+                              onDelete={handleVendorDelete}
                             />
                           </div>
-                        )}
+                        </td>
+                      </tr>
+                    )}
 
-                        {/* Inline Edit Contact Form */}
-                        {editingContactId && expandedVendorId === vendor.id && vendor.contacts && (
-                          <>
-                            {vendor.contacts
-                              .filter((c) => c.id === editingContactId)
-                              .map((contact) => (
-                                <div
-                                  key={contact.id}
-                                  className={`mb-3 transition-all duration-300 ease-out ${
-                                    isContactFormAnimating[`edit-${contact.id}`]
-                                      ? "opacity-100 translate-y-0"
-                                      : "opacity-0 -translate-y-4"
-                                  }`}
+                    {/* Expanded row showing contacts */}
+                    {isExpanded && editingVendorId !== vendor.id && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50"
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                Contact Persons
+                              </h4>
+                              {!addingContactVendorId && (
+                                <button
+                                  onClick={() =>
+                                    handleAddContactClick(vendor.id)
+                                  }
+                                  className="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center gap-1"
                                 >
-                                  <ContactPersonForm
-                                    vendorId={vendor.id}
-                                    vendorName={vendor.name}
-                                    existingContact={contact}
-                                    isFirstContact={false}
-                                    onSubmit={handleContactSubmit}
-                                    onCancel={handleContactCancel}
-                                    onDelete={async () => {
-                                      await handleDeleteContact(vendor.id, contact.id);
-                                    }}
-                                  />
-                                </div>
-                              ))}
-                          </>
-                        )}
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 4v16m8-8H4"
+                                    />
+                                  </svg>
+                                  Add Contact
+                                </button>
+                              )}
+                            </div>
 
-                        {/* Contact List */}
-                        {vendor.contacts && vendor.contacts.length > 0 && !addingContactVendorId && (
-                          <div className="space-y-2">
-                            {vendor.contacts
-                              .filter((c) => c.id !== editingContactId)
-                              .map((contact) => (
-                                <div
-                                  key={contact.id}
-                                  className="flex items-center justify-between bg-white p-3 rounded-md border border-gray-200"
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <div className="text-sm font-medium text-gray-900">
-                                        {contact.firstName} {contact.lastName}
+                            {/* Inline Add Contact Form */}
+                            {addingContactVendorId === vendor.id && (
+                              <div
+                                className={`mb-3 transition-all duration-300 ease-out ${
+                                  isContactFormAnimating[`add-${vendor.id}`]
+                                    ? "opacity-100 translate-y-0"
+                                    : "opacity-0 -translate-y-4"
+                                }`}
+                              >
+                                <ContactPersonForm
+                                  vendorId={vendor.id}
+                                  vendorName={vendor.name}
+                                  isFirstContact={
+                                    !vendor.contacts ||
+                                    vendor.contacts.length === 0
+                                  }
+                                  onSubmit={handleContactSubmit}
+                                  onCancel={handleContactCancel}
+                                />
+                              </div>
+                            )}
+
+                            {/* Inline Edit Contact Form */}
+                            {editingContactId &&
+                              expandedVendorId === vendor.id &&
+                              vendor.contacts && (
+                                <>
+                                  {vendor.contacts
+                                    .filter((c) => c.id === editingContactId)
+                                    .map((contact) => (
+                                      <div
+                                        key={contact.id}
+                                        className={`mb-3 transition-all duration-300 ease-out ${
+                                          isContactFormAnimating[
+                                            `edit-${contact.id}`
+                                          ]
+                                            ? "opacity-100 translate-y-0"
+                                            : "opacity-0 -translate-y-4"
+                                        }`}
+                                      >
+                                        <ContactPersonForm
+                                          vendorId={vendor.id}
+                                          vendorName={vendor.name}
+                                          existingContact={contact}
+                                          isFirstContact={false}
+                                          onSubmit={handleContactSubmit}
+                                          onCancel={handleContactCancel}
+                                          onDelete={async () => {
+                                            await handleDeleteContact(
+                                              vendor.id,
+                                              contact.id
+                                            );
+                                          }}
+                                        />
                                       </div>
-                                      {contact.isMainContact && (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                          Main Contact
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-sm text-gray-500 mt-1">{contact.email}</div>
-                                  </div>
-                                  <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-                                    <button
-                                      onClick={() => handleEditContactClick(vendor.id, contact.id)}
-                                      className="text-primary-600 hover:text-primary-700 underline text-sm"
-                                    >
-                                      Edit
-                                    </button>
-                                  </div>
+                                    ))}
+                                </>
+                              )}
+
+                            {/* Contact List */}
+                            {vendor.contacts &&
+                              vendor.contacts.length > 0 &&
+                              !addingContactVendorId && (
+                                <div className="space-y-2">
+                                  {vendor.contacts
+                                    .filter((c) => c.id !== editingContactId)
+                                    .map((contact) => (
+                                      <div
+                                        key={contact.id}
+                                        className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-md border border-gray-200 dark:border-gray-700"
+                                      >
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2">
+                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                              {contact.firstName}{" "}
+                                              {contact.lastName}
+                                            </div>
+                                            {contact.isMainContact && (
+                                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                                                Main Contact
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                            {contact.email}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                                          <button
+                                            onClick={() =>
+                                              handleEditContactClick(
+                                                vendor.id,
+                                                contact.id
+                                              )
+                                            }
+                                            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 underline text-sm"
+                                          >
+                                            Edit
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
                                 </div>
-                              ))}
-                          </div>
-                        )}
+                              )}
 
-                        {/* Empty State */}
-                        {(!vendor.contacts || vendor.contacts.length === 0) && !addingContactVendorId && (
-                          <div className="text-center py-4">
-                            <p className="text-sm text-gray-500 italic">
-                              No contacts added yet
-                            </p>
+                            {/* Empty State */}
+                            {(!vendor.contacts ||
+                              vendor.contacts.length === 0) &&
+                              !addingContactVendorId && (
+                                <div className="text-center py-4">
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                    No contacts added yet
+                                  </p>
+                                </div>
+                              )}
                           </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
 
-          {/* Inline Add Vendor Form - appears after last vendor */}
-          {addingVendor && (
-            <tr>
-              <td colSpan={6} className="px-4 py-4 bg-gray-50">
-                <div
-                  className={`transition-all duration-300 ease-out ${
-                    isVendorFormAnimating
-                      ? "opacity-100 translate-y-0"
-                      : "opacity-0 -translate-y-4"
-                  }`}
-                >
-                  <VendorForm
-                    projectId={projectId}
-                    onSubmit={handleVendorSubmit}
-                    onCancel={handleVendorCancel}
-                  />
-                </div>
-              </td>
-            </tr>
-          )}
-        </tbody>
+              {/* Inline Add Vendor Form - appears after last vendor */}
+              {addingVendor && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-4 bg-gray-50 dark:bg-gray-900/50"
+                  >
+                    <div
+                      className={`transition-all duration-300 ease-out ${
+                        isVendorFormAnimating
+                          ? "opacity-100 translate-y-0"
+                          : "opacity-0 -translate-y-4"
+                      }`}
+                    >
+                      <VendorForm
+                        projectId={projectId}
+                        onSubmit={handleVendorSubmit}
+                        onCancel={handleVendorCancel}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
           </table>
         </div>
       )}
     </div>
   );
 }
-

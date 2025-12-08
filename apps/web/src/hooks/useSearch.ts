@@ -92,11 +92,13 @@ export function useSearch<T>(
   const { searchKeys, caseSensitive = false, minChars = 1 } = options;
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Ensure items is always an array - use the original reference if it's already an array
+  const safeItems = Array.isArray(items) ? items : [];
   const isSearching = searchTerm.length >= minChars;
 
   const filteredItems = useMemo(() => {
-    if (!isSearching) {
-      return items;
+    if (!isSearching || safeItems.length === 0) {
+      return safeItems;
     }
 
     const normalizedTerm = caseSensitive
@@ -107,10 +109,10 @@ export function useSearch<T>(
     const searchWords = normalizedTerm.split(/\s+/).filter(Boolean);
 
     if (searchWords.length === 0) {
-      return items;
+      return safeItems;
     }
 
-    return items.filter((item) => {
+    return safeItems.filter((item) => {
       // Get all searchable values for this item
       const searchableValues = searchKeys.map((key) => {
         const value = getNestedValue(item, key as string);
@@ -123,7 +125,7 @@ export function useSearch<T>(
         searchableValues.some((value) => value.includes(word))
       );
     });
-  }, [items, searchTerm, searchKeys, caseSensitive, isSearching]);
+  }, [safeItems, searchTerm, searchKeys, caseSensitive, isSearching]);
 
   const clearSearch = useCallback(() => {
     setSearchTerm("");
@@ -135,7 +137,7 @@ export function useSearch<T>(
     filteredItems,
     isSearching,
     clearSearch,
-    filteredCount: items.length - filteredItems.length,
+    filteredCount: safeItems.length - filteredItems.length,
   };
 }
 

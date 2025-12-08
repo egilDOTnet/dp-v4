@@ -1,6 +1,8 @@
-import React from 'react';
-import { SearchBar } from './SearchBar';
-import { EmptyState } from './EmptyState';
+"use client";
+
+import React from "react";
+import { SearchBar } from "./SearchBar";
+import { EmptyState } from "./EmptyState";
 
 export interface SearchableListProps {
   query: string;
@@ -22,10 +24,10 @@ export const SearchableList: React.FC<SearchableListProps> = ({
   children,
   itemCount,
   filteredCount,
-  searchPlaceholder = 'Search...',
-  emptyStateTitle = 'No results found',
-  emptyStateDescription = 'Try adjusting your search query',
-  className = '',
+  searchPlaceholder = "Search...",
+  emptyStateTitle = "No results found",
+  emptyStateDescription = "Try adjusting your search query",
+  className = "",
 }) => {
   const isSearching = query.trim().length > 0;
   const hasResults = filteredCount > 0;
@@ -42,8 +44,8 @@ export const SearchableList: React.FC<SearchableListProps> = ({
           />
         </div>
         {isSearching && (
-          <div className="text-sm text-text-secondary">
-            {filteredCount} of {itemCount} {itemCount === 1 ? 'item' : 'items'}
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {filteredCount} of {itemCount} {itemCount === 1 ? "item" : "items"}
           </div>
         )}
       </div>
@@ -51,7 +53,12 @@ export const SearchableList: React.FC<SearchableListProps> = ({
       {!hasResults ? (
         <EmptyState
           icon={
-            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-12 h-12"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
