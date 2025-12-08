@@ -720,10 +720,10 @@ export default function RequirementHierarchyComponent({
               }}
             >
               {isEditing ? (
-                <div className="border-2 border-primary-600 rounded-lg bg-white flex items-stretch overflow-hidden">
+                <div className="border-2 border-primary-900 rounded-lg bg-white flex items-stretch overflow-hidden">
                   {/* Left side: Number - same as view mode */}
                   <div 
-                    className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
+                    className="bg-primary-900 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
                   >
                     <span className="font-semibold text-lg leading-none">
                       {h1.number.endsWith('.') ? h1.number.slice(0, -1) : h1.number}
@@ -761,7 +761,7 @@ export default function RequirementHierarchyComponent({
                           }
                         }}
                         placeholder="Title"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-lg"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-900 font-medium text-lg"
                       />
                       <textarea
                         value={formData.description}
@@ -778,7 +778,7 @@ export default function RequirementHierarchyComponent({
                         }}
                         placeholder="Description (optional)"
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-900"
                       />
                       {/* Delete button in lower right */}
                       <div className="flex justify-end">
@@ -795,7 +795,7 @@ export default function RequirementHierarchyComponent({
                 </div>
               ) : (
                 <div 
-                  className="border-2 border-primary-600 rounded-lg bg-white flex items-stretch overflow-hidden cursor-pointer"
+                  className="rounded-lg bg-primary-800 flex items-stretch overflow-hidden cursor-pointer"
                   onClick={(e) => {
                     // Allow click to toggle if not dragging
                     if (!isDragging) {
@@ -807,7 +807,7 @@ export default function RequirementHierarchyComponent({
                   <div 
                     {...attributes}
                     {...listeners}
-                    className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-700 transition-colors"
+                    className="bg-primary-900 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-950 transition-colors"
                     title="Drag to reorder or click to expand/collapse"
                   >
                     <span className="font-semibold text-lg leading-none">
@@ -821,11 +821,7 @@ export default function RequirementHierarchyComponent({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className={`font-medium text-lg leading-none hover:text-primary-600 cursor-pointer ${
-                              expandedHierarchies.has(h1.id)
-                                ? "text-primary-700"
-                                : "text-gray-900"
-                            }`}
+                            className="font-medium text-lg leading-none text-gray-100 hover:text-white cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               startEdit(h1);
@@ -840,7 +836,7 @@ export default function RequirementHierarchyComponent({
                                 e.stopPropagation();
                                 toggleDescription(h1.id);
                               }}
-                              className="flex-shrink-0 text-gray-500 hover:text-gray-700 self-center"
+                              className="flex-shrink-0 text-white hover:text-white self-center"
                               title="Toggle description"
                             >
                               <svg
@@ -852,7 +848,7 @@ export default function RequirementHierarchyComponent({
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  strokeWidth={2}
+                                  strokeWidth={2.5}
                                   d="M4 6h16M4 12h16M4 18h16"
                                 />
                               </svg>
@@ -860,7 +856,7 @@ export default function RequirementHierarchyComponent({
                           )}
                           <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
                             getTotalChildCount(h1.id) > 0 
-                              ? 'bg-gray-200 text-gray-700' 
+                              ? 'bg-primary-900 text-white' 
                               : 'invisible'
                           }`}>
                             {getTotalChildCount(h1.id) || 0}
@@ -868,7 +864,7 @@ export default function RequirementHierarchyComponent({
                         </div>
                         {/* Description */}
                         {h1.description && expandedDescriptions.has(h1.id) && (
-                          <p className="text-sm text-gray-600 mt-1">{h1.description}</p>
+                          <p className="text-sm text-gray-100 mt-1">{h1.description}</p>
                         )}
                       </div>
                     </div>
@@ -920,10 +916,10 @@ export default function RequirementHierarchyComponent({
                           }}
                         >
                           {isEditing2 ? (
-                            <div className="border-2 border-primary-500 rounded-lg bg-white flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
+                            <div className="border-2 border-primary-800 rounded-lg bg-white flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
                               {/* Left side: Number - same as view mode */}
                               <div 
-                                className="bg-primary-500 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
+                                className="bg-primary-800 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
                               >
                                 <span className="font-semibold text-base leading-none">
                                   {h2.number.endsWith('.') ? h2.number.slice(0, -1) : h2.number}
@@ -963,7 +959,7 @@ export default function RequirementHierarchyComponent({
                                       }
                                     }}
                                     placeholder="Title"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium text-base"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-800 font-medium text-base"
                                   />
                                   <textarea
                                     value={formData.description}
@@ -982,7 +978,7 @@ export default function RequirementHierarchyComponent({
                                     }}
                                     placeholder="Description (optional)"
                                     rows={2}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-800"
                                   />
                                   {/* Delete button in lower right */}
                                   <div className="flex justify-end">
@@ -999,7 +995,7 @@ export default function RequirementHierarchyComponent({
                             </div>
                           ) : (
                             <div 
-                              className="border-2 border-primary-500 rounded-lg bg-white flex items-stretch overflow-hidden cursor-pointer" 
+                              className="rounded-lg bg-primary-700 flex items-stretch overflow-hidden cursor-pointer" 
                               style={{ marginLeft: '3.5rem' }}
                               onClick={(e) => {
                                 // Allow click to toggle if not dragging
@@ -1012,7 +1008,7 @@ export default function RequirementHierarchyComponent({
                               <div 
                                 {...attributes}
                                 {...listeners}
-                                className="bg-primary-500 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-600 transition-colors"
+                                className="bg-primary-800 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:bg-primary-900 transition-colors"
                                 title="Drag to reorder or click to expand/collapse"
                               >
                                 <span className="font-semibold text-base leading-none">
@@ -1026,11 +1022,7 @@ export default function RequirementHierarchyComponent({
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span
-                                        className={`font-medium text-base leading-none hover:text-primary-600 cursor-pointer ${
-                                          expandedHierarchies.has(h2.id)
-                                            ? "text-primary-700"
-                                            : "text-gray-900"
-                                        }`}
+                                        className="font-medium text-base leading-none text-gray-100 hover:text-white cursor-pointer"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           startEdit(h2);
@@ -1045,7 +1037,7 @@ export default function RequirementHierarchyComponent({
                                             e.stopPropagation();
                                             toggleDescription(h2.id);
                                           }}
-                                          className="flex-shrink-0 text-gray-500 hover:text-gray-700 self-center"
+                                          className="flex-shrink-0 text-white hover:text-white self-center"
                                           title="Toggle description"
                                         >
                                           <svg
@@ -1057,7 +1049,7 @@ export default function RequirementHierarchyComponent({
                                             <path
                                               strokeLinecap="round"
                                               strokeLinejoin="round"
-                                              strokeWidth={2}
+                                              strokeWidth={2.5}
                                               d="M4 6h16M4 12h16M4 18h16"
                                             />
                                           </svg>
@@ -1068,7 +1060,7 @@ export default function RequirementHierarchyComponent({
                                         return (
                                           <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
                                             count > 0 
-                                              ? 'bg-gray-200 text-gray-700' 
+                                              ? 'bg-primary-800 text-white' 
                                               : 'invisible'
                                           }`}>
                                             {count || 0}
@@ -1078,7 +1070,7 @@ export default function RequirementHierarchyComponent({
                                     </div>
                                     {/* Description */}
                                     {h2.description && expandedDescriptions.has(h2.id) && (
-                                      <p className="text-sm text-gray-600 mt-1">
+                                      <p className="text-sm text-gray-100 mt-1">
                                         {h2.description}
                                       </p>
                                     )}
