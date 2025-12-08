@@ -110,6 +110,8 @@ async function renumberItemsInHierarchy(hierarchyId: string) {
           where: { id: allItems[i].id },
           data: { number: newNumber, order: newOrder },
         });
+        // Recursively renumber all requirements within this sub-hierarchy
+        await renumberRequirementsInHierarchy(allItems[i].id, newNumber);
       }
     } else {
       const requirement = hierarchy.requirements.find((r) => r.id === allItems[i].id);
@@ -119,6 +121,28 @@ async function renumberItemsInHierarchy(hierarchyId: string) {
           data: { number: newNumber, order: newOrder },
         });
       }
+    }
+  }
+}
+
+// Helper function to recursively renumber all requirements within a hierarchy
+async function renumberRequirementsInHierarchy(hierarchyId: string, hierarchyNumber: string) {
+  const requirements = await db.requirement.findMany({
+    where: { hierarchyId },
+    orderBy: { order: "asc" },
+  });
+
+  // Remove trailing period from hierarchy number for concatenation
+  const hierarchyNumberBase = hierarchyNumber.endsWith('.') ? hierarchyNumber.slice(0, -1) : hierarchyNumber;
+
+  // Renumber all requirements
+  for (let i = 0; i < requirements.length; i++) {
+    const newNumber = `${hierarchyNumberBase}.${i + 1}.`;
+    if (requirements[i].number !== newNumber) {
+      await db.requirement.update({
+        where: { id: requirements[i].id },
+        data: { number: newNumber },
+      });
     }
   }
 }
@@ -318,6 +342,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
             data: { number: newNumber },
           });
         }
+        // Recursively renumber all children of this level 1 hierarchy
+        await renumberItemsInHierarchy(allLevel1Hierarchies[i].id);
       }
 
       // Reload hierarchy with updated number
@@ -518,6 +544,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
               data: { number: newNumber },
             });
           }
+          // Recursively renumber all children of this level 1 hierarchy
+          await renumberItemsInHierarchy(level1Hierarchies[i].id);
         }
       } else {
         // For level 2 hierarchies, renumber items in the parent

@@ -235,6 +235,24 @@ export default function RequirementList({
       }
 
       if (!clickedInsideRequirement) {
+        // Save any pending changes before exiting edit mode
+        Object.entries(editingFields).forEach(([requirementId, fields]) => {
+          const data = formData[requirementId];
+          const requirement = requirements.find((r) => r.id === requirementId);
+          
+          if (data && requirement) {
+            fields.forEach((field) => {
+              if (field === "description" && data.description !== requirement.description) {
+                handleFieldSave(requirementId, "description", data.description);
+              } else if (field === "type" && data.type !== requirement.type) {
+                handleFieldSave(requirementId, "type", data.type);
+              } else if (field === "status" && data.status !== requirement.status) {
+                handleFieldSave(requirementId, "status", data.status);
+              }
+            });
+          }
+        });
+
         // Exit all edit modes
         setEditingFields({});
         setShowHistoryId(null);
@@ -245,7 +263,7 @@ export default function RequirementList({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isCreatingNew]);
+  }, [isCreatingNew, editingFields, formData, requirements]);
 
   const handleCreate = async () => {
     if (!newRequirement.description.trim()) {
@@ -665,7 +683,7 @@ export default function RequirementList({
                   <div 
                     {...(dragAttributes || {})}
                     {...(dragListeners || {})}
-                    className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg ${dragAttributes ? 'cursor-grab active:cursor-grabbing hover:brightness-110 transition-all' : ''}`}
+                    className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg ${dragAttributes ? 'cursor-grab active:cursor-grabbing hover:brightness-110 transition-all' : ''}`}
                     title={dragAttributes ? "Drag to reorder" : undefined}
                   >
                     <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>
@@ -674,11 +692,11 @@ export default function RequirementList({
                   </div>
 
                   {/* Right side: Requirement content */}
-                  <div className="flex-1 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      {/* Description area */}
-                      <div className="flex-1 min-w-0">
-                        {isEditingDescription ? (
+                  <div className="flex-1 px-4 py-3">
+                    {isEditing ? (
+                      <div className="grid grid-cols-4 gap-4">
+                        {/* Description area - 3 columns */}
+                        <div className="col-span-3">
                           <textarea
                             ref={(el) => {
                               descriptionTextareaRefs.current[requirement.id] = el;
@@ -695,70 +713,119 @@ export default function RequirementList({
                               }
                             }}
                             placeholder="Requirement description"
-                            rows={2}
+                            rows={5}
                             className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 focus:ring-primary-500`}
                             autoFocus
                           />
-                        ) : (
-                          <p 
-                            className={`${colorClasses.descriptionSize} leading-none text-gray-900 cursor-pointer hover:text-primary-600`}
-                            onClick={() => handleFieldFocus(requirement.id, "description")}
-                          >
-                            {requirement.description}
-                          </p>
-                        )}
+                        </div>
 
-                        {/* Show timestamps and history/delete only in edit mode */}
-                        {isEditing && (
-                          <div className="mt-3 flex justify-between items-start text-xs text-gray-500">
-                            <div className="space-y-1">
-                              <div>
-                                Created: {new Date(requirement.createdAt).toLocaleDateString()}
-                                {requirement.createdBy &&
-                                  ` by ${
-                                    requirement.createdBy.firstName &&
-                                    requirement.createdBy.lastName
-                                      ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
-                                      : requirement.createdBy.name ||
-                                        requirement.createdBy.email
-                                  }`}
-                              </div>
-                              <button
-                                onClick={() => loadHistory(requirement.id)}
-                                className="text-primary-600 hover:text-primary-700 underline"
-                              >
-                                {isShowingHistory ? "Hide" : "Show"} History
-                              </button>
-                            </div>
-                            <div className="space-y-1 text-right">
-                              {requirement.updatedAt !== requirement.createdAt && (
-                                <div>
-                                  Modified:{" "}
-                                  {new Date(requirement.updatedAt).toLocaleDateString()}
-                                  {requirement.lastModifiedBy &&
-                                    ` by ${
-                                      requirement.lastModifiedBy.firstName &&
-                                      requirement.lastModifiedBy.lastName
-                                        ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
-                                        : requirement.lastModifiedBy.name ||
-                                          requirement.lastModifiedBy.email
-                                    }`}
-                                </div>
-                              )}
-                              <button
-                                onClick={() => handleDelete(requirement.id)}
-                                disabled={loading}
-                                className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                        {/* Metadata area - 1 column */}
+                        <div className="col-span-1 text-xs text-gray-500 space-y-2">
+                          {/* Type */}
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-700 whitespace-nowrap">Type:</span>
+                            <select
+                              value={requirementFormData.type || ""}
+                              onChange={(e) => {
+                                const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
+                                updateFormField(requirement.id, "type", newType);
+                                handleFieldSave(requirement.id, "type", newType);
+                              }}
+                              onFocus={() => handleFieldFocus(requirement.id, "type")}
+                              onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                              <option value="">(Blank)</option>
+                              <option value="Information">Information</option>
+                              <option value="Mandatory">Mandatory</option>
+                              <option value="Important">Important</option>
+                              <option value="Wish">Wish</option>
+                            </select>
                           </div>
-                        )}
 
-                        {/* History display */}
-                        {isShowingHistory && isEditing && (
-                          <div className="mt-4 border-t border-gray-200 pt-4">
+                          {/* Status */}
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-700 whitespace-nowrap">Status:</span>
+                            <select
+                              value={requirementFormData.status || ""}
+                              onChange={(e) => {
+                                const newStatus = e.target.value as Requirement["status"];
+                                updateFormField(requirement.id, "status", newStatus);
+                                handleFieldSave(requirement.id, "status", newStatus);
+                              }}
+                              onFocus={() => handleFieldFocus(requirement.id, "status")}
+                              onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
+                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            >
+                              <option value="New">New</option>
+                              <option value="ForReview">For Review</option>
+                              <option value="Approved">Approved</option>
+                            </select>
+                          </div>
+                          
+                          {/* Created */}
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium text-gray-700">Created:</span>
+                            <span>{new Date(requirement.createdAt).toLocaleDateString()}</span>
+                            {requirement.createdBy && (
+                              <span
+                                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-[10px] font-semibold cursor-help"
+                                title={
+                                  requirement.createdBy.firstName &&
+                                  requirement.createdBy.lastName
+                                    ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
+                                    : requirement.createdBy.name ||
+                                      requirement.createdBy.email
+                                }
+                              >
+                                i
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Modified */}
+                          {requirement.updatedAt !== requirement.createdAt && (
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium text-gray-700">Modified:</span>
+                              <span>{new Date(requirement.updatedAt).toLocaleDateString()}</span>
+                              {requirement.lastModifiedBy && (
+                                <span
+                                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-[10px] font-semibold cursor-help"
+                                  title={
+                                    requirement.lastModifiedBy.firstName &&
+                                    requirement.lastModifiedBy.lastName
+                                      ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
+                                      : requirement.lastModifiedBy.name ||
+                                        requirement.lastModifiedBy.email
+                                  }
+                                >
+                                  i
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Show History and Delete on same line */}
+                          <div className="flex justify-between items-center pt-2">
+                            <button
+                              onClick={() => loadHistory(requirement.id)}
+                              className="text-primary-600 hover:text-primary-700 underline"
+                            >
+                              {isShowingHistory ? "Hide" : "Show"} History
+                            </button>
+                            <button
+                              onClick={() => handleDelete(requirement.id)}
+                              disabled={loading}
+                              className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      
+                        {/* History display - spans all 4 columns */}
+                        {isShowingHistory && (
+                          <div className="col-span-4 border-t border-gray-200 pt-4 mt-4">
                             <h4 className="font-medium mb-2 text-sm">History</h4>
                             <div className="space-y-2">
                               {getFilteredHistory(requirement.id).length === 0 ? (
@@ -767,44 +834,76 @@ export default function RequirementList({
                                 getFilteredHistory(requirement.id).map((entry) => (
                                   <div
                                     key={entry.id}
-                                    className="bg-gray-50 rounded p-3 text-sm"
+                                    className="bg-gray-50 rounded p-3 text-sm grid grid-cols-4 gap-4"
                                   >
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span
-                                        className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
-                                          entry.type
-                                        )}`}
-                                      >
-                                        {entry.type}
-                                      </span>
-                                      <span
-                                        className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
-                                          entry.status
-                                        )}`}
-                                      >
-                                        {entry.status}
-                                      </span>
-                                      <span className="text-gray-500">
-                                        {new Date(entry.createdAt).toLocaleString()}
-                                      </span>
-                                      {entry.modifiedBy && (
-                                        <span className="text-gray-500">
-                                          by{" "}
-                                          {entry.modifiedBy.firstName &&
-                                          entry.modifiedBy.lastName
-                                            ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
-                                            : entry.modifiedBy.name ||
-                                              entry.modifiedBy.email}
-                                        </span>
-                                      )}
+                                    {/* Description - 3 columns */}
+                                    <div className="col-span-3">
+                                      <p className="text-gray-700">{entry.description}</p>
                                     </div>
-                                    <p className="text-gray-700 mb-2">{entry.description}</p>
-                                    <button
-                                      onClick={() => restoreFromHistory(requirement.id, entry)}
-                                      className="text-xs text-primary-600 hover:text-primary-700 underline"
-                                    >
-                                      Restore
-                                    </button>
+                                    
+                                            {/* Metadata - 1 column */}
+                                            <div className="col-span-1 text-xs text-gray-500 space-y-2">
+                                              {/* Type */}
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-medium text-gray-700 whitespace-nowrap">Type:</span>
+                                                <span
+                                                  className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
+                                                    entry.type
+                                                  )}`}
+                                                >
+                                                  {entry.type}
+                                                </span>
+                                              </div>
+                                              {/* Status */}
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-medium text-gray-700 whitespace-nowrap">Status:</span>
+                                                <span
+                                                  className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                                                    entry.status
+                                                  )}`}
+                                                >
+                                                  {entry.status}
+                                                </span>
+                                              </div>
+                                              {/* Modified */}
+                                              <div className="flex items-center gap-1">
+                                                <span className="font-medium text-gray-700">Modified:</span>
+                                                <span>
+                                                  {new Date(entry.createdAt).toLocaleDateString('en-GB', { 
+                                                    day: '2-digit', 
+                                                    month: '2-digit', 
+                                                    year: 'numeric' 
+                                                  })} {new Date(entry.createdAt).toLocaleTimeString('en-GB', { 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit',
+                                                    hour12: false
+                                                  })}
+                                                </span>
+                                                {entry.modifiedBy && (
+                                                  <span
+                                                    className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-[10px] font-semibold cursor-help"
+                                                    title={
+                                                      entry.modifiedBy.firstName &&
+                                                      entry.modifiedBy.lastName
+                                                        ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
+                                                        : entry.modifiedBy.name ||
+                                                          entry.modifiedBy.email
+                                                    }
+                                                  >
+                                                    i
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {/* Restore button */}
+                                              <div className="text-right pt-2">
+                                                <button
+                                                  onClick={() => restoreFromHistory(requirement.id, entry)}
+                                                  className="text-xs text-primary-600 hover:text-primary-700 underline"
+                                                >
+                                                  Restore
+                                                </button>
+                                              </div>
+                                            </div>
                                   </div>
                                 ))
                               )}
@@ -812,85 +911,39 @@ export default function RequirementList({
                           </div>
                         )}
                       </div>
-
-                      {/* Right side: Type, Status, and Edit button */}
-                      <div className="flex items-start gap-2 flex-shrink-0">
-                        {isEditingType ? (
-                          <select
-                            value={requirementFormData.type || ""}
-                            onChange={(e) => {
-                              const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
-                              updateFormField(requirement.id, "type", newType);
-                              handleFieldSave(requirement.id, "type", newType);
-                            }}
-                            onFocus={() => handleFieldFocus(requirement.id, "type")}
-                            onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
-                            className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            autoFocus
+                  ) : (
+                      <div className="flex items-center justify-between gap-4">
+                        {/* Description area */}
+                        <div className="flex-1 min-w-0">
+                          <p 
+                            className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-600`}
+                            onClick={() => enterEditMode(requirement.id)}
                           >
-                            <option value="">(Blank)</option>
-                            <option value="Information">Information</option>
-                            <option value="Mandatory">Mandatory</option>
-                            <option value="Important">Important</option>
-                            <option value="Wish">Wish</option>
-                          </select>
-                        ) : (
+                            {requirement.description}
+                          </p>
+                        </div>
+
+                        {/* Right side: Type and Status */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getTypeColor(
+                            className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
                               requirementFormData.type
                             )}`}
-                            onClick={() => {
-                              if (isEditing) {
-                                handleFieldFocus(requirement.id, "type");
-                              }
-                            }}
+                            onClick={() => enterEditMode(requirement.id)}
                           >
                             {requirementFormData.type}
                           </span>
-                        )}
-                        {isEditingStatus ? (
-                          <select
-                            value={requirementFormData.status || ""}
-                            onChange={(e) => {
-                              const newStatus = e.target.value as Requirement["status"];
-                              updateFormField(requirement.id, "status", newStatus);
-                              handleFieldSave(requirement.id, "status", newStatus);
-                            }}
-                            onFocus={() => handleFieldFocus(requirement.id, "status")}
-                            onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
-                            className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            autoFocus
-                          >
-                            <option value="New">New</option>
-                            <option value="ForReview">For Review</option>
-                            <option value="Approved">Approved</option>
-                          </select>
-                        ) : (
                           <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getStatusColor(
+                            className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getStatusColor(
                               requirementFormData.status
                             )}`}
-                            onClick={() => {
-                              if (isEditing) {
-                                handleFieldFocus(requirement.id, "status");
-                              }
-                            }}
+                            onClick={() => enterEditMode(requirement.id)}
                           >
                             {requirementFormData.status || "New"}
                           </span>
-                        )}
-                        {!isEditing && (
-                          <button
-                            onClick={() => {
-                              enterEditMode(requirement.id);
-                            }}
-                            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors"
-                          >
-                            Edit
-                          </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               );
@@ -911,12 +964,12 @@ export default function RequirementList({
                 }`}
               >
                 {/* Left side: Number indicator */}
-                <div className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                <div className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
                   <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>+</span>
                 </div>
 
                 {/* Right side: Form content */}
-                <div className="flex-1 p-4">
+                <div className="flex-1 px-4 py-3">
                   <div className="flex items-start justify-between gap-4 mb-3">
                     {/* Description textarea */}
                     <div className="flex-1 min-w-0">
@@ -1099,7 +1152,7 @@ export default function RequirementList({
                         <div 
                           {...attributes}
                           {...listeners}
-                          className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all`}
+                          className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all`}
                           title="Drag to reorder"
                         >
                           <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>
@@ -1108,11 +1161,11 @@ export default function RequirementList({
                         </div>
 
                         {/* Right side: Requirement content */}
-                        <div className="flex-1 p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            {/* Description area */}
-                            <div className="flex-1 min-w-0">
-                              {isEditingDescription ? (
+                        <div className="flex-1 px-4 py-3">
+                          {isEditing ? (
+                            <div className="grid grid-cols-4 gap-4">
+                              {/* Description area - 3 columns */}
+                              <div className="col-span-3">
                                 <textarea
                                   ref={(el) => {
                                     descriptionTextareaRefs.current[requirement.id] = el;
@@ -1129,70 +1182,119 @@ export default function RequirementList({
                                     }
                                   }}
                                   placeholder="Requirement description"
-                                  rows={2}
+                                  rows={5}
                                   className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 focus:ring-primary-500`}
                                   autoFocus
                                 />
-                              ) : (
-                                <p 
-                                  className={`${colorClasses.descriptionSize} leading-none text-gray-900 cursor-pointer hover:text-primary-600`}
-                                  onClick={() => handleFieldFocus(requirement.id, "description")}
-                                >
-                                  {requirement.description}
-                                </p>
-                              )}
+                              </div>
 
-                              {/* Show timestamps and history/delete only in edit mode */}
-                              {isEditing && (
-                                <div className="mt-3 flex justify-between items-start text-xs text-gray-500">
-                                  <div className="space-y-1">
-                                    <div>
-                                      Created: {new Date(requirement.createdAt).toLocaleDateString()}
-                                      {requirement.createdBy &&
-                                        ` by ${
-                                          requirement.createdBy.firstName &&
-                                          requirement.createdBy.lastName
-                                            ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
-                                            : requirement.createdBy.name ||
-                                              requirement.createdBy.email
-                                        }`}
-                                    </div>
-                                    <button
-                                      onClick={() => loadHistory(requirement.id)}
-                                      className="text-primary-600 hover:text-primary-700 underline"
-                                    >
-                                      {isShowingHistory ? "Hide" : "Show"} History
-                                    </button>
-                                  </div>
-                                  <div className="space-y-1 text-right">
-                                    {requirement.updatedAt !== requirement.createdAt && (
-                                      <div>
-                                        Modified:{" "}
-                                        {new Date(requirement.updatedAt).toLocaleDateString()}
-                                        {requirement.lastModifiedBy &&
-                                          ` by ${
-                                            requirement.lastModifiedBy.firstName &&
-                                            requirement.lastModifiedBy.lastName
-                                              ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
-                                              : requirement.lastModifiedBy.name ||
-                                                requirement.lastModifiedBy.email
-                                          }`}
-                                      </div>
-                                    )}
-                                    <button
-                                      onClick={() => handleDelete(requirement.id)}
-                                      disabled={loading}
-                                      className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
+                              {/* Metadata area - 1 column */}
+                              <div className="col-span-1 text-xs text-gray-500 space-y-2">
+                                {/* Type */}
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-700 whitespace-nowrap">Type:</span>
+                                  <select
+                                    value={requirementFormData.type || ""}
+                                    onChange={(e) => {
+                                      const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
+                                      updateFormField(requirement.id, "type", newType);
+                                      handleFieldSave(requirement.id, "type", newType);
+                                    }}
+                                    onFocus={() => handleFieldFocus(requirement.id, "type")}
+                                    onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                  >
+                                    <option value="">(Blank)</option>
+                                    <option value="Information">Information</option>
+                                    <option value="Mandatory">Mandatory</option>
+                                    <option value="Important">Important</option>
+                                    <option value="Wish">Wish</option>
+                                  </select>
                                 </div>
-                              )}
 
-                              {/* History display */}
-                              {isShowingHistory && isEditing && (
-                                <div className="mt-4 border-t border-gray-200 pt-4">
+                                {/* Status */}
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-700 whitespace-nowrap">Status:</span>
+                                  <select
+                                    value={requirementFormData.status || ""}
+                                    onChange={(e) => {
+                                      const newStatus = e.target.value as Requirement["status"];
+                                      updateFormField(requirement.id, "status", newStatus);
+                                      handleFieldSave(requirement.id, "status", newStatus);
+                                    }}
+                                    onFocus={() => handleFieldFocus(requirement.id, "status")}
+                                    onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                  >
+                                    <option value="New">New</option>
+                                    <option value="ForReview">For Review</option>
+                                    <option value="Approved">Approved</option>
+                                  </select>
+                                </div>
+                                
+                                {/* Created */}
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium text-gray-700">Created:</span>
+                                  <span>{new Date(requirement.createdAt).toLocaleDateString()}</span>
+                                  {requirement.createdBy && (
+                                    <span
+                                      className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-[10px] font-semibold cursor-help"
+                                      title={
+                                        requirement.createdBy.firstName &&
+                                        requirement.createdBy.lastName
+                                          ? `${requirement.createdBy.firstName} ${requirement.createdBy.lastName}`
+                                          : requirement.createdBy.name ||
+                                            requirement.createdBy.email
+                                      }
+                                    >
+                                      i
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Modified */}
+                                {requirement.updatedAt !== requirement.createdAt && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium text-gray-700">Modified:</span>
+                                    <span>{new Date(requirement.updatedAt).toLocaleDateString()}</span>
+                                    {requirement.lastModifiedBy && (
+                                      <span
+                                        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-[10px] font-semibold cursor-help"
+                                        title={
+                                          requirement.lastModifiedBy.firstName &&
+                                          requirement.lastModifiedBy.lastName
+                                            ? `${requirement.lastModifiedBy.firstName} ${requirement.lastModifiedBy.lastName}`
+                                            : requirement.lastModifiedBy.name ||
+                                              requirement.lastModifiedBy.email
+                                        }
+                                      >
+                                        i
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Show History and Delete on same line */}
+                                <div className="flex justify-between items-center pt-2">
+                                  <button
+                                    onClick={() => loadHistory(requirement.id)}
+                                    className="text-primary-600 hover:text-primary-700 underline"
+                                  >
+                                    {isShowingHistory ? "Hide" : "Show"} History
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(requirement.id)}
+                                    disabled={loading}
+                                    className="text-red-600 hover:text-red-800 disabled:opacity-50 underline"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            
+                              {/* History display - spans all 4 columns */}
+                              {isShowingHistory && (
+                                <div className="col-span-4 border-t border-gray-200 pt-4 mt-4">
                                   <h4 className="font-medium mb-2 text-sm">History</h4>
                                   <div className="space-y-2">
                                     {getFilteredHistory(requirement.id).length === 0 ? (
@@ -1201,44 +1303,76 @@ export default function RequirementList({
                                       getFilteredHistory(requirement.id).map((entry) => (
                                         <div
                                           key={entry.id}
-                                          className="bg-gray-50 rounded p-3 text-sm"
+                                          className="bg-gray-50 rounded p-3 text-sm grid grid-cols-4 gap-4"
                                         >
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <span
-                                              className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
-                                                entry.type
-                                              )}`}
-                                            >
-                                              {entry.type}
-                                            </span>
-                                            <span
-                                              className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
-                                                entry.status
-                                              )}`}
-                                            >
-                                              {entry.status}
-                                            </span>
-                                            <span className="text-gray-500">
-                                              {new Date(entry.createdAt).toLocaleString()}
-                                            </span>
-                                            {entry.modifiedBy && (
-                                              <span className="text-gray-500">
-                                                by{" "}
-                                                {entry.modifiedBy.firstName &&
-                                                entry.modifiedBy.lastName
-                                                  ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
-                                                  : entry.modifiedBy.name ||
-                                                    entry.modifiedBy.email}
-                                              </span>
-                                            )}
+                                          {/* Description - 3 columns */}
+                                          <div className="col-span-3">
+                                            <p className="text-gray-700">{entry.description}</p>
                                           </div>
-                                          <p className="text-gray-700 mb-2">{entry.description}</p>
-                                          <button
-                                            onClick={() => restoreFromHistory(requirement.id, entry)}
-                                            className="text-xs text-primary-600 hover:text-primary-700 underline"
-                                          >
-                                            Restore
-                                          </button>
+                                          
+                                          {/* Metadata - 1 column */}
+                                          <div className="col-span-1 text-xs text-gray-500 space-y-2">
+                                            {/* Type */}
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-medium text-gray-700 whitespace-nowrap">Type:</span>
+                                              <span
+                                                className={`px-2 py-0.5 rounded text-xs font-medium ${getTypeColor(
+                                                  entry.type
+                                                )}`}
+                                              >
+                                                {entry.type}
+                                              </span>
+                                            </div>
+                                            {/* Status */}
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-medium text-gray-700 whitespace-nowrap">Status:</span>
+                                              <span
+                                                className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                                                  entry.status
+                                                )}`}
+                                              >
+                                                {entry.status}
+                                              </span>
+                                            </div>
+                                            {/* Modified */}
+                                            <div className="flex items-center gap-1">
+                                              <span className="font-medium text-gray-700">Modified:</span>
+                                              <span>
+                                                {new Date(entry.createdAt).toLocaleDateString('en-GB', { 
+                                                  day: '2-digit', 
+                                                  month: '2-digit', 
+                                                  year: 'numeric' 
+                                                })} {new Date(entry.createdAt).toLocaleTimeString('en-GB', { 
+                                                  hour: '2-digit', 
+                                                  minute: '2-digit',
+                                                  hour12: false
+                                                })}
+                                              </span>
+                                              {entry.modifiedBy && (
+                                                <span
+                                                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-400 text-white text-[10px] font-semibold cursor-help"
+                                                  title={
+                                                    entry.modifiedBy.firstName &&
+                                                    entry.modifiedBy.lastName
+                                                      ? `${entry.modifiedBy.firstName} ${entry.modifiedBy.lastName}`
+                                                      : entry.modifiedBy.name ||
+                                                        entry.modifiedBy.email
+                                                  }
+                                                >
+                                                  i
+                                                </span>
+                                              )}
+                                            </div>
+                                            {/* Restore button */}
+                                            <div className="text-right pt-2">
+                                              <button
+                                                onClick={() => restoreFromHistory(requirement.id, entry)}
+                                                className="text-xs text-primary-600 hover:text-primary-700 underline"
+                                              >
+                                                Restore
+                                              </button>
+                                            </div>
+                                          </div>
                                         </div>
                                       ))
                                     )}
@@ -1246,85 +1380,39 @@ export default function RequirementList({
                                 </div>
                               )}
                             </div>
-
-                            {/* Right side: Type, Status, and Edit button */}
-                            <div className="flex items-start gap-2 flex-shrink-0">
-                              {isEditingType ? (
-                                <select
-                                  value={requirementFormData.type || ""}
-                                  onChange={(e) => {
-                                    const newType = e.target.value === "" ? "Information" : (e.target.value as Requirement["type"]);
-                                    updateFormField(requirement.id, "type", newType);
-                                    handleFieldSave(requirement.id, "type", newType);
-                                  }}
-                                  onFocus={() => handleFieldFocus(requirement.id, "type")}
-                                  onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
-                                  className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                  autoFocus
+                          ) : (
+                            <div className="flex items-center justify-between gap-4">
+                              {/* Description area */}
+                              <div className="flex-1 min-w-0">
+                                <p 
+                                  className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-600`}
+                                  onClick={() => enterEditMode(requirement.id)}
                                 >
-                                  <option value="">(Blank)</option>
-                                  <option value="Information">Information</option>
-                                  <option value="Mandatory">Mandatory</option>
-                                  <option value="Important">Important</option>
-                                  <option value="Wish">Wish</option>
-                                </select>
-                              ) : (
+                                  {requirement.description}
+                                </p>
+                              </div>
+
+                            {/* Right side: Type and Status */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
                                 <span
-                                  className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getTypeColor(
+                                  className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
                                     requirementFormData.type
                                   )}`}
-                                  onClick={() => {
-                                    if (isEditing) {
-                                      handleFieldFocus(requirement.id, "type");
-                                    }
-                                  }}
+                                  onClick={() => enterEditMode(requirement.id)}
                                 >
                                   {requirementFormData.type}
                                 </span>
-                              )}
-                              {isEditingStatus ? (
-                                <select
-                                  value={requirementFormData.status || ""}
-                                  onChange={(e) => {
-                                    const newStatus = e.target.value as Requirement["status"];
-                                    updateFormField(requirement.id, "status", newStatus);
-                                    handleFieldSave(requirement.id, "status", newStatus);
-                                  }}
-                                  onFocus={() => handleFieldFocus(requirement.id, "status")}
-                                  onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
-                                  className="px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                  autoFocus
-                                >
-                                  <option value="New">New</option>
-                                  <option value="ForReview">For Review</option>
-                                  <option value="Approved">Approved</option>
-                                </select>
-                              ) : (
                                 <span
-                                  className={`px-2 py-1 rounded text-xs font-medium ${isEditing ? 'cursor-pointer hover:opacity-80' : ''} ${getStatusColor(
+                                  className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getStatusColor(
                                     requirementFormData.status
                                   )}`}
-                                  onClick={() => {
-                                    if (isEditing) {
-                                      handleFieldFocus(requirement.id, "status");
-                                    }
-                                  }}
+                                  onClick={() => enterEditMode(requirement.id)}
                                 >
                                   {requirementFormData.status || "New"}
                                 </span>
-                              )}
-                              {!isEditing && (
-                                <button
-                                  onClick={() => {
-                                    enterEditMode(requirement.id);
-                                  }}
-                                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm transition-colors"
-                                >
-                                  Edit
-                                </button>
-                              )}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1347,12 +1435,12 @@ export default function RequirementList({
                   }`}
                 >
                   {/* Left side: Number indicator */}
-                  <div className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 py-4 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                  <div className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
                     <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>+</span>
                   </div>
 
                   {/* Right side: Form content */}
-                  <div className="flex-1 p-4">
+                  <div className="flex-1 px-4 py-3">
                     <div className="flex items-start justify-between gap-4 mb-3">
                       {/* Description textarea */}
                       <div className="flex-1 min-w-0">
