@@ -1522,7 +1522,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       const rfi = await db.rFI.findUnique({
         where: { projectId },
         include: {
-          RFIQuestion: true,
+          questions: true,
         },
       });
 
@@ -1540,7 +1540,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       }
 
       const rfiStats = {
-        questionCount: rfi?.RFIQuestion?.length || 0,
+        questionCount: rfi?.questions?.length || 0,
         status: rfiStatus,
         deadline: rfi?.deadline || null,
       };
