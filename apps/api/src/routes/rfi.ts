@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { FastifyInstance } from "fastify";
 import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
 
@@ -216,7 +216,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // For create, get templates and apply defaults
-      let createData: any = {
+      const createData: any = {
         projectId,
         emailText: request.body.emailText || "",
         rfiInformation: request.body.rfiInformation || "",

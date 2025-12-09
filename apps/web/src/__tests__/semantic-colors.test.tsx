@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from './utils/test-utils';
 import { Card } from '@/components/ui/Card';
-import { Dialog } from '@/components/ui/Dialog';
+import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import {
   hasHardCodedBackgroundColors,
   hasSemanticBackgroundColors,
@@ -42,23 +42,22 @@ describe('Semantic Color Usage', () => {
   describe('Dialog Component', () => {
     it('should use semantic background classes for content', () => {
       render(
-        <Dialog
-          isOpen={true}
-          onClose={() => {}}
-          title="Test Dialog"
-        >
-          <div>Test content</div>
+        <Dialog open={true} onOpenChange={() => {}}>
+          <DialogContent>
+            <div>Test content</div>
+          </DialogContent>
         </Dialog>,
       );
 
       // Dialog renders in a portal to document.body, so check there
-      // The dialog should use semantic classes (bg-background-secondary)
+      // The dialog should use semantic classes (bg-background or bg-background-secondary)
       const allElements = document.body.querySelectorAll('*');
       let foundSemanticClass = false;
       
       allElements.forEach((element) => {
         const className = element.className || '';
-        if (typeof className === 'string' && className.includes('bg-background-secondary')) {
+        if (typeof className === 'string' && 
+            (className.includes('bg-background-secondary') || className.includes('bg-background'))) {
           foundSemanticClass = true;
           // Verify no hard-coded colors in this element
           expect(hasHardCodedBackgroundColors(className)).toBe(false);
