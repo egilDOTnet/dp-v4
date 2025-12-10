@@ -50,8 +50,9 @@ The color system is based on the green palette extracted from the Dynamic Purcha
 - **Background**: White → Gray-50 → Gray-100
 - **Text**: Gray-900 → Gray-700 → Gray-500
 - **Success**: #65D405 (Primary green from logo)
-- **Warning**: #FFCF33 (Alternative yellow)
+- **Warning**: #FFCF33 (Alternative yellow) / #FFCF33 (Yellow-600: #FFCF33)
 - **Error**: #B91C1C (Error red)
+- **Accent**: Primary green (#65D405 / primary-600) for primary actions
 
 ### Dark Mode
 - **Primary**: #65D405 → #c7ff82 (Green from logo, reversed scale)
@@ -268,6 +269,40 @@ For sections with title + actions (no search bar), use `justify-between`:
 </div>
 ```
 
+### Multi-Edit Operations
+All buttons that perform bulk edit operations on multiple selected items use **accent blue** color for visual distinction:
+- **Light mode**: `bg-accent-600 hover:bg-accent-700` (#0891b2 → #0e7490)
+- **Dark mode**: `bg-accent-600 hover:bg-accent-700` (same colors, excellent contrast on dark backgrounds)
+
+This applies to:
+- "Multi edit" buttons
+- "Bulk update" actions
+- Any other operation that modifies multiple selected items
+
+**Color Rationale**: 
+- Accent blue is used for secondary actions (as defined in the color system)
+- Distinct from primary green (create actions) and error red (delete actions)
+- Provides clear visual hierarchy: Green = Create, Blue = Edit, Red = Delete
+
+```tsx
+<button className="px-4 py-2 bg-accent-600 text-white rounded-md hover:bg-accent-700">
+  Multi edit
+</button>
+```
+
+### Selection Indicators (Checkboxes)
+All checkboxes used for selecting items (requirements, hierarchies, etc.) use **accent blue** (`accent-600`, #0891b2) for the checked state to maintain visual consistency with multi-edit operations.
+
+**Implementation**:
+- Checkboxes use the CSS `accent-color` property set to `var(--color-accent-600)`
+- This is defined globally in `globals.css` for all `input[type="checkbox"]` elements
+- Matches the color used for multi-edit buttons, creating a cohesive selection experience
+
+**Color Rationale**:
+- Consistent with multi-edit operations (both involve selection/editing)
+- Distinct from primary green (create actions) and error red (delete actions)
+- Provides clear visual feedback that items are selected for editing operations
+
 ## Keyboard Shortcuts
 
 ### Global
@@ -411,6 +446,37 @@ The application logo is currently using the PNG version from `assets/dynamicpurc
 - Other authentication pages
 
 **Future Enhancement**: The current PNG logo should be replaced with a high-quality SVG version that better matches the original design. This will improve scalability and visual quality across different screen sizes and resolutions.
+
+## Modal Overlay Pattern
+
+All modals use a consistent overlay pattern with a dimmed background:
+
+- **Overlay**: `bg-black/80` (80% opacity black background)
+- **Behavior**: Clicking outside the modal closes it (acts as cancel)
+- **Keyboard**: Escape key closes the modal
+- **Animation**: Fade in/out with zoom effect for smooth transitions
+
+### Implementation
+
+Modals use the Dialog component from `@/components/ui/Dialog.tsx` which automatically provides:
+- Dimmed background overlay
+- Click-outside-to-close behavior
+- Escape key handling
+- Smooth animations
+
+### Multi-Edit Forms
+
+When editing multiple items, use "Don't change" as the default option for all fields. This allows users to selectively update only the fields they want to change:
+
+```tsx
+<Select value={type} onChange={(e) => setType(e.target.value)}>
+  <option value="">Don't change</option>
+  <option value="Option1">Option 1</option>
+  <option value="Option2">Option 2</option>
+</Select>
+```
+
+Only fields that are not "Don't change" (empty string) should be included in the update payload.
 
 ## Future Enhancements
 

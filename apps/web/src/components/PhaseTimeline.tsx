@@ -54,11 +54,11 @@ export default function PhaseTimeline({
                 onClick={() => onPhaseClick(phase.id)}
                 onMouseEnter={() => setHoveredPhaseId(phase.id)}
                 onMouseLeave={() => setHoveredPhaseId(null)}
-                className={`
+                  className={`
                   w-full flex flex-col items-center justify-center p-2 rounded-lg shadow-md
                   transition-all duration-200 h-20
                   ${statusColor}
-                  ${isSelected ? `ring-4 ring-blue-500 ${borderColor} border-2` : "border-2 border-transparent"}
+                  ${isSelected ? `ring-4 ring-primary-500 border-primary-700 border-2` : "border-2 border-transparent"}
                   cursor-pointer
                 `}
               >

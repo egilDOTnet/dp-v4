@@ -35,6 +35,9 @@ interface RequirementHierarchyProps {
   expandedHierarchies: Set<string>;
   onExpandedHierarchiesChange: (hierarchies: Set<string>) => void;
   disableDragAndDrop?: boolean;
+  selectedRequirementIds?: Set<string>;
+  onRequirementToggle?: (requirementId: string) => void;
+  onHierarchyToggle?: (hierarchyId: string) => void;
 }
 
 
@@ -113,9 +116,11 @@ interface RequirementItemProps {
   hierarchyLevel?: 1 | 2;
   dragAttributes?: any;
   dragListeners?: any;
+  selectedRequirementIds?: Set<string>;
+  onRequirementToggle?: (requirementId: string) => void;
 }
 
-function RequirementItem({ projectId, requirement, onRequirementUpdate, selectedHierarchyId, hierarchyLevel = 1, dragAttributes, dragListeners }: RequirementItemProps) {
+function RequirementItem({ projectId, requirement, onRequirementUpdate, selectedHierarchyId, hierarchyLevel = 1, dragAttributes, dragListeners, selectedRequirementIds, onRequirementToggle }: RequirementItemProps) {
   // Use RequirementList but only for this single requirement with drag enabled if props provided
   return (
     <RequirementList
@@ -130,6 +135,8 @@ function RequirementItem({ projectId, requirement, onRequirementUpdate, selected
       hierarchyLevel={hierarchyLevel}
       dragAttributes={dragAttributes}
       dragListeners={dragListeners}
+      selectedRequirementIds={selectedRequirementIds}
+      onRequirementToggle={onRequirementToggle}
     />
   );
 }
@@ -173,6 +180,9 @@ export default function RequirementHierarchyComponent({
   expandedHierarchies,
   onExpandedHierarchiesChange,
   disableDragAndDrop = false,
+  selectedRequirementIds = new Set(),
+  onRequirementToggle,
+  onHierarchyToggle,
 }: RequirementHierarchyProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingParentId, setCreatingParentId] = useState<string | null>(null);
@@ -197,6 +207,28 @@ export default function RequirementHierarchyComponent({
 
   const level1Hierarchies = hierarchies.filter((h) => h.parentId === null).sort((a, b) => a.order - b.order);
   const level2Hierarchies = hierarchies.filter((h) => h.parentId !== null).sort((a, b) => a.order - b.order);
+
+  // Helper to check if all requirements under a hierarchy are selected
+  const areAllRequirementsSelected = (hierarchyId: string): boolean => {
+    const directRequirements = requirements.filter((r) => r.hierarchyId === hierarchyId);
+    const childHierarchies = level2Hierarchies.filter((h) => h.parentId === hierarchyId);
+    
+    const allDirectSelected = directRequirements.length > 0 && 
+      directRequirements.every((r) => selectedRequirementIds.has(r.id));
+    
+    const allChildrenSelected = childHierarchies.length > 0 &&
+      childHierarchies.every((h) => areAllRequirementsSelected(h.id));
+    
+    if (directRequirements.length === 0 && childHierarchies.length === 0) {
+      return false; // No requirements to select
+    }
+    
+    if (directRequirements.length > 0 && childHierarchies.length > 0) {
+      return allDirectSelected && allChildrenSelected;
+    }
+    
+    return directRequirements.length > 0 ? allDirectSelected : allChildrenSelected;
+  };
 
   // Helper to get combined and sorted children (both sub-hierarchies and requirements) for a Level 1 hierarchy
   const getChildrenForLevel1 = (h1Id: string) => {
@@ -999,7 +1031,7 @@ export default function RequirementHierarchyComponent({
                             </div>
                           ) : (
                             <div 
-                              className="rounded-lg bg-primary-500 flex items-stretch overflow-hidden cursor-pointer" 
+                              className="group relative rounded-lg bg-primary-500 flex items-stretch overflow-visible cursor-pointer" 
                               style={{ marginLeft: '3.5rem' }}
                               onClick={(e) => {
                                 // Allow click to toggle if not dragging
@@ -1008,6 +1040,32 @@ export default function RequirementHierarchyComponent({
                                 }
                               }}
                             >
+                              {/* Checkbox - positioned to the left of the number */}
+                              {onHierarchyToggle && requirements.filter((r) => r.hierarchyId === h2.id).length > 0 && (
+                                <div
+                                  className={`absolute -left-8 top-1/2 -translate-y-1/2 transition-opacity z-10 flex items-center justify-center ${
+                                    areAllRequirementsSelected(h2.id)
+                                      ? "opacity-100"
+                                      : "opacity-0 group-hover:opacity-100"
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onHierarchyToggle(h2.id);
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={areAllRequirementsSelected(h2.id)}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      onHierarchyToggle(h2.id);
+                                    }}
+                                    className="w-5 h-5 cursor-pointer"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                              )}
+                              
                               {/* Left side: Number with drag handle */}
                               <div
                                 {...(disableDragAndDrop ? {} : attributes)}
@@ -1101,6 +1159,8 @@ export default function RequirementHierarchyComponent({
                                         hierarchyLevel={2}
                                         dragAttributes={disableDragAndDrop ? undefined : attributes}
                                         dragListeners={disableDragAndDrop ? undefined : listeners}
+                                        selectedRequirementIds={selectedRequirementIds}
+                                        onRequirementToggle={onRequirementToggle}
                                       />
                                     )}
                                   </SortableRequirementWrapper>
@@ -1118,7 +1178,7 @@ export default function RequirementHierarchyComponent({
                                 )}
                               </div>
                               
-                              {onAddRequirement && createForHierarchyId !== h2.id && (
+                              {onAddRequirement && createForHierarchyId !== h2.id && !disableDragAndDrop && (
                                 <div className="mt-2" style={{ marginLeft: '7rem' }}>
                                   <button
                                     onClick={(e) => {
@@ -1152,6 +1212,8 @@ export default function RequirementHierarchyComponent({
                                 hierarchyLevel={1}
                                 dragAttributes={disableDragAndDrop ? undefined : attributes}
                                 dragListeners={disableDragAndDrop ? undefined : listeners}
+                                selectedRequirementIds={selectedRequirementIds}
+                                onRequirementToggle={onRequirementToggle}
                               />
                             </div>
                           )}
@@ -1450,8 +1512,8 @@ export default function RequirementHierarchyComponent({
                 </div>
               )}
 
-              {/* Add Level 2 Hierarchy and Requirement Links - only show if parent is expanded */}
-              {expandedHierarchies.has(h1.id) && !isCreatingChild && (() => {
+              {/* Add Level 2 Hierarchy and Requirement Links - only show if parent is expanded and not searching */}
+              {expandedHierarchies.has(h1.id) && !isCreatingChild && !disableDragAndDrop && (() => {
                 const subHierarchies = level2Hierarchies.filter((h2) => h2.parentId === h1.id);
                 const level1Requirements = requirements.filter((r) => r.hierarchyId === h1.id);
                 const hasSubHierarchies = subHierarchies.length > 0;
@@ -1498,7 +1560,7 @@ export default function RequirementHierarchyComponent({
       </DndContext>
 
       {/* Add top-level hierarchy link */}
-      {creatingParentId !== "ROOT" && editingId === null && (
+      {creatingParentId !== "ROOT" && editingId === null && !disableDragAndDrop && (
         <div className="mt-2">
           <button
             onClick={() => startCreate(null)}

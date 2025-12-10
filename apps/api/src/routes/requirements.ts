@@ -1169,6 +1169,275 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       return reply.send(history);
     }
   );
+
+  // Bulk update requirements
+  fastify.put(
+    "/:projectId/requirements/bulk-update",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId } = request.params as { projectId: string };
+      const body = request.body as {
+        requirementIds: string[];
+        type?: string;
+        status?: string | null;
+        hierarchyId?: string;
+      };
+      const currentUser = getUser(request);
+
+      // Verify project access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const isMember = project.ProjectMember.some(
+        (pm) => pm.userId === currentUser.userId
+      );
+      if (!isMember && project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify all requirements belong to project
+      const requirements = await db.requirement.findMany({
+        where: {
+          id: { in: body.requirementIds },
+          hierarchy: {
+            projectId,
+          },
+        },
+        include: {
+          hierarchy: true,
+        },
+      });
+
+      if (requirements.length !== body.requirementIds.length) {
+        return reply.status(400).send({ error: "Invalid requirement IDs" });
+      }
+
+      // Validate hierarchyId if provided
+      let newHierarchyId: string | undefined;
+      if (body.hierarchyId !== undefined) {
+        const hierarchy = await db.requirementHierarchy.findUnique({
+          where: { id: body.hierarchyId },
+        });
+
+        if (!hierarchy || hierarchy.projectId !== projectId) {
+          return reply.status(400).send({ error: "Invalid hierarchy" });
+        }
+        newHierarchyId = body.hierarchyId;
+      }
+
+      // Normalize empty string to null for status
+      const normalizedStatus = body.status !== undefined 
+        ? (body.status === "" || body.status === null ? null : body.status)
+        : undefined;
+
+      // Prepare update data
+      const updateData: {
+        type?: any;
+        status?: any;
+        hierarchyId?: string;
+        lastModifiedById: string;
+      } = {
+        lastModifiedById: currentUser.userId,
+      };
+
+      if (body.type !== undefined) {
+        updateData.type = body.type as any;
+      }
+      if (normalizedStatus !== undefined) {
+        updateData.status = normalizedStatus as any;
+      }
+      if (newHierarchyId !== undefined) {
+        updateData.hierarchyId = newHierarchyId;
+      }
+
+      // Track old hierarchy IDs for renumbering
+      const oldHierarchyIds = new Set<string>();
+      requirements.forEach((req) => {
+        oldHierarchyIds.add(req.hierarchyId);
+      });
+
+      // If moving to new hierarchy, calculate starting order
+      let nextOrder = 1;
+      if (newHierarchyId) {
+        const maxOrder = await db.requirement.findFirst({
+          where: { hierarchyId: newHierarchyId },
+          orderBy: { order: "desc" },
+          select: { order: true },
+        });
+        nextOrder = (maxOrder?.order || 0) + 1;
+      }
+
+      // Update all requirements sequentially to maintain order
+      const updatedRequirements = [];
+      for (let index = 0; index < body.requirementIds.length; index++) {
+        const reqId = body.requirementIds[index];
+        const requirement = requirements.find((r) => r.id === reqId);
+        if (!requirement) continue;
+
+        // Prepare update data for this requirement
+        const reqUpdateData: {
+          type?: any;
+          status?: any;
+          hierarchyId?: string;
+          order?: number;
+          lastModifiedById: string;
+        } = {
+          lastModifiedById: currentUser.userId,
+        };
+
+        if (body.type !== undefined) {
+          reqUpdateData.type = body.type as any;
+        }
+        if (normalizedStatus !== undefined) {
+          reqUpdateData.status = normalizedStatus as any;
+        }
+        if (newHierarchyId && newHierarchyId !== requirement.hierarchyId) {
+          reqUpdateData.hierarchyId = newHierarchyId;
+          reqUpdateData.order = nextOrder + index;
+        }
+
+        const updated = await db.requirement.update({
+          where: { id: reqId },
+          data: reqUpdateData,
+        });
+
+        // Create history entry if changed
+        const hasChanges =
+          (body.type !== undefined && body.type !== requirement.type) ||
+          (normalizedStatus !== undefined && normalizedStatus !== requirement.status) ||
+          (newHierarchyId !== undefined && newHierarchyId !== requirement.hierarchyId);
+
+        if (hasChanges) {
+          await createRequirementHistory(
+            reqId,
+            updated.description,
+            updated.type,
+            updated.status,
+            currentUser.userId
+          );
+        }
+
+        updatedRequirements.push(updated);
+      }
+
+      // Renumber items in affected hierarchies
+      const allHierarchyIds = new Set([...oldHierarchyIds]);
+      if (newHierarchyId) {
+        allHierarchyIds.add(newHierarchyId);
+      }
+
+      for (const hierarchyId of allHierarchyIds) {
+        await renumberItemsInHierarchy(hierarchyId);
+      }
+
+      // Return updated requirements with full relations
+      const finalRequirements = await db.requirement.findMany({
+        where: {
+          id: { in: body.requirementIds },
+        },
+        include: {
+          hierarchy: {
+            include: {
+              parent: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+          },
+          lastModifiedBy: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return reply.send(finalRequirements);
+    }
+  );
+
+  // Bulk delete requirements
+  fastify.delete(
+    "/:projectId/requirements/bulk-delete",
+    { preHandler: [authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { projectId } = request.params as { projectId: string };
+      const body = request.body as {
+        requirementIds: string[];
+      };
+      const currentUser = getUser(request);
+
+      // Verify project access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const isMember = project.ProjectMember.some(
+        (pm) => pm.userId === currentUser.userId
+      );
+      if (!isMember && project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify all requirements belong to project and get their hierarchy IDs
+      const requirements = await db.requirement.findMany({
+        where: {
+          id: { in: body.requirementIds },
+          hierarchy: {
+            projectId,
+          },
+        },
+        include: {
+          hierarchy: true,
+        },
+      });
+
+      if (requirements.length !== body.requirementIds.length) {
+        return reply.status(400).send({ error: "Invalid requirement IDs" });
+      }
+
+      // Track hierarchy IDs for renumbering
+      const hierarchyIds = new Set<string>();
+      requirements.forEach((req) => {
+        hierarchyIds.add(req.hierarchyId);
+      });
+
+      // Delete all requirements
+      await db.requirement.deleteMany({
+        where: {
+          id: { in: body.requirementIds },
+        },
+      });
+
+      // Renumber items in affected hierarchies
+      for (const hierarchyId of hierarchyIds) {
+        await renumberItemsInHierarchy(hierarchyId);
+      }
+
+      return reply.status(204).send();
+    }
+  );
 }
 
 

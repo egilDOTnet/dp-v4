@@ -7,6 +7,8 @@ import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
 import { useSearch } from "@/hooks/useSearch";
 import { SearchBar } from "@/components/ui";
+import MultiEditRequirementModal from "@/components/MultiEditRequirementModal";
+import MultiDeleteRequirementModal from "@/components/MultiDeleteRequirementModal";
 
 export default function RequirementsPage() {
   const params = useParams();
@@ -20,6 +22,9 @@ export default function RequirementsPage() {
   const [createForHierarchyId, setCreateForHierarchyId] = useState<string | null>(null);
   const [showHeroBanner, setShowHeroBanner] = useState(true);
   const [expandedHierarchies, setExpandedHierarchies] = useState<Set<string>>(new Set());
+  const [selectedRequirementIds, setSelectedRequirementIds] = useState<Set<string>>(new Set());
+  const [showMultiEditModal, setShowMultiEditModal] = useState(false);
+  const [showMultiDeleteModal, setShowMultiDeleteModal] = useState(false);
 
   // Search functionality
   const { searchTerm, setSearchTerm, filteredItems: filteredRequirements, clearSearch, isSearching } =
@@ -43,6 +48,33 @@ export default function RequirementsPage() {
     });
     return hierarchiesWithMatches;
   }, [isSearching, filteredRequirements, hierarchies, expandedHierarchies]);
+
+  // Filter hierarchies to only show those with matching requirements when searching
+  const displayHierarchies = useMemo(() => {
+    if (!isSearching) return hierarchies;
+    
+    // Get all hierarchy IDs that have matching requirements
+    const hierarchiesWithMatches = new Set<string>();
+    filteredRequirements.forEach((req) => {
+      hierarchiesWithMatches.add(req.hierarchyId);
+    });
+    
+    // Filter hierarchies: include if they have matching requirements or if any of their children do
+    return hierarchies.filter((hierarchy) => {
+      // Level 1 hierarchy: include if it has matching requirements directly OR if any child has matches
+      if (hierarchy.parentId === null) {
+        // Check if this hierarchy has direct matching requirements
+        if (hierarchiesWithMatches.has(hierarchy.id)) {
+          return true;
+        }
+        // Check if any child hierarchy has matching requirements
+        const childHierarchies = hierarchies.filter(h => h.parentId === hierarchy.id);
+        return childHierarchies.some(child => hierarchiesWithMatches.has(child.id));
+      }
+      // Level 2 hierarchy: include only if it has matching requirements
+      return hierarchiesWithMatches.has(hierarchy.id);
+    });
+  }, [isSearching, hierarchies, filteredRequirements]);
 
   // Filter requirements to only show matches when searching
   const displayRequirements = isSearching ? filteredRequirements : requirements;
@@ -98,6 +130,130 @@ export default function RequirementsPage() {
     // Clear the create form when collapsing or switching hierarchies
     if (id !== createForHierarchyId) {
       setCreateForHierarchyId(null);
+    }
+  };
+
+  const handleRequirementToggle = (requirementId: string) => {
+    setSelectedRequirementIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(requirementId)) {
+        next.delete(requirementId);
+      } else {
+        next.add(requirementId);
+      }
+      return next;
+    });
+  };
+
+  const handleHierarchyToggle = (hierarchyId: string) => {
+    // Get all requirements under this hierarchy (including nested)
+    const getAllRequirementsUnderHierarchy = (hId: string): string[] => {
+      const directRequirements = requirements
+        .filter((r) => r.hierarchyId === hId)
+        .map((r) => r.id);
+      
+      const childHierarchies = hierarchies.filter((h) => h.parentId === hId);
+      const childRequirements = childHierarchies.flatMap((h) =>
+        getAllRequirementsUnderHierarchy(h.id)
+      );
+      
+      return [...directRequirements, ...childRequirements];
+    };
+
+    const requirementIds = getAllRequirementsUnderHierarchy(hierarchyId);
+    const allSelected = requirementIds.every((id) => selectedRequirementIds.has(id));
+
+    setSelectedRequirementIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        // Uncheck all
+        requirementIds.forEach((id) => next.delete(id));
+      } else {
+        // Check all
+        requirementIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const getCheckButtonLabel = () => {
+    if (selectedRequirementIds.size > 0) return "Uncheck all";
+    if (isSearching) return "Check result";
+    return "Check all";
+  };
+
+  const handleCheckAllToggle = () => {
+    if (selectedRequirementIds.size > 0) {
+      // Uncheck all
+      setSelectedRequirementIds(new Set());
+    } else if (isSearching) {
+      // Check all filtered results
+      setSelectedRequirementIds(new Set(filteredRequirements.map((r) => r.id)));
+      // Expand all hierarchies that contain matching requirements
+      const hierarchiesWithMatches = new Set<string>();
+      filteredRequirements.forEach((req) => {
+        hierarchiesWithMatches.add(req.hierarchyId);
+        const hierarchy = hierarchies.find(h => h.id === req.hierarchyId);
+        if (hierarchy?.parentId) {
+          hierarchiesWithMatches.add(hierarchy.parentId);
+        }
+      });
+      setExpandedHierarchies(hierarchiesWithMatches);
+    } else {
+      // Check all requirements
+      setSelectedRequirementIds(new Set(requirements.map((r) => r.id)));
+      // Expand all hierarchies so users can see what's selected
+      const allHierarchyIds = new Set(hierarchies.map(h => h.id));
+      setExpandedHierarchies(allHierarchyIds);
+    }
+  };
+
+  const handleMultiEdit = () => {
+    setShowMultiEditModal(true);
+  };
+
+  const handleMultiDelete = () => {
+    setShowMultiDeleteModal(true);
+  };
+
+  const handleMultiEditClose = () => {
+    setShowMultiEditModal(false);
+  };
+
+  const handleMultiDeleteClose = () => {
+    setShowMultiDeleteModal(false);
+  };
+
+  const handleMultiEditSave = async (data: {
+    type?: "Information" | "Mandatory" | "Important" | "Wish";
+    status?: "Approved" | "ForReview" | "New" | null;
+    hierarchyId?: string;
+  }) => {
+    try {
+      await api.requirements.bulkUpdate(projectId, {
+        requirementIds: Array.from(selectedRequirementIds),
+        ...data,
+      });
+      setSelectedRequirementIds(new Set());
+      setShowMultiEditModal(false);
+      // Reload all data to ensure requirements are properly refreshed
+      // This will update the requirements state, which will trigger useSearch to recalculate
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to update requirements");
+    }
+  };
+
+  const handleMultiDeleteConfirm = async () => {
+    try {
+      await api.requirements.bulkDelete(projectId, {
+        requirementIds: Array.from(selectedRequirementIds),
+      });
+      setSelectedRequirementIds(new Set());
+      setShowMultiDeleteModal(false);
+      loadData();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete requirements");
     }
   };
 
@@ -190,6 +346,32 @@ export default function RequirementsPage() {
             {filteredRequirements.length} of {requirements.length} requirements
           </span>
         )}
+        <div className="flex items-center gap-2 ml-auto">
+          {/* Multi edit and delete - only when selected */}
+          {selectedRequirementIds.size > 0 && (
+            <>
+              <button
+                onClick={handleMultiEdit}
+                className="px-4 py-2 bg-accent-600 text-white rounded-md hover:bg-accent-700 transition-colors text-sm"
+              >
+                Multi edit
+              </button>
+              <button
+                onClick={handleMultiDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+              >
+                Multi delete
+              </button>
+            </>
+          )}
+          {/* Check all/result/uncheck button - always visible, always right-aligned */}
+          <button
+            onClick={handleCheckAllToggle}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm"
+          >
+            {getCheckButtonLabel()}
+          </button>
+        </div>
       </div>
 
       {/* Hero Banner */}
@@ -243,7 +425,7 @@ export default function RequirementsPage() {
         <div className="bg-background-secondary rounded-lg shadow-md p-6">
           <RequirementHierarchyComponent
             projectId={projectId}
-            hierarchies={hierarchies}
+            hierarchies={displayHierarchies}
             requirements={displayRequirements}
             selectedHierarchyId={selectedHierarchyId}
             onHierarchySelect={handleHierarchySelect}
@@ -258,9 +440,32 @@ export default function RequirementsPage() {
             expandedHierarchies={isSearching ? searchExpandedHierarchies : expandedHierarchies}
             onExpandedHierarchiesChange={setExpandedHierarchies}
             disableDragAndDrop={isSearching}
+            selectedRequirementIds={selectedRequirementIds}
+            onRequirementToggle={handleRequirementToggle}
+            onHierarchyToggle={handleHierarchyToggle}
           />
         </div>
       </div>
+
+      {/* Multi-Edit Modal */}
+      {showMultiEditModal && (
+        <MultiEditRequirementModal
+          projectId={projectId}
+          hierarchies={hierarchies}
+          selectedCount={selectedRequirementIds.size}
+          onSave={handleMultiEditSave}
+          onClose={handleMultiEditClose}
+        />
+      )}
+
+      {/* Multi-Delete Modal */}
+      {showMultiDeleteModal && (
+        <MultiDeleteRequirementModal
+          selectedCount={selectedRequirementIds.size}
+          onConfirm={handleMultiDeleteConfirm}
+          onClose={handleMultiDeleteClose}
+        />
+      )}
     </div>
   );
 }

@@ -52,7 +52,7 @@ Generated from the logo colors with interpolated shades for a cohesive palette:
 
 ## Accent Color (BLUE)
 
-Used for secondary actions, informational elements, and accents.
+Used for secondary actions, informational elements, accents, and selection indicators.
 
 ### Base Color
 - **Accent Blue**:
@@ -68,7 +68,7 @@ Used for secondary actions, informational elements, and accents.
 - `accent-300`: `#67e8f9`
 - `accent-400`: `#4ff5fc` - Main accent blue (from brand manual)
 - `accent-500`: `#06b6d4`
-- `accent-600`: `#0891b2`
+- `accent-600`: `#0891b2` - Used for multi-edit buttons and checkbox selection indicators
 - `accent-700`: `#0e7490`
 
 ## Alternative Color (YELLOW)

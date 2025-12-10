@@ -339,4 +339,8 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  /* Checkbox accent color - matches multi-edit button color */
+  input[type="checkbox"] {
+    accent-color: var(--color-accent-600);
+  }
 }

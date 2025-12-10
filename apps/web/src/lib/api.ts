@@ -410,6 +410,32 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(data),
       }),
+    bulkUpdate: (
+      projectId: string,
+      data: {
+        requirementIds: string[];
+        type?: "Information" | "Mandatory" | "Important" | "Wish";
+        status?: "Approved" | "ForReview" | "New" | null;
+        hierarchyId?: string;
+      }
+    ) =>
+      apiRequest<Requirement[]>(
+        `/api/projects/${projectId}/requirements/bulk-update`,
+        {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }
+      ),
+    bulkDelete: (
+      projectId: string,
+      data: {
+        requirementIds: string[];
+      }
+    ) =>
+      apiRequest<void>(`/api/projects/${projectId}/requirements/bulk-delete`, {
+        method: "DELETE",
+        body: JSON.stringify(data),
+      }),
     getHistory: (projectId: string, id: string) =>
       apiRequest<RequirementHistory[]>(
         `/api/projects/${projectId}/requirements/${id}/history`
