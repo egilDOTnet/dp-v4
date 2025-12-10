@@ -14,7 +14,7 @@ interface RequirementsWidgetProps {
 const statusColors: Record<string, string> = {
   New: "bg-blue-100 text-blue-700 border-blue-300",
   ForReview: "bg-yellow-100 text-yellow-700 border-yellow-300",
-  Approved: "bg-green-100 text-green-700 border-green-300",
+  Approved: "bg-primary-100 text-primary-700 border-primary-300",
   None: "bg-gray-100 text-gray-600 border-gray-300",
 };
 
@@ -29,7 +29,7 @@ const typeColors: Record<string, string> = {
   Information: "bg-blue-50 text-blue-600 border-blue-200",
   Mandatory: "bg-red-50 text-red-600 border-red-200",
   Important: "bg-orange-50 text-orange-600 border-orange-200",
-  Wish: "bg-green-50 text-green-600 border-green-200",
+  Wish: "bg-primary-50 text-primary-600 border-primary-200",
 };
 
 const typeIcons: Record<string, string> = {

@@ -235,7 +235,7 @@ export default function TasksPage() {
           <button
             onClick={() => setIsCreatingNewTask(true)}
             disabled={isCreatingNewTask}
-            className="ml-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
+            className="ml-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
           >
             <svg
               className="w-4 h-4"

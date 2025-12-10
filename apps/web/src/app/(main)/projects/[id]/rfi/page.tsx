@@ -361,7 +361,7 @@ export default function RFIPage() {
               <button
                 onClick={handlePublish}
                 disabled={isPublishing || !deadline}
-                className="px-4 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
               >
                 {isPublishing ? "Publishing..." : "Publish"}
               </button>

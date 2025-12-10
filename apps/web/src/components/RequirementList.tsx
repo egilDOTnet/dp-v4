@@ -122,17 +122,24 @@ export default function RequirementList({
   // Get color and font classes based on hierarchy level
   const getColorClasses = () => {
     if (hierarchyLevel === 2) {
+      // Level 3 requirements (under level 2 hierarchy)
+      // Number background: same as level 2 hierarchy title background (primary-500)
+      // Border: same as level 2 hierarchy title background (primary-500)
       return {
-        border: 'border-primary-400',
-        bg: 'bg-primary-400',
+        border: 'border-primary-500',
+        bg: 'bg-primary-500',
+        focusRing: 'focus:ring-primary-500',
         numberSize: 'text-sm',
         descriptionSize: 'text-sm',
       };
     }
-    // Level 1 uses primary-500
+    // Level 2 requirements (under level 1 hierarchy)
+    // Number background: same as level 2 hierarchy number background (primary-600)
+    // Text background: white (bg-background-tertiary)
     return {
-      border: 'border-primary-500',
-      bg: 'bg-primary-500',
+      border: 'border-primary-600',
+      bg: 'bg-primary-600',
+      focusRing: 'focus:ring-primary-600',
       numberSize: 'text-base',
       descriptionSize: 'text-base',
     };
@@ -615,7 +622,7 @@ export default function RequirementList({
     }
     switch (status) {
       case "Approved":
-        return "bg-green-100 text-green-800";
+        return "bg-primary-100 text-primary-800";
       case "ForReview":
         return "bg-yellow-100 text-yellow-800";
       case "New":
@@ -714,7 +721,7 @@ export default function RequirementList({
                             }}
                             placeholder="Requirement description"
                             rows={5}
-                            className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 focus:ring-primary-500`}
+                            className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
                             autoFocus
                           />
                         </div>
@@ -733,7 +740,7 @@ export default function RequirementList({
                               }}
                               onFocus={() => handleFieldFocus(requirement.id, "type")}
                               onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
-                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
                             >
                               <option value="">(Blank)</option>
                               <option value="Information">Information</option>
@@ -755,7 +762,7 @@ export default function RequirementList({
                               }}
                               onFocus={() => handleFieldFocus(requirement.id, "status")}
                               onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
-                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
                             >
                               <option value="New">New</option>
                               <option value="ForReview">For Review</option>
@@ -809,7 +816,7 @@ export default function RequirementList({
                           <div className="flex justify-between items-center pt-2">
                             <button
                               onClick={() => loadHistory(requirement.id)}
-                              className="text-primary-600 hover:text-primary-700 underline"
+                              className="text-primary-600 hover:text-primary-500 underline"
                             >
                               {isShowingHistory ? "Hide" : "Show"} History
                             </button>
@@ -916,7 +923,7 @@ export default function RequirementList({
                         {/* Description area */}
                         <div className="flex-1 min-w-0">
                           <p 
-                            className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-600`}
+                            className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-500`}
                             onClick={() => enterEditMode(requirement.id)}
                           >
                             {requirement.description}
@@ -1183,7 +1190,7 @@ export default function RequirementList({
                                   }}
                                   placeholder="Requirement description"
                                   rows={5}
-                                  className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 focus:ring-primary-500`}
+                                  className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
                                   autoFocus
                                 />
                               </div>
@@ -1202,7 +1209,7 @@ export default function RequirementList({
                                     }}
                                     onFocus={() => handleFieldFocus(requirement.id, "type")}
                                     onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
-                                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
                                   >
                                     <option value="">(Blank)</option>
                                     <option value="Information">Information</option>
@@ -1224,7 +1231,7 @@ export default function RequirementList({
                                     }}
                                     onFocus={() => handleFieldFocus(requirement.id, "status")}
                                     onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
-                                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
                                   >
                                     <option value="New">New</option>
                                     <option value="ForReview">For Review</option>
@@ -1278,7 +1285,7 @@ export default function RequirementList({
                                 <div className="flex justify-between items-center pt-2">
                                   <button
                                     onClick={() => loadHistory(requirement.id)}
-                                    className="text-primary-600 hover:text-primary-700 underline"
+                                    className="text-primary-600 hover:text-primary-500 underline"
                                   >
                                     {isShowingHistory ? "Hide" : "Show"} History
                                   </button>
@@ -1385,7 +1392,7 @@ export default function RequirementList({
                               {/* Description area */}
                               <div className="flex-1 min-w-0">
                                 <p 
-                                  className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-600`}
+                                  className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-500`}
                                   onClick={() => enterEditMode(requirement.id)}
                                 >
                                   {requirement.description}

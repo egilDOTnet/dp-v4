@@ -10,18 +10,18 @@
    ================================================================= */
 
 @theme {
-  /* Primary Colors (GREEN) - Brand Colors */
-  --color-primary-50: #f0fdf4;   /* Lightest green tint */
-  --color-primary-100: #dcfce7;  /* Very light green */
-  --color-primary-200: #c7ff82;  /* Light green from brand manual (C=22 M=0 Y=49 K=0) */
-  --color-primary-300: #a8e85c;  /* Light-medium green */
-  --color-primary-400: #89d136;  /* Medium-light green */
-  --color-primary-500: #65d405;  /* Main brand green from brand manual (C=60 M=16 Y=98 K=1) */
-  --color-primary-600: #4fa804;  /* Medium-dark green */
-  --color-primary-700: #3d7c03;  /* Dark green */
-  --color-primary-800: #2a5002;  /* Very dark green */
-  --color-primary-900: #182401;  /* Darkest green */
-  --color-primary-950: #0f1501;  /* Almost black green */
+  /* Primary Colors (GREEN) - Brand Colors from Logo */
+  --color-primary-50: #f7ffec;   /* Lightest green tint - derived from logo light green */
+  --color-primary-100: #eeffda;  /* Very light green - derived from logo light green */
+  --color-primary-200: #c7ff82;  /* Light green from logo (C=22 M=0 Y=49 K=0) */
+  --color-primary-300: #aaf25d;  /* Light-medium green - interpolated between light and main */
+  --color-primary-400: #8ce537;  /* Medium-light green - interpolated between light and main */
+  --color-primary-500: #65d405;  /* Main brand green from logo (C=60 M=16 Y=98 K=1) */
+  --color-primary-600: #56b404;  /* Medium-dark green - darkened from main */
+  --color-primary-700: #428a03;  /* Dark green - further darkened for contrast */
+  --color-primary-800: #2d5f02;  /* Very dark green - for deep contrast */
+  --color-primary-900: #193501;  /* Darkest green - near black with green tint */
+  --color-primary-950: #0a1500;  /* Almost black green - maximum darkness */
 
   /* Accent Colors (BLUE) - Secondary Actions */
   --color-accent-50: #ecfeff;
@@ -53,12 +53,12 @@
   --color-error-600: #e80c00;  /* Main error red from brand manual (C=7 M=95 Y=100 K=2) */
   --color-error-700: #b91c1c;
 
-  /* Success Colors - Uses Primary Green */
-  --color-success-50: #f0fdf4;
-  --color-success-100: #dcfce7;
-  --color-success-500: #65d405;  /* Same as primary-500 */
-  --color-success-600: #4fa804;  /* Same as primary-600 */
-  --color-success-700: #3d7c03;  /* Same as primary-700 */
+  /* Success Colors - Uses Primary Green from Logo */
+  --color-success-50: #f7ffec;  /* Same as primary-50 */
+  --color-success-100: #eeffda;  /* Same as primary-100 */
+  --color-success-500: #65d405;  /* Same as primary-500 - main brand green */
+  --color-success-600: #56b404;  /* Same as primary-600 */
+  --color-success-700: #428a03;  /* Same as primary-700 */
 
   /* Warning Colors - Uses Alternative Yellow */
   --color-warning-50: #fffbeb;

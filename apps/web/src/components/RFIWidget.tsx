@@ -23,7 +23,7 @@ const statusConfig = {
   },
   finished: {
     label: "Finished",
-    color: "bg-green-100 text-green-700 border-green-300",
+    color: "bg-primary-100 text-primary-700 border-primary-300",
     icon: "✅",
   },
 };

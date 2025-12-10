@@ -387,7 +387,7 @@ export function VendorFormDialog({
               )}
             </div>
             {brregName && (
-              <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+              <p className="mt-1 text-xs text-primary-600 dark:text-primary-400">
                 Found in brreg.no: "{brregName}"
               </p>
             )}

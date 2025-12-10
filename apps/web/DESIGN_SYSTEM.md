@@ -40,21 +40,29 @@ const { theme, setTheme, toggleTheme } = useTheme();
 
 ## Color System
 
+The color system is based on the green palette extracted from the Dynamic Purchase logo, ensuring brand consistency throughout the application.
+
 ### Light Mode
-- **Primary**: #0066CC →#003264 (Blue)
+- **Primary**: #65D405 → #428a03 (Green from logo)
+  - Main brand green: `#65d405` (primary-500)
+  - Light green: `#c7ff82` (primary-200)
+  - Full scale: primary-50 through primary-950
 - **Background**: White → Gray-50 → Gray-100
 - **Text**: Gray-900 → Gray-700 → Gray-500
-- **Success**: #10B981 (Green)
-- **Warning**: #F59E0B (Amber)
-- **Error**: #EF4444 (Red)
+- **Success**: #65D405 (Primary green from logo)
+- **Warning**: #FFCF33 (Alternative yellow)
+- **Error**: #B91C1C (Error red)
 
 ### Dark Mode
-- **Primary**: #3B82F6 →#85b8f8 (Lighter Blue)
+- **Primary**: #65D405 → #c7ff82 (Green from logo, reversed scale)
+  - Main brand green: `#65d405` (primary-500, same as light mode)
+  - Light green: `#c7ff82` (primary-800 in dark mode)
+  - Scale reversed for optimal contrast on dark backgrounds
 - **Background**: Gray-950 → Gray-900 → Gray-800
 - **Text**: Gray-50 → Gray-300 → Gray-400
-- **Success**: #34D399 (Lighter Green)
-- **Warning**: #FCD34D (Lighter Amber)
-- **Error**: #F87171 (Lighter Red)
+- **Success**: #65D405 (Primary green from logo)
+- **Warning**: #FFCF33 (Alternative yellow)
+- **Error**: #F87171 (Lighter red for dark mode)
 
 ### Usage in Components
 
@@ -218,9 +226,9 @@ All components are mobile-first responsive:
 - Responsive navigation and menus
 
 ### Create/Add Actions
-All buttons that create or add new items use **success green** color for visual consistency:
-- **Light mode**: `bg-green-600 hover:bg-green-700` (#16A34A)
-- **Dark mode**: `bg-green-600 hover:bg-green-700` (same)
+All buttons that create or add new items use **primary green** color (from logo) for visual consistency:
+- **Light mode**: `bg-primary-600 hover:bg-primary-700` (#56b404 → #428a03)
+- **Dark mode**: `bg-primary-600 hover:bg-primary-700` (same colors, excellent contrast on dark backgrounds)
 
 This applies to:
 - "Add Vendor" buttons
@@ -244,7 +252,7 @@ This applies to:
       {filteredItems.length} of {items.length} items
     </span>
   )}
-  <button className="ml-auto px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+  <button className="ml-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">
     Add Item
   </button>
 </div>
@@ -254,7 +262,7 @@ For sections with title + actions (no search bar), use `justify-between`:
 ```tsx
 <div className="flex items-center justify-between">
   <h2 className="text-xl font-semibold">Section Title</h2>
-  <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+  <button className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">
     New Item
   </button>
 </div>

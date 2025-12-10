@@ -722,10 +722,10 @@ export default function RequirementHierarchyComponent({
               }}
             >
               {isEditing ? (
-                <div className="border-2 border-primary-900 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden">
+                <div className="border-2 border-primary-700 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden">
                   {/* Left side: Number - same as view mode */}
                   <div 
-                    className="bg-primary-900 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
+                    className="bg-primary-700 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
                   >
                     <span className="font-semibold text-lg leading-none">
                       {h1.number.endsWith('.') ? h1.number.slice(0, -1) : h1.number}
@@ -763,7 +763,7 @@ export default function RequirementHierarchyComponent({
                           }
                         }}
                         placeholder="Title"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-900 font-medium text-lg"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-700 font-medium text-lg"
                       />
                       <textarea
                         value={formData.description}
@@ -780,7 +780,7 @@ export default function RequirementHierarchyComponent({
                         }}
                         placeholder="Description (optional)"
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-900"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-700"
                       />
                       {/* Delete button in lower right */}
                       <div className="flex justify-end">
@@ -797,7 +797,7 @@ export default function RequirementHierarchyComponent({
                 </div>
               ) : (
                 <div 
-                  className="rounded-lg bg-primary-800 flex items-stretch overflow-hidden cursor-pointer"
+                  className="rounded-lg bg-primary-600 flex items-stretch overflow-hidden cursor-pointer"
                   onClick={(e) => {
                     // Allow click to toggle if not dragging
                     if (!isDragging) {
@@ -809,8 +809,8 @@ export default function RequirementHierarchyComponent({
                   <div
                     {...(disableDragAndDrop ? {} : attributes)}
                     {...(disableDragAndDrop ? {} : listeners)}
-                    className={`bg-primary-900 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg transition-colors ${
-                      disableDragAndDrop ? '' : 'cursor-grab active:cursor-grabbing hover:bg-primary-950'
+                    className={`bg-primary-700 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg transition-colors ${
+                      disableDragAndDrop ? '' : 'cursor-grab active:cursor-grabbing hover:bg-primary-800'
                     }`}
                     title={disableDragAndDrop ? "Click to expand/collapse" : "Drag to reorder or click to expand/collapse"}
                   >
@@ -860,7 +860,7 @@ export default function RequirementHierarchyComponent({
                           )}
                           <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
                             getTotalChildCount(h1.id) > 0 
-                              ? 'bg-primary-900 text-white' 
+                              ? 'bg-primary-700 text-white' 
                               : 'invisible'
                           }`}>
                             {getTotalChildCount(h1.id) || 0}
@@ -920,10 +920,10 @@ export default function RequirementHierarchyComponent({
                           }}
                         >
                           {isEditing2 ? (
-                            <div className="border-2 border-primary-800 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
+                            <div className="border-2 border-primary-600 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
                               {/* Left side: Number - same as view mode */}
                               <div 
-                                className="bg-primary-800 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
+                                className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
                               >
                                 <span className="font-semibold text-base leading-none">
                                   {h2.number.endsWith('.') ? h2.number.slice(0, -1) : h2.number}
@@ -963,7 +963,7 @@ export default function RequirementHierarchyComponent({
                                       }
                                     }}
                                     placeholder="Title"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-800 font-medium text-base"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-600 font-medium text-base"
                                   />
                                   <textarea
                                     value={formData.description}
@@ -982,7 +982,7 @@ export default function RequirementHierarchyComponent({
                                     }}
                                     placeholder="Description (optional)"
                                     rows={2}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-800"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-600"
                                   />
                                   {/* Delete button in lower right */}
                                   <div className="flex justify-end">
@@ -999,7 +999,7 @@ export default function RequirementHierarchyComponent({
                             </div>
                           ) : (
                             <div 
-                              className="rounded-lg bg-primary-700 flex items-stretch overflow-hidden cursor-pointer" 
+                              className="rounded-lg bg-primary-500 flex items-stretch overflow-hidden cursor-pointer" 
                               style={{ marginLeft: '3.5rem' }}
                               onClick={(e) => {
                                 // Allow click to toggle if not dragging
@@ -1012,8 +1012,8 @@ export default function RequirementHierarchyComponent({
                               <div
                                 {...(disableDragAndDrop ? {} : attributes)}
                                 {...(disableDragAndDrop ? {} : listeners)}
-                                className={`bg-primary-800 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg transition-colors ${
-                                  disableDragAndDrop ? '' : 'cursor-grab active:cursor-grabbing hover:bg-primary-900'
+                                className={`bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 rounded-tl-lg rounded-bl-lg transition-colors ${
+                                  disableDragAndDrop ? '' : 'cursor-grab active:cursor-grabbing hover:bg-primary-700'
                                 }`}
                                 title={disableDragAndDrop ? "Click to expand/collapse" : "Drag to reorder or click to expand/collapse"}
                               >
@@ -1066,7 +1066,7 @@ export default function RequirementHierarchyComponent({
                                         return (
                                           <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
                                             count > 0 
-                                              ? 'bg-primary-800 text-white' 
+                                              ? 'bg-primary-600 text-white' 
                                               : 'invisible'
                                           }`}>
                                             {count || 0}
@@ -1125,7 +1125,7 @@ export default function RequirementHierarchyComponent({
                                       e.stopPropagation();
                                       onAddRequirement(h2.id);
                                     }}
-                                    className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                                    className="text-sm text-primary-600 hover:text-primary-500 transition-colors"
                                   >
                                     + Add requirement here
                                   </button>
@@ -1216,7 +1216,7 @@ export default function RequirementHierarchyComponent({
                                 }
                               }}
                               placeholder="Title"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400"
                             />
                             <textarea
                               value={formData.description}
@@ -1225,7 +1225,7 @@ export default function RequirementHierarchyComponent({
                               }
                               placeholder="Description (optional)"
                               rows={2}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-400"
                             />
                             <div className="flex gap-2 justify-between">
                               <div className="flex gap-2">
@@ -1296,9 +1296,9 @@ export default function RequirementHierarchyComponent({
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-start gap-2 flex-wrap">
                                     <span
-                                      className={`font-medium hover:text-primary-600 ${
+                                      className={`font-medium hover:text-primary-500 ${
                                         expandedHierarchies.has(h2.id)
-                                          ? "text-primary-700"
+                                          ? "text-primary-600"
                                           : "text-gray-900"
                                       }`}
                                     >
@@ -1369,7 +1369,7 @@ export default function RequirementHierarchyComponent({
                                         }
                                         onAddRequirement(h2.id);
                                       }}
-                                    className="w-6 h-6 bg-green-600 text-white rounded-full hover:bg-green-700 flex items-center justify-center transition-colors"
+                                    className="w-6 h-6 bg-primary-600 text-white rounded-full hover:bg-primary-700 flex items-center justify-center transition-colors"
                                     title="New requirement"
                                   >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1462,7 +1462,7 @@ export default function RequirementHierarchyComponent({
                     {!hasRequirements && (
                       <button
                         onClick={() => startCreate(h1.id)}
-                        className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                        className="text-sm text-primary-600 hover:text-primary-500 transition-colors"
                       >
                         + Add sub-hierarchy here
                       </button>
@@ -1480,7 +1480,7 @@ export default function RequirementHierarchyComponent({
                           }
                           onAddRequirement(h1.id);
                         }}
-                        className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+                        className="text-sm text-primary-600 hover:text-primary-500 transition-colors"
                       >
                         + Add requirement here
                       </button>

@@ -13,14 +13,14 @@ const statusColors = {
   not_started: "bg-gray-300 hover:bg-gray-400",
   ongoing: "bg-yellow-400 hover:bg-yellow-500",
   delayed: "bg-red-400 hover:bg-red-500",
-  completed: "bg-green-400 hover:bg-green-500",
+  completed: "bg-primary-400 hover:bg-primary-500",
 };
 
 const statusBorders = {
   not_started: "border-gray-400",
   ongoing: "border-yellow-500",
   delayed: "border-red-500",
-  completed: "border-green-500",
+  completed: "border-primary-500",
 };
 
 const statusLabels = {

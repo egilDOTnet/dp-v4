@@ -739,7 +739,7 @@ export default function VendorList({
                                               {contact.lastName}
                                             </div>
                                             {contact.isMainContact && (
-                                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200">
                                                 Main Contact
                                               </span>
                                             )}

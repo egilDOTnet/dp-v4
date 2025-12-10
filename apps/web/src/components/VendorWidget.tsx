@@ -13,13 +13,13 @@ const statusColors: Record<string, string> = {
   Pending: "bg-gray-100 text-gray-700 border-gray-300",
   RFI_Received: "bg-blue-100 text-blue-700 border-blue-300",
   RFI_Rejected: "bg-red-100 text-red-700 border-red-300",
-  RFI_Answered: "bg-green-100 text-green-700 border-green-300",
+  RFI_Answered: "bg-primary-100 text-primary-700 border-primary-300",
   RFP_Received: "bg-purple-100 text-purple-700 border-purple-300",
   RFP_Answered: "bg-indigo-100 text-indigo-700 border-indigo-300",
   RFP_Rejected: "bg-orange-100 text-orange-700 border-orange-300",
   Shortlisted: "bg-yellow-100 text-yellow-700 border-yellow-300",
   Lost: "bg-gray-100 text-gray-500 border-gray-300",
-  Won: "bg-green-100 text-green-800 border-green-400",
+  Won: "bg-primary-100 text-primary-800 border-primary-400",
 };
 
 const statusLabels: Record<string, string> = {

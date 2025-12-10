@@ -18,7 +18,7 @@ export const Badge: React.FC<BadgeProps> = ({
 
   const variantStyles = {
     default: "bg-background-tertiary text-text-primary",
-    success: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300",
+    success: "bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300",
     warning:
       "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300",
     error: "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300",

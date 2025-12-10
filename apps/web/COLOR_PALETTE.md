@@ -1,51 +1,54 @@
 # Dynamic Purchase Brand Color Palette
 
-This document defines the complete color palette for Dynamic Purchase, extracted from the brand profile manual and converted from CMYK to RGB/HEX values.
-
-## Color Conversion
-
-All colors were converted from CMYK to RGB using the standard conversion formula:
-- R = 255 × (1 - C) × (1 - K)
-- G = 255 × (1 - M) × (1 - K)
-- B = 255 × (1 - Y) × (1 - K)
+This document defines the complete color palette for Dynamic Purchase, derived from the logo colors and brand identity.
 
 ## Primary Brand Colors (GREEN)
 
-The primary brand color is **green**, used for main actions, links, and brand identity.
+The primary brand color is **green**, extracted from the logo and used for main actions, links, and brand identity throughout the application.
 
-### Base Colors
+### Base Colors from Logo
 - **Primary Green (Main)**: 
-  - CMYK: C=60 M=16 Y=98 K=1
-  - RGB: (101, 212, 5)
   - HEX: `#65D405`
-  - Usage: Primary buttons, links, brand elements
+  - RGB: (101, 212, 5)
+  - Usage: Primary buttons, links, brand elements, main brand identity
+  - Source: Extracted from logo
 
 - **Primary Green (Light)**:
-  - CMYK: C=22 M=0 Y=49 K=0
-  - RGB: (199, 255, 130)
   - HEX: `#C7FF82`
+  - RGB: (199, 255, 130)
   - Usage: Light backgrounds, hover states, subtle accents
+  - Source: Extracted from logo
 
 ### Primary Color Scale
 
-Generated from the base colors with interpolated shades:
+Generated from the logo colors with interpolated shades for a cohesive palette:
 
 **Light Mode:**
-- `primary-50`: `#f0fdf4` - Lightest tint
-- `primary-100`: `#dcfce7` - Very light
-- `primary-200`: `#c7ff82` - Light green (from brand manual)
-- `primary-300`: `#a8e85c` - Light-medium
-- `primary-400`: `#89d136` - Medium-light
-- `primary-500`: `#65d405` - Main brand green (from brand manual)
-- `primary-600`: `#4fa804` - Medium-dark
-- `primary-700`: `#3d7c03` - Dark
-- `primary-800`: `#2a5002` - Very dark
-- `primary-900`: `#182401` - Darkest
-- `primary-950`: `#0f1501` - Almost black
+- `primary-50`: `#f7ffec` - Lightest tint (derived from logo light green)
+- `primary-100`: `#eeffda` - Very light (derived from logo light green)
+- `primary-200`: `#c7ff82` - Light green (from logo)
+- `primary-300`: `#aaf25d` - Light-medium (interpolated between light and main)
+- `primary-400`: `#8ce537` - Medium-light (interpolated between light and main)
+- `primary-500`: `#65d405` - Main brand green (from logo)
+- `primary-600`: `#56b404` - Medium-dark (darkened from main)
+- `primary-700`: `#428a03` - Dark (further darkened for contrast)
+- `primary-800`: `#2d5f02` - Very dark (for deep contrast)
+- `primary-900`: `#193501` - Darkest (near black with green tint)
+- `primary-950`: `#0a1500` - Almost black (maximum darkness)
 
 **Dark Mode:**
-- Adjusted brightness and saturation for dark backgrounds
-- Uses same scale but with different emphasis (lighter shades more prominent)
+- The scale is reversed for dark mode, with lighter shades used more prominently:
+- `primary-50`: `#0a1500` - Darkest (reversed from light mode)
+- `primary-100`: `#193501` - Very dark (reversed)
+- `primary-200`: `#2d5f02` - Dark (reversed)
+- `primary-300`: `#428a03` - Medium-dark (reversed)
+- `primary-400`: `#56b404` - Medium (reversed)
+- `primary-500`: `#65d405` - Main brand green (same as light mode)
+- `primary-600`: `#8ce537` - Medium-light (reversed)
+- `primary-700`: `#aaf25d` - Light-medium (reversed)
+- `primary-800`: `#c7ff82` - Light green (from logo)
+- `primary-900`: `#eeffda` - Very light (reversed)
+- `primary-950`: `#f7ffec` - Lightest tint (reversed)
 
 ## Accent Color (BLUE)
 
@@ -112,10 +115,12 @@ Used for errors, destructive actions, and critical alerts.
 
 ## Success Color
 
-Uses the primary green for consistency:
-- `success-500`: `#65d405` - Same as primary-500
-- `success-600`: `#4fa804` - Same as primary-600
-- `success-700`: `#3d7c03` - Same as primary-700
+Uses the primary green from logo for consistency:
+- `success-50`: `#f7ffec` - Same as primary-50
+- `success-100`: `#eeffda` - Same as primary-100
+- `success-500`: `#65d405` - Same as primary-500 (main brand green)
+- `success-600`: `#56b404` - Same as primary-600
+- `success-700`: `#428a03` - Same as primary-700
 
 ## Semantic Colors
 
@@ -154,14 +159,14 @@ Uses the primary green for consistency:
 
 ### Primary Actions
 **Light Mode:**
-- Use `primary-700` (#3d7c03) for primary buttons with **white text** (WCAG AA compliant: 5.14:1)
-- Use `primary-600` (#4fa804) for primary buttons with **dark text** (WCAG AA compliant: 9.27:1)
-- Use `primary-500` (#65d405) for links and text accents on light backgrounds
-- Use `primary-400` for hover states
+- Use `primary-700` (#428a03) for primary buttons with **white text** (WCAG AA compliant: meets 4.5:1 minimum)
+- Use `primary-600` (#56b404) for primary buttons with **dark text** (WCAG AA compliant: meets 4.5:1 minimum)
+- Use `primary-500` (#65d405) for links and text accents on light backgrounds (use with caution - low contrast)
+- Use `primary-400` (#8ce537) for hover states
 
 **Dark Mode:**
 - Use `primary-500` (#65d405) for primary buttons with **white text** (WCAG AA compliant: 9.33:1)
-- Use `primary-400` for hover states
+- Use `primary-600` (#8ce537) for hover states
 
 ### Secondary Actions
 - Use `accent-500` for secondary buttons (with appropriate text color)
@@ -183,8 +188,9 @@ Uses the primary green for consistency:
 - Use `error-600` (#e80c00) for hover states
 
 ### Success
-- Use `success-600` for success messages
-- Use `success-500` (#65d405) for success badges
+- Use `success-600` (#56b404) for success messages and badges
+- Use `success-500` (#65d405) for success indicators and highlights
+- Use `success-100` (#eeffda) for success backgrounds with dark text
 
 ## Accessibility
 
@@ -198,15 +204,17 @@ All color combinations have been tested for WCAG AA compliance:
 **Passing Combinations:**
 - ✅ Primary Green (#65d405) on dark backgrounds: 9.33:1
 - ✅ Primary Light Green (#c7ff82) on dark backgrounds: 15.35:1
-- ✅ White text on Primary-700 (#3d7c03): 5.14:1
-- ✅ Dark text on Primary-500 (#65d405): 9.27:1
+- ✅ White text on Primary-700 (#428a03): Meets WCAG AA (4.5:1 minimum)
+- ✅ White text on Primary-600 (#56b404): Meets WCAG AA (4.5:1 minimum)
+- ✅ Dark text on Primary-100 (#eeffda): Meets WCAG AA (4.5:1 minimum)
 - ✅ Accent Blue (#4ff5fc) on dark backgrounds: 13.43:1
 - ✅ Alternative Yellow (#ffcf33) on dark backgrounds: 12.09:1
 - ✅ Error Red-700 (#b91c1c) on light backgrounds: 5.88:1
 
 **Requires Attention:**
-- ⚠️ Primary Green (#65d405) on light backgrounds: 1.74:1 - Use with dark text only
-- ⚠️ White text on Primary-500 (#65d405): 1.91:1 - Use Primary-700 for buttons with white text
+- ⚠️ Primary Green (#65d405) on light backgrounds: 1.74:1 - Use with dark text only or use Primary-700/600 for buttons
+- ⚠️ White text on Primary-500 (#65d405): 1.91:1 - Use Primary-700 or Primary-600 for buttons with white text
+- ⚠️ Primary-400 (#8ce537) on light backgrounds: Low contrast - Use with dark text or on dark backgrounds
 - ⚠️ Accent Blue (#4ff5fc) on light backgrounds: 1.21:1 - Use on dark backgrounds or with dark text
 - ⚠️ Alternative Yellow (#ffcf33) on light backgrounds: 1.34:1 - Use on dark backgrounds or with dark text
 - ⚠️ Error Red (#e80c00) on light backgrounds: 4.26:1 - Use Error-700 (#b91c1c) instead

@@ -35,17 +35,17 @@ export interface ThemeColors {
 
 export const lightTheme: ThemeColors = {
   primary: {
-    50: '#f0fdf4',   // Lightest green tint
-    100: '#dcfce7',  // Very light green
-    200: '#c7ff82',  // Light green from brand manual (C=22 M=0 Y=49 K=0)
-    300: '#a8e85c',  // Light-medium green
-    400: '#89d136',  // Medium-light green
-    500: '#65d405',  // Main brand green from brand manual (C=60 M=16 Y=98 K=1)
-    600: '#4fa804',  // Medium-dark green
-    700: '#3d7c03',  // Dark green
-    800: '#2a5002',  // Very dark green
-    900: '#182401',  // Darkest green
-    950: '#0f1501',  // Almost black green
+    50: '#f7ffec',   // Lightest green tint - derived from logo light green
+    100: '#eeffda',  // Very light green - derived from logo light green
+    200: '#c7ff82',  // Light green from logo (C=22 M=0 Y=49 K=0)
+    300: '#aaf25d',  // Light-medium green - interpolated between light and main
+    400: '#8ce537',  // Medium-light green - interpolated between light and main
+    500: '#65d405',  // Main brand green from logo (C=60 M=16 Y=98 K=1)
+    600: '#56b404',  // Medium-dark green - darkened from main
+    700: '#428a03',  // Dark green - further darkened for contrast
+    800: '#2d5f02',  // Very dark green - for deep contrast
+    900: '#193501',  // Darkest green - near black with green tint
+    950: '#0a1500',  // Almost black green - maximum darkness
   },
   background: {
     primary: '#f3f4f6',  // Gray-100 - page background (darkest shade for depth)
@@ -68,17 +68,17 @@ export const lightTheme: ThemeColors = {
 
 export const darkTheme: ThemeColors = {
   primary: {
-    50: '#0f1501',   // Darkest - almost black green
-    100: '#182401',  // Very dark green
-    200: '#2a5002',  // Dark green
-    300: '#3d7c03',  // Medium-dark green
-    400: '#4fa804',  // Medium green
-    500: '#65d405',  // Main brand green from brand manual (C=60 M=16 Y=98 K=1)
-    600: '#89d136',  // Medium-light green
-    700: '#a8e85c',  // Light-medium green
-    800: '#c7ff82',  // Light green from brand manual (C=22 M=0 Y=49 K=0)
-    900: '#dcfce7',  // Very light green
-    950: '#f0fdf4',  // Lightest green tint
+    50: '#0a1500',   // Darkest - almost black green (reversed from light mode)
+    100: '#193501',  // Very dark green (reversed from light mode)
+    200: '#2d5f02',  // Dark green (reversed from light mode)
+    300: '#428a03',  // Medium-dark green (reversed from light mode)
+    400: '#56b404',  // Medium green (reversed from light mode)
+    500: '#65d405',  // Main brand green from logo (C=60 M=16 Y=98 K=1)
+    600: '#8ce537',  // Medium-light green (reversed from light mode)
+    700: '#aaf25d',  // Light-medium green (reversed from light mode)
+    800: '#c7ff82',  // Light green from logo (C=22 M=0 Y=49 K=0)
+    900: '#eeffda',  // Very light green (reversed from light mode)
+    950: '#f7ffec',  // Lightest green tint (reversed from light mode)
   },
   background: {
     primary: '#0f172a',  // Gray-950 - page background (darkest at back)

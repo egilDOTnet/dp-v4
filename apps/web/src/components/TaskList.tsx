@@ -833,7 +833,7 @@ export default function TaskList({
             <button
               onClick={handleStartNewTask}
               disabled={isCreatingNewTask}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm disabled:opacity-50"
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm disabled:opacity-50"
             >
               New Task
             </button>
@@ -1046,7 +1046,7 @@ export default function TaskList({
                         ${isNewlyCreated ? "shadow-lg scale-105" : ""}
                         ${isDragging ? "opacity-50 shadow-md" : ""}
                         ${isDelayed && !isNewlyCreated && !isDragging && !isCompleting ? "border-red-400" : ""}
-                        ${isCompleted && !isNewlyCreated && !isDragging ? "border-green-400" : ""}
+                        ${isCompleted && !isNewlyCreated && !isDragging ? "border-primary-400" : ""}
                       `}
                     >
                       {/* Left side: Drag handle panel */}
@@ -1078,7 +1078,7 @@ export default function TaskList({
                           </div>
                         </div>
                       ) : (
-                        <div className={`${isCompleted ? 'bg-green-500' : 'bg-primary-500'} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                        <div className={`${isCompleted ? 'bg-primary-500' : 'bg-primary-500'} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
                           {isCompleted ? (
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1097,7 +1097,7 @@ export default function TaskList({
                             <button
                               onClick={() => handleMarkAsDone(task.id)}
                               disabled={loading}
-                              className="flex-shrink-0 w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-gray-400 hover:border-green-500 hover:bg-green-50 disabled:opacity-50 transition-colors"
+                              className="flex-shrink-0 w-7 h-7 rounded-full border border-gray-300 bg-gray-100 flex items-center justify-center text-gray-400 hover:border-primary-500 hover:bg-primary-50 disabled:opacity-50 transition-colors"
                               title="Mark as done"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1109,7 +1109,7 @@ export default function TaskList({
                             <button
                               onClick={() => handleReopen(task.id)}
                               disabled={loading}
-                              className="flex-shrink-0 w-7 h-7 rounded-full border border-green-300 bg-green-100 flex items-center justify-center text-green-600 hover:border-green-500 hover:bg-green-200 disabled:opacity-50 transition-colors"
+                              className="flex-shrink-0 w-7 h-7 rounded-full border border-primary-300 bg-primary-100 flex items-center justify-center text-primary-600 hover:border-primary-500 hover:bg-primary-200 disabled:opacity-50 transition-colors"
                               title="Reopen task"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1363,7 +1363,7 @@ export default function TaskList({
                                 </span>
                               )}
                               {isCompleted && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded whitespace-nowrap">
+                                <span className="text-xs bg-primary-100 text-primary-800 px-2 py-1 rounded whitespace-nowrap">
                                   Completed
                                 </span>
                               )}
@@ -1448,12 +1448,12 @@ export default function TaskList({
                         border-2 rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-500 ease-out
                         ${isNewlyCreated ? "border-primary-500 shadow-lg scale-105" : ""}
                         ${isDelayed && !isNewlyCreated ? "border-red-400" : ""}
-                        ${isCompleted && !isNewlyCreated ? "border-green-400" : ""}
+                        ${isCompleted && !isNewlyCreated ? "border-primary-400" : ""}
                         ${!isNewlyCreated && !isDelayed && !isCompleted ? "border-gray-200" : ""}
                       `}
                     >
                       {/* Left side panel - shows checkmark for completed */}
-                      <div className={`${isCompleted ? 'bg-green-500' : 'bg-primary-500'} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                      <div className={`${isCompleted ? 'bg-primary-500' : 'bg-primary-500'} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
                         {isCompleted ? (
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1470,7 +1470,7 @@ export default function TaskList({
                             <button
                               onClick={() => handleReopen(task.id)}
                               disabled={loading}
-                              className="flex-shrink-0 w-7 h-7 rounded-full border border-green-300 bg-green-100 flex items-center justify-center text-green-600 hover:border-green-500 hover:bg-green-200 disabled:opacity-50 transition-colors"
+                              className="flex-shrink-0 w-7 h-7 rounded-full border border-primary-300 bg-primary-100 flex items-center justify-center text-primary-600 hover:border-primary-500 hover:bg-primary-200 disabled:opacity-50 transition-colors"
                               title="Reopen task"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
