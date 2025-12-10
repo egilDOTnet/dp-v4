@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
+import { verifyProjectAccess } from "../middleware/project-access";
 
 // Helper to safely access RFI models with better error handling
 // Prisma generates model names in camelCase: Project -> db.project, RFI -> db.rFI
@@ -38,51 +39,121 @@ function getRFIModel(modelName: string) {
 }
 
 export default async function rfiRoutes(fastify: FastifyInstance) {
-  // Get RFI for a project
+  /**
+   * Get RFI for a project
+   * User must be a project member or company admin
+   * Creates RFI if it doesn't exist with default templates
+   */
   fastify.get<{
     Params: { id: string };
   }>(
     "/:id/rfi",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get RFI for a project. User must be a project member or company administrator. If RFI doesn't exist, creates it with default email and information templates.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "RFI with questions and options",
+            // No schema validation - return data as-is to avoid serialization issues
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
-        if (!request.user) {
-          return reply.status(401).send({ error: "Unauthorized" });
-        }
 
-        // Verify project exists and user has access
-        const project = await db.project.findUnique({
-          where: { id: projectId },
-          include: { ProjectMember: true },
-        });
-
-        if (!project) {
-          return reply.status(404).send({ error: "Project not found" });
-        }
-
-        const user = await db.user.findUnique({
-          where: { id: getUser(request).userId },
-          include: { projectMembers: true },
-        });
-
-        const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-        const isAdmin =
-          (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-          user?.tenantId === project.tenantId;
-
-        if (!isMember && !isAdmin) {
-          return reply.status(403).send({ error: "Access denied" });
-        }
+        // Verify project access using middleware (includes auth check)
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+        const project = (request as any).project;
 
         // Get or create RFI
-        const RFI = getRFIModel("RFI");
-        let rfi = await RFI.findUnique({
+        // Use select instead of include to ensure proper JSON serialization
+        // Access model directly like requirements endpoint does
+        let rfi = await db.rFI.findUnique({
           where: { projectId },
-          include: {
+          select: {
+            id: true,
+            projectId: true,
+            emailSubject: true,
+            emailText: true,
+            rfiInformation: true,
+            emailTemplateId: true,
+            rfiInformationTemplateId: true,
+            deadline: true,
+            autoPublishDate: true,
+            isPublished: true,
+            publishedAt: true,
+            unpublishedAt: true,
+            createdAt: true,
+            updatedAt: true,
             questions: {
-              include: {
+              select: {
+                id: true,
+                rfiId: true,
+                title: true,
+                description: true,
+                type: true,
+                order: true,
+                required: true,
+                scaleLabels: true,
+                createdAt: true,
+                updatedAt: true,
                 options: {
+                  select: {
+                    id: true,
+                    questionId: true,
+                    label: true,
+                    value: true,
+                    xAxis: true,
+                    yAxis: true,
+                    order: true,
+                    createdAt: true,
+                    updatedAt: true,
+                  },
                   orderBy: { order: "asc" },
                 },
               },
@@ -106,7 +177,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           const rfiInformation = rfiInfoTemplate?.content?.replace(/{PROJECT_NAME}/g, project.name).replace(/{PROJECT_DESCRIPTION}/g, project.type || "No description available") || "";
 
           // Create RFI if it doesn't exist
-          rfi = await RFI.create({
+          rfi = await db.rFI.create({
             data: {
               projectId,
               emailSubject,
@@ -115,10 +186,45 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
               emailTemplateId: emailTemplate?.id,
               rfiInformationTemplateId: rfiInfoTemplate?.id,
             },
-            include: {
+            select: {
+              id: true,
+              projectId: true,
+              emailSubject: true,
+              emailText: true,
+              rfiInformation: true,
+              emailTemplateId: true,
+              rfiInformationTemplateId: true,
+              deadline: true,
+              autoPublishDate: true,
+              isPublished: true,
+              publishedAt: true,
+              unpublishedAt: true,
+              createdAt: true,
+              updatedAt: true,
               questions: {
-                include: {
+                select: {
+                  id: true,
+                  rfiId: true,
+                  title: true,
+                  description: true,
+                  type: true,
+                  order: true,
+                  required: true,
+                  scaleLabels: true,
+                  createdAt: true,
+                  updatedAt: true,
                   options: {
+                    select: {
+                      id: true,
+                      questionId: true,
+                      label: true,
+                      value: true,
+                      xAxis: true,
+                      yAxis: true,
+                      order: true,
+                      createdAt: true,
+                      updatedAt: true,
+                    },
                     orderBy: { order: "asc" },
                   },
                 },
@@ -128,9 +234,17 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           });
         }
 
+
+        // Using select ensures we get plain JavaScript objects that serialize correctly
+        // Fastify's serializer handles Date objects automatically
         return reply.send(rfi);
       } catch (error: any) {
-        request.log.error({ err: error }, "Error in GET /:id/rfi");
+        request.log.error({ 
+          err: error, 
+          errorMessage: error.message,
+          errorStack: error.stack,
+          projectId: request.params.id
+        }, "Error in GET /:id/rfi");
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "An unexpected error occurred",
@@ -139,7 +253,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Create or update RFI
+  /**
+   * Create or update RFI
+   * User must be a project member or company admin
+   * Validates that autoPublishDate is before deadline if both are set
+   */
   fastify.put<{
     Params: { id: string };
     Body: {
@@ -151,7 +269,98 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/rfi",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Create or update RFI settings. User must be a project member or company administrator. Validates that autoPublishDate is before deadline if both are provided.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            emailSubject: {
+              type: "string",
+              nullable: true,
+              description: "Email subject for RFI invitations",
+            },
+            emailText: {
+              type: "string",
+              nullable: true,
+              description: "Email body text for RFI invitations",
+            },
+            rfiInformation: {
+              type: "string",
+              nullable: true,
+              description: "RFI information/instructions text",
+            },
+            deadline: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+              description: "RFI deadline (ISO 8601 datetime)",
+            },
+            autoPublishDate: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+              description: "Auto-publish date (must be before deadline if both set)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "Created or updated RFI",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error (e.g., autoPublishDate >= deadline)",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -159,29 +368,10 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+      const project = (request as any).project;
 
       // Validate dates
       if (request.body.deadline && request.body.autoPublishDate) {
@@ -195,7 +385,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Update or create RFI
-      const RFI = getRFIModel("RFI");
+      // Use direct model access like requirements endpoint
       const updateData: any = {};
       if (request.body.emailSubject !== undefined) {
         updateData.emailSubject = request.body.emailSubject;
@@ -227,7 +417,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       };
 
       // Only fetch templates if creating new RFI and fields not explicitly provided
-      const existingRfi = await RFI.findUnique({ where: { projectId } });
+      const existingRfi = await db.rFI.findUnique({ where: { projectId } });
       if (!existingRfi) {
         if (!request.body.emailSubject) {
           createData.emailSubject = `Request for Information (RFI) for "${project.name}"`;
@@ -252,22 +442,60 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         }
       }
 
-      const rfi = await RFI.upsert({
+      // Use select instead of include to ensure proper JSON serialization
+      const rfi = await db.rFI.upsert({
         where: { projectId },
         update: updateData,
         create: createData,
-        include: {
+        select: {
+          id: true,
+          projectId: true,
+          emailSubject: true,
+          emailText: true,
+          rfiInformation: true,
+          emailTemplateId: true,
+          rfiInformationTemplateId: true,
+          deadline: true,
+          autoPublishDate: true,
+          isPublished: true,
+          publishedAt: true,
+          unpublishedAt: true,
+          createdAt: true,
+          updatedAt: true,
           questions: {
-            include: {
+            select: {
+              id: true,
+              rfiId: true,
+              title: true,
+              description: true,
+              type: true,
+              order: true,
+              required: true,
+              scaleLabels: true,
+              createdAt: true,
+              updatedAt: true,
               options: {
+                select: {
+                  id: true,
+                  questionId: true,
+                  label: true,
+                  value: true,
+                  xAxis: true,
+                  yAxis: true,
+                  order: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
                 orderBy: { order: "asc" },
               },
             },
             orderBy: { order: "asc" },
           },
         },
-      });
+        });
 
+        // Using select ensures we get plain JavaScript objects that serialize correctly
+        // Fastify's serializer handles Date objects automatically
         return reply.send(rfi);
       } catch (error: any) {
         request.log.error({ err: error }, "Error in PUT /:id/rfi");
@@ -279,12 +507,78 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Publish RFI
+  /**
+   * Publish RFI
+   * User must be a project member or company admin
+   * Requires deadline to be set
+   */
   fastify.post<{
     Params: { id: string };
   }>(
     "/:id/rfi/publish",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Publish an RFI. User must be a project member or company administrator. Requires the RFI deadline to be set before publishing.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+            },
+            description: "RFI published successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "RFI deadline not set",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or RFI not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -292,29 +586,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get RFI
       const RFI = getRFIModel("RFI");
@@ -354,12 +628,71 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Unpublish RFI
+  /**
+   * Unpublish RFI
+   * User must be a project member or company admin
+   * Sets unpublishedAt timestamp
+   */
   fastify.post<{
     Params: { id: string };
   }>(
     "/:id/rfi/unpublish",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Unpublish an RFI. User must be a project member or company administrator. Sets the unpublishedAt timestamp.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+            },
+            description: "RFI unpublished successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -367,29 +700,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Unpublish RFI
       const RFI = getRFIModel("RFI");
@@ -412,12 +725,70 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get all questions for an RFI
+  /**
+   * Get all questions for an RFI
+   * User must be a project member or company admin
+   * Returns empty array if RFI doesn't exist
+   */
   fastify.get<{
     Params: { id: string };
   }>(
     "/:id/rfi/questions",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all questions for an RFI. User must be a project member or company administrator. Returns questions with their options, ordered by order field. Returns empty array if RFI doesn't exist.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "Array of RFI questions",
+            // No schema validation - return data as-is to avoid serialization issues
+            // Fastify's schema validation can strip properties from Prisma objects
+            // even when using select. Using only description allows proper serialization.
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -425,53 +796,58 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      // Get RFI
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      const rfi = await RFI.findUnique({
+      // Get RFI ID first to query questions directly
+      // Using findMany directly (like requirements endpoint) avoids relation serialization issues
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
+        select: { id: true },
       });
 
       if (!rfi) {
         return reply.send([]);
       }
 
-      // Get questions
-      const questions = await RFIQuestion.findMany({
+      // Query questions directly using findMany (same pattern as requirements endpoint)
+      // Access the model via dbAny since TypeScript doesn't know about rFIQuestion
+      const dbAny = db as any;
+      const questions = await dbAny.rFIQuestion.findMany({
         where: { rfiId: rfi.id },
-        include: {
+        select: {
+          id: true,
+          rfiId: true,
+          title: true,
+          description: true,
+          type: true,
+          order: true,
+          required: true,
+          scaleLabels: true,
+          createdAt: true,
+          updatedAt: true,
           options: {
+            select: {
+              id: true,
+              questionId: true,
+              label: true,
+              value: true,
+              xAxis: true,
+              yAxis: true,
+              order: true,
+              createdAt: true,
+              updatedAt: true,
+            },
             orderBy: { order: "asc" },
           },
         },
         orderBy: { order: "asc" },
       });
 
-        return reply.send(questions);
+      // Using select ensures we get plain JavaScript objects that serialize correctly
+      // Fastify's serializer handles Date objects automatically
+      return reply.send(questions);
       } catch (error: any) {
         request.log.error({ err: error }, "Error in GET /:id/rfi/questions");
         return reply.status(500).send({
@@ -482,7 +858,12 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Create question
+  /**
+   * Create question
+   * User must be a project member or company admin
+   * Creates RFI if it doesn't exist
+   * Auto-generates order based on existing questions
+   */
   fastify.post<{
     Params: { id: string };
     Body: {
@@ -494,7 +875,89 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/rfi/questions",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Create a question for an RFI. User must be a project member or company administrator. Creates RFI if it doesn't exist. Order is auto-generated based on existing questions.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["title", "type"],
+          properties: {
+            title: {
+              type: "string",
+              description: "Question title",
+            },
+            description: {
+              type: "string",
+              nullable: true,
+              description: "Question description",
+            },
+            type: {
+              type: "string",
+              description: "Question type (e.g., 'text', 'scale', 'multiple_choice')",
+            },
+            required: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether the question is required",
+            },
+            scaleLabels: {
+              type: "object",
+              nullable: true,
+              additionalProperties: { type: "string" },
+              description: "Scale labels for scale-type questions",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            description: "Created question with auto-generated order",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -502,29 +965,10 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+      const project = (request as any).project;
 
       // Get or create RFI
       const RFI = getRFIModel("RFI");
@@ -568,6 +1012,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       const order = maxOrderQuestion ? maxOrderQuestion.order + 1 : 1;
 
       // Create question
+      // Use select instead of include to ensure proper JSON serialization
       const question = await RFIQuestion.create({
         data: {
           rfiId: rfi.id,
@@ -578,8 +1023,29 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           order,
           scaleLabels: request.body.scaleLabels || null,
         },
-        include: {
+        select: {
+          id: true,
+          rfiId: true,
+          title: true,
+          description: true,
+          type: true,
+          order: true,
+          required: true,
+          scaleLabels: true,
+          createdAt: true,
+          updatedAt: true,
           options: {
+            select: {
+              id: true,
+              questionId: true,
+              label: true,
+              value: true,
+              xAxis: true,
+              yAxis: true,
+              order: true,
+              createdAt: true,
+              updatedAt: true,
+            },
             orderBy: { order: "asc" },
           },
         },
@@ -596,7 +1062,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update question
+  /**
+   * Update question
+   * User must be a project member or company admin
+   * All fields are optional
+   */
   fastify.put<{
     Params: { id: string; questionId: string };
     Body: {
@@ -608,7 +1078,94 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/rfi/questions/:questionId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update an RFI question. User must be a project member or company administrator. All fields are optional - only provided fields are updated.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "questionId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            questionId: {
+              type: "string",
+              description: "Question ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            title: {
+              type: "string",
+              nullable: true,
+              description: "Question title",
+            },
+            description: {
+              type: "string",
+              nullable: true,
+              description: "Question description",
+            },
+            type: {
+              type: "string",
+              nullable: true,
+              description: "Question type",
+            },
+            required: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether the question is required",
+            },
+            scaleLabels: {
+              type: "object",
+              nullable: true,
+              additionalProperties: { type: "string" },
+              description: "Scale labels for scale-type questions",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "Updated question",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, or question not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -678,11 +1235,33 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           updateData.scaleLabels = request.body.scaleLabels;
         }
 
+        // Use select instead of include to ensure proper JSON serialization
         const updatedQuestion = await RFIQuestion.update({
           where: { id: questionId },
           data: updateData,
-          include: {
+          select: {
+            id: true,
+            rfiId: true,
+            title: true,
+            description: true,
+            type: true,
+            order: true,
+            required: true,
+            scaleLabels: true,
+            createdAt: true,
+            updatedAt: true,
             options: {
+              select: {
+                id: true,
+                questionId: true,
+                label: true,
+                value: true,
+                xAxis: true,
+                yAxis: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+              },
               orderBy: { order: "asc" },
             },
           },
@@ -699,12 +1278,71 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Delete question
+  /**
+   * Delete question
+   * User must be a project member or company admin
+   * Cascades to delete options and responses
+   */
   fastify.delete<{
     Params: { id: string; questionId: string };
   }>(
     "/:id/rfi/questions/:questionId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Delete an RFI question. User must be a project member or company administrator. Cascades to delete related options and vendor responses.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "questionId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            questionId: {
+              type: "string",
+              description: "Question ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Question deleted successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, or question not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -713,29 +1351,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify question belongs to RFI
       const RFI = getRFIModel("RFI");
@@ -772,7 +1390,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Reorder questions
+  /**
+   * Reorder questions
+   * User must be a project member or company admin
+   * Updates order for all specified questions
+   */
   fastify.put<{
     Params: { id: string };
     Body: {
@@ -780,7 +1402,76 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/rfi/questions/reorder",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Reorder RFI questions (for drag-and-drop). User must be a project member or company administrator. Updates order for all specified questions based on their position in the array.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["questionIds"],
+          properties: {
+            questionIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of question IDs in the desired order",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Questions reordered successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid question IDs",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or RFI not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -788,29 +1479,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify RFI exists
       const RFI = getRFIModel("RFI");
@@ -844,7 +1515,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Add option to question
+  /**
+   * Add option to question
+   * User must be a project member or company admin
+   * Auto-generates order based on existing options
+   */
   fastify.post<{
     Params: { id: string; questionId: string };
     Body: {
@@ -855,7 +1530,88 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/rfi/questions/:questionId/options",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Add an option to an RFI question. User must be a project member or company administrator. Order is auto-generated based on existing options.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "questionId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            questionId: {
+              type: "string",
+              description: "Question ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["label"],
+          properties: {
+            label: {
+              type: "string",
+              description: "Option label",
+            },
+            value: {
+              type: "string",
+              nullable: true,
+              description: "Option value",
+            },
+            xAxis: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether this option is on the X-axis (for matrix questions)",
+            },
+            yAxis: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether this option is on the Y-axis (for matrix questions)",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            description: "Created option with auto-generated order",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, or question not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -864,29 +1620,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify question belongs to RFI
       const RFI = getRFIModel("RFI");
@@ -939,7 +1675,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update option
+  /**
+   * Update option
+   * User must be a project member or company admin
+   * All fields are optional
+   */
   fastify.put<{
     Params: { id: string; questionId: string; optionId: string };
     Body: {
@@ -950,7 +1690,92 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/rfi/questions/:questionId/options/:optionId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update an RFI question option. User must be a project member or company administrator. All fields are optional - only provided fields are updated.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "questionId", "optionId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            questionId: {
+              type: "string",
+              description: "Question ID",
+            },
+            optionId: {
+              type: "string",
+              description: "Option ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            label: {
+              type: "string",
+              nullable: true,
+              description: "Option label",
+            },
+            value: {
+              type: "string",
+              nullable: true,
+              description: "Option value",
+            },
+            xAxis: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether this option is on the X-axis",
+            },
+            yAxis: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether this option is on the Y-axis",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "Updated option",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, question, or option not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -960,29 +1785,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify option belongs to question and question belongs to RFI
       const RFI = getRFIModel("RFI");
@@ -1043,12 +1848,75 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Delete option
+  /**
+   * Delete option
+   * User must be a project member or company admin
+   * Cascades to delete related responses
+   */
   fastify.delete<{
     Params: { id: string; questionId: string; optionId: string };
   }>(
     "/:id/rfi/questions/:questionId/options/:optionId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Delete an RFI question option. User must be a project member or company administrator. Cascades to delete related vendor responses.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "questionId", "optionId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            questionId: {
+              type: "string",
+              description: "Question ID",
+            },
+            optionId: {
+              type: "string",
+              description: "Option ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Option deleted successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, question, or option not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -1058,29 +1926,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify option belongs to question and question belongs to RFI
       const RFI = getRFIModel("RFI");
@@ -1126,7 +1974,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Reorder options
+  /**
+   * Reorder options
+   * User must be a project member or company admin
+   * Updates order for all specified options
+   */
   fastify.put<{
     Params: { id: string; questionId: string };
     Body: {
@@ -1134,7 +1986,80 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/rfi/questions/:questionId/options/reorder",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Reorder RFI question options (for drag-and-drop). User must be a project member or company administrator. Updates order for all specified options based on their position in the array.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "questionId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            questionId: {
+              type: "string",
+              description: "Question ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["optionIds"],
+          properties: {
+            optionIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of option IDs in the desired order",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Options reordered successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid option IDs",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, or question not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -1143,29 +2068,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify question belongs to RFI
       const RFI = getRFIModel("RFI");
@@ -1208,12 +2113,72 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get vendor responses
+  /**
+   * Get vendor responses
+   * User must be a project member or company admin
+   * Returns empty array if RFI doesn't exist
+   */
   fastify.get<{
     Params: { id: string };
   }>(
     "/:id/rfi/vendor-responses",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all vendor responses for an RFI. User must be a project member or company administrator. Returns responses with vendor and answer details. Returns empty array if RFI doesn't exist.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              description: "Vendor response with answers",
+            },
+            description: "Array of vendor responses",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -1221,29 +2186,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get RFI
       const RFI = getRFIModel("RFI");
@@ -1257,23 +2202,49 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Get vendor responses
+      // Use select instead of include to ensure proper JSON serialization
       const vendorResponses = await RFIVendorResponse.findMany({
         where: { rfiId: rfi.id },
-        include: {
+        select: {
+          id: true,
+          status: true,
+          sentAt: true,
+          answeredAt: true,
+          createdAt: true,
           projectVendor: {
-            include: {
+            select: {
+              vendorId: true,
               vendor: {
-                include: {
-                  VendorContactPerson: true,
+                select: {
+                  id: true,
+                  name: true,
+                  VendorContactPerson: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      phone: true,
+                    },
+                  },
                 },
               },
             },
           },
-          contactPerson: true,
+          contactPerson: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
       });
 
+      // Format response to match expected structure
       return reply.send(
         vendorResponses.map((vr: any) => ({
           id: vr.id,
@@ -1302,12 +2273,80 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Send RFI to vendors
+  /**
+   * Send RFI to vendors
+   * User must be a project member or company admin
+   * Requires RFI to be published
+   * Sends email invitations to all project vendors
+   */
   fastify.post<{
     Params: { id: string };
   }>(
     "/:id/rfi/send",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Send RFI to all project vendors. User must be a project member or company administrator. Requires RFI to be published. Sends email invitations to all vendors linked to the project.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              sent: { type: "number", description: "Number of emails sent" },
+            },
+            description: "RFI sent to vendors successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "RFI not published or no vendors in project",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or RFI not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -1315,29 +2354,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get RFI
       const RFI = getRFIModel("RFI");
@@ -1410,11 +2429,6 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           }
 
           // TODO: Send email in production
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              `[RFI Email] Would send RFI to ${mainContact.email} for vendor ${pv.vendor.name}`
-            );
-          }
         }
       }
 
@@ -1429,12 +2443,82 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Resend RFI to a specific vendor
+  /**
+   * Resend RFI to specific vendor
+   * User must be a project member or company admin
+   * Requires RFI to be published
+   */
   fastify.post<{
     Params: { id: string; vendorId: string };
   }>(
     "/:id/rfi/resend/:vendorId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Resend RFI invitation to a specific vendor. User must be a project member or company administrator. Requires RFI to be published.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "vendorId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            vendorId: {
+              type: "string",
+              description: "Vendor ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+            },
+            description: "RFI resent to vendor successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "RFI not published or vendor not in project",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, or vendor not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -1443,29 +2527,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get RFI
       const RFI = getRFIModel("RFI");
@@ -1528,11 +2592,6 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       });
 
       // TODO: Send email in production (with CC to logged in user)
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          `[RFI Email] Would resend RFI to ${mainContact.email} for vendor ${projectVendor.vendor.name} (CC: ${user?.email})`
-        );
-      }
 
         return reply.send({ success: true });
       } catch (error: any) {
@@ -1545,12 +2604,68 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get RFI preview
+  /**
+   * Get RFI preview
+   * User must be a project member or company admin
+   * Returns RFI with questions and options for preview
+   */
   fastify.get<{
     Params: { id: string };
   }>(
     "/:id/rfi/preview",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get RFI preview for display. User must be a project member or company administrator. Returns RFI with all questions and options ordered for preview.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "RFI with questions and options for preview",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const projectId = request.params.id;
@@ -1558,38 +2673,54 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get RFI with questions
-      const RFI = getRFIModel("RFI");
-      const rfi = await RFI.findUnique({
+      // Use select instead of include to ensure proper JSON serialization
+      // Use direct model access like requirements endpoint
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
-        include: {
+        select: {
+          id: true,
+          projectId: true,
+          emailSubject: true,
+          emailText: true,
+          rfiInformation: true,
+          emailTemplateId: true,
+          rfiInformationTemplateId: true,
+          deadline: true,
+          autoPublishDate: true,
+          isPublished: true,
+          publishedAt: true,
+          unpublishedAt: true,
+          createdAt: true,
+          updatedAt: true,
           questions: {
-            include: {
+            select: {
+              id: true,
+              rfiId: true,
+              title: true,
+              description: true,
+              type: true,
+              order: true,
+              required: true,
+              scaleLabels: true,
+              createdAt: true,
+              updatedAt: true,
               options: {
+                select: {
+                  id: true,
+                  questionId: true,
+                  label: true,
+                  value: true,
+                  xAxis: true,
+                  yAxis: true,
+                  order: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
                 orderBy: { order: "asc" },
               },
             },
@@ -1602,6 +2733,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: "RFI not found" });
         }
 
+        // Using select ensures we get plain JavaScript objects that serialize correctly
+        // Fastify's serializer handles Date objects automatically
         return reply.send(rfi);
       } catch (error: any) {
         request.log.error({ err: error }, "Error in GET /:id/rfi/preview");

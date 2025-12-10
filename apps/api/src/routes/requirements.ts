@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
+import { verifyProjectAccess } from "../middleware/project-access";
 
 // Helper function to generate hierarchy number
 async function generateHierarchyNumber(
@@ -167,57 +168,230 @@ async function createRequirementHistory(
 }
 
 export default async function requirementRoutes(fastify: FastifyInstance) {
-  // Get all hierarchies for a project
+  /**
+   * Get all hierarchies for a project
+   * User must be a project member or company admin
+   * Returns hierarchies with parent, children, and requirement counts
+   */
   fastify.get(
     "/:projectId/requirements/hierarchies",
-    { preHandler: [authenticate] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { projectId } = request.params as { projectId: string };
-      const currentUser = getUser(request);
-
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      // Check if user is a project member
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const hierarchies = await db.requirementHierarchy.findMany({
-        where: { projectId },
-        include: {
-          parent: true,
-          children: {
-            orderBy: { order: "asc" },
-          },
-          _count: {
-            select: { requirements: true },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all requirement hierarchies for a project. User must be a project member or company administrator. Returns hierarchies with parent relationships, children, and requirement counts, ordered by parent and order.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
           },
         },
-        orderBy: [
-          { parentId: "asc" },
-          { order: "asc" },
-        ],
-      });
+        response: {
+          200: {
+            description: "Array of requirement hierarchies",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
 
-      return reply.send(hierarchies);
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        request.log.info({ projectId }, "Fetching requirement hierarchies");
+        
+        // TEMPORARY TEST: Return hardcoded data to verify response works
+        // const testData = [
+        //   { id: "test1", title: "Test Hierarchy 1", projectId, order: 1 },
+        //   { id: "test2", title: "Test Hierarchy 2", projectId, order: 2 }
+        // ];
+        // request.log.info({ testData }, "Returning test data");
+        // return reply.send(testData);
+
+        const hierarchies = await db.requirementHierarchy.findMany({
+          where: { projectId },
+          select: {
+            id: true,
+            projectId: true,
+            parentId: true,
+            number: true,
+            title: true,
+            description: true,
+            order: true,
+            createdAt: true,
+            updatedAt: true,
+            parent: {
+              select: {
+                id: true,
+                projectId: true,
+                parentId: true,
+                number: true,
+                title: true,
+                description: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+            children: {
+              select: {
+                id: true,
+                projectId: true,
+                parentId: true,
+                number: true,
+                title: true,
+                description: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: { order: "asc" },
+            },
+            _count: {
+              select: { requirements: true },
+            },
+          },
+          orderBy: [
+            { parentId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        request.log.info({ count: hierarchies.length, projectId, sample: hierarchies[0] }, "Found requirement hierarchies");
+
+        if (hierarchies.length === 0) {
+          request.log.warn({ projectId }, "No hierarchies found for project");
+          return reply.send([]);
+        }
+
+        // Return Prisma results directly - using select ensures clean objects
+        request.log.info({ 
+          sendingCount: hierarchies.length,
+          firstItemKeys: hierarchies[0] ? Object.keys(hierarchies[0]) : [],
+          firstItemId: hierarchies[0]?.id,
+          firstItemTitle: hierarchies[0]?.title
+        }, "Sending hierarchies response");
+        
+        return reply.send(hierarchies);
+      } catch (error: any) {
+        request.log.error({ err: error, projectId: request.params }, "Error fetching requirement hierarchies");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to fetch hierarchies",
+        });
+      }
     }
   );
 
-  // Create hierarchy level
+  /**
+   * Create a hierarchy level
+   * User must be a project member or company admin
+   * Supports 2-level hierarchy (parent and sub-hierarchy)
+   * Auto-generates hierarchy numbers and handles renumbering
+   */
   fastify.post(
     "/:projectId/requirements/hierarchies",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Create a requirement hierarchy level. User must be a project member or company administrator. Supports 2-level hierarchy structure. Hierarchy numbers are auto-generated and existing items are renumbered as needed.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["title"],
+          properties: {
+            title: {
+              type: "string",
+              description: "Hierarchy title",
+            },
+            description: {
+              type: "string",
+              nullable: true,
+              description: "Hierarchy description",
+            },
+            parentId: {
+              type: "string",
+              nullable: true,
+              description: "Parent hierarchy ID (for level 2 hierarchies, null for level 1)",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            description: "Created hierarchy with auto-generated number",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid parent hierarchy",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const body = request.body as {
@@ -225,24 +399,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         description?: string;
         parentId?: string | null;
       };
-      const currentUser = getUser(request);
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Validate parent if provided
       if (body.parentId) {
@@ -359,17 +519,83 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update hierarchy level
+  /**
+   * Update hierarchy level
+   * User must be a project member or company admin
+   * Updates title and description
+   */
   fastify.put(
     "/:projectId/requirements/hierarchies/:id",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update a requirement hierarchy level. User must be a project member or company administrator. Updates title and description.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+            id: {
+              type: "string",
+              description: "Hierarchy ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            title: {
+              type: "string",
+              nullable: true,
+              description: "Hierarchy title",
+            },
+            description: {
+              type: "string",
+              nullable: true,
+              description: "Hierarchy description",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "Updated hierarchy",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or hierarchy not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
       const body = request.body as {
         title?: string;
         description?: string | null;
       };
-      const currentUser = getUser(request);
 
       const hierarchy = await db.requirementHierarchy.findUnique({
         where: { id },
@@ -379,22 +605,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Hierarchy not found" });
       }
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       const updated = await db.requirementHierarchy.update({
         where: { id },
@@ -412,13 +625,71 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Delete hierarchy level
+  /**
+   * Delete hierarchy level
+   * User must be a project member or company admin
+   * Cannot delete if hierarchy has requirements or children
+   * Handles renumbering of remaining items
+   */
   fastify.delete(
     "/:projectId/requirements/hierarchies/:id",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Delete a requirement hierarchy level. User must be a project member or company administrator. Cannot delete if the hierarchy has requirements or child hierarchies. Remaining items are renumbered after deletion.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+            id: {
+              type: "string",
+              description: "Hierarchy ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Hierarchy deleted successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Cannot delete hierarchy with requirements or children",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or hierarchy not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
-      const currentUser = getUser(request);
 
       const hierarchy = await db.requirementHierarchy.findUnique({
         where: { id },
@@ -432,22 +703,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Hierarchy not found" });
       }
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Check if hierarchy has requirements or children
       if (hierarchy.requirements.length > 0 || hierarchy.children.length > 0) {
@@ -471,34 +729,90 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Bulk reorder hierarchies (for drag-and-drop)
+  /**
+   * Bulk reorder hierarchies (for drag-and-drop)
+   * User must be a project member or company admin
+   * Updates order and regenerates numbers for all affected hierarchies
+   */
   fastify.put(
     "/:projectId/requirements/hierarchies/reorder",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk reorder requirement hierarchies (for drag-and-drop). User must be a project member or company administrator. Updates order for all specified hierarchies and regenerates numbers accordingly.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["hierarchyIds"],
+          properties: {
+            hierarchyIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of hierarchy IDs in the desired order",
+            },
+            parentId: {
+              type: "string",
+              nullable: true,
+              description: "Parent hierarchy ID (for level 2 hierarchies, null for level 1)",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Hierarchies reordered successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid hierarchy IDs",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const body = request.body as {
         hierarchyIds: string[];
         parentId?: string | null;
       };
-      const currentUser = getUser(request);
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify all hierarchies belong to project and have the correct parentId
       const hierarchies = await db.requirementHierarchy.findMany({
@@ -556,37 +870,73 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get all requirements for a project
+  /**
+   * Get all requirements for a project
+   * User must be a project member or company admin
+   * Returns requirements with hierarchy information
+   */
   fastify.get(
     "/:projectId/requirements",
-    { preHandler: [authenticate] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { projectId } = request.params as { projectId: string };
-      const currentUser = getUser(request);
-
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const requirements = await db.requirement.findMany({
-        where: {
-          hierarchy: {
-            projectId,
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all requirements for a project. User must be a project member or company administrator. Returns requirements with their hierarchy information.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
           },
         },
+        response: {
+          200: {
+            description: "Array of requirements",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        request.log.info({ projectId }, "Fetching requirements");
+
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+          },
         include: {
           hierarchy: {
             include: {
@@ -618,14 +968,114 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         ],
       });
 
-      return reply.send(requirements);
+        request.log.info({ count: requirements.length, projectId, sample: requirements[0] }, "Found requirements");
+
+        if (requirements.length === 0) {
+          request.log.warn({ projectId }, "No requirements found for project");
+          return reply.send([]);
+        }
+
+        // Return Prisma results directly - using select ensures clean objects
+        request.log.info({ 
+          sendingCount: requirements.length,
+          firstItemKeys: requirements[0] ? Object.keys(requirements[0]) : [],
+          firstItemId: requirements[0]?.id,
+          firstItemDescription: requirements[0]?.description?.substring(0, 50)
+        }, "Sending requirements response");
+        
+        return reply.send(requirements);
+      } catch (error: any) {
+        request.log.error({ err: error, projectId: request.params }, "Error fetching requirements");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to fetch requirements",
+        });
+      }
     }
   );
 
-  // Create requirement
+  /**
+   * Create requirement
+   * User must be a project member or company admin
+   * Auto-generates requirement number and handles renumbering
+   */
   fastify.post(
     "/:projectId/requirements",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Create a requirement. User must be a project member or company administrator. Requirement numbers are auto-generated and existing items are renumbered as needed.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["hierarchyId", "description", "type"],
+          properties: {
+            hierarchyId: {
+              type: "string",
+              description: "Hierarchy ID to attach requirement to",
+            },
+            description: {
+              type: "string",
+              description: "Requirement description",
+            },
+            type: {
+              type: "string",
+              description: "Requirement type",
+            },
+            status: {
+              type: "string",
+              nullable: true,
+              description: "Requirement status (optional)",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            description: "Created requirement with auto-generated number",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid hierarchy",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const body = request.body as {
@@ -636,22 +1086,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       };
       const currentUser = getUser(request);
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify hierarchy belongs to project
       const hierarchy = await db.requirementHierarchy.findUnique({
@@ -766,10 +1202,89 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update requirement
+  /**
+   * Update requirement
+   * User must be a project member or company admin
+   * Creates history entry for changes
+   */
   fastify.put(
     "/:projectId/requirements/:id",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update a requirement. User must be a project member or company administrator. Creates a history entry for any changes made.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+            id: {
+              type: "string",
+              description: "Requirement ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            description: {
+              type: "string",
+              nullable: true,
+              description: "Requirement description",
+            },
+            type: {
+              type: "string",
+              nullable: true,
+              description: "Requirement type",
+            },
+            status: {
+              type: "string",
+              nullable: true,
+              description: "Requirement status (cannot change from non-null to null)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "Updated requirement",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or requirement not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
       const body = request.body as {
@@ -790,22 +1305,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Normalize empty string to null for status
       const normalizedStatus = body.status !== undefined 
@@ -893,13 +1395,63 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Delete requirement
+  /**
+   * Delete requirement
+   * User must be a project member or company admin
+   * Handles renumbering of remaining items
+   */
   fastify.delete(
     "/:projectId/requirements/:id",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Delete a requirement. User must be a project member or company administrator. Remaining items in the hierarchy are renumbered after deletion.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+            id: {
+              type: "string",
+              description: "Requirement ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Requirement deleted successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or requirement not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
-      const currentUser = getUser(request);
 
       const requirement = await db.requirement.findUnique({
         where: { id },
@@ -912,22 +1464,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       const hierarchyId = requirement.hierarchyId;
 
@@ -942,10 +1481,84 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Move requirement to different hierarchy
+  /**
+   * Move requirement to different hierarchy
+   * User must be a project member or company admin
+   * Handles renumbering in both old and new hierarchies
+   */
   fastify.put(
     "/:projectId/requirements/:id/move",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Move a requirement to a different hierarchy. User must be a project member or company administrator. Handles renumbering in both the old and new hierarchies.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+            id: {
+              type: "string",
+              description: "Requirement ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["hierarchyId"],
+          properties: {
+            hierarchyId: {
+              type: "string",
+              description: "New hierarchy ID to move requirement to",
+            },
+            order: {
+              type: "number",
+              nullable: true,
+              description: "Order position in new hierarchy (defaults to end)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "Moved requirement with updated number",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid hierarchy",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or requirement not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
       const body = request.body as {
@@ -965,22 +1578,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify new hierarchy belongs to project
       const newHierarchy = await db.requirementHierarchy.findUnique({
@@ -1056,10 +1656,79 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Bulk reorder requirements (for drag-and-drop)
+  /**
+   * Bulk reorder requirements (for drag-and-drop)
+   * User must be a project member or company admin
+   * Updates order and regenerates numbers
+   */
   fastify.put(
     "/:projectId/requirements/reorder",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk reorder requirements (for drag-and-drop). User must be a project member or company administrator. Updates order for all specified requirements and regenerates numbers accordingly.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["requirementIds", "hierarchyId"],
+          properties: {
+            requirementIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of requirement IDs in the desired order",
+            },
+            hierarchyId: {
+              type: "string",
+              description: "Hierarchy ID containing the requirements",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Requirements reordered successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid requirement IDs or hierarchy",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const body = request.body as {
@@ -1068,22 +1737,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       };
       const currentUser = getUser(request);
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify hierarchy belongs to project
       const hierarchy = await db.requirementHierarchy.findUnique({
@@ -1114,13 +1770,68 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get requirement history
+  /**
+   * Get requirement history
+   * User must be a project member or company admin
+   * Returns change history with modifier information
+   */
   fastify.get(
     "/:projectId/requirements/:id/history",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get change history for a requirement. User must be a project member or company administrator. Returns history entries with information about who made the changes.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+            id: {
+              type: "string",
+              description: "Requirement ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              description: "Requirement history entry with modifier information",
+            },
+            description: "Array of requirement history entries",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or requirement not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
-      const currentUser = getUser(request);
 
       const requirement = await db.requirement.findUnique({
         where: { id },
@@ -1133,22 +1844,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       const history = await db.requirementHistory.findMany({
         where: { requirementId: id },
@@ -1170,10 +1868,95 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Bulk update requirements
+  /**
+   * Bulk update requirements
+   * User must be a project member or company admin
+   * Updates multiple requirements and handles renumbering if moved
+   */
   fastify.put(
     "/:projectId/requirements/bulk-update",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk update multiple requirements. User must be a project member or company administrator. Can update type, status, or move requirements to a different hierarchy. Handles renumbering if requirements are moved.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["requirementIds"],
+          properties: {
+            requirementIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of requirement IDs to update",
+            },
+            type: {
+              type: "string",
+              nullable: true,
+              description: "New type for all requirements",
+            },
+            status: {
+              type: "string",
+              nullable: true,
+              description: "New status for all requirements",
+            },
+            hierarchyId: {
+              type: "string",
+              nullable: true,
+              description: "New hierarchy ID to move all requirements to",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              description: "Updated requirement with full relations",
+            },
+            description: "Array of updated requirements",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid requirement/hierarchy IDs",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const body = request.body as {
@@ -1184,22 +1967,9 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       };
       const currentUser = getUser(request);
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify all requirements belong to project
       const requirements = await db.requirement.findMany({
@@ -1372,33 +2142,84 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Bulk delete requirements
+  /**
+   * Bulk delete requirements
+   * User must be a project member or company admin
+   * Deletes multiple requirements and handles renumbering
+   */
   fastify.delete(
     "/:projectId/requirements/bulk-delete",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk delete multiple requirements. User must be a project member or company administrator. Deletes all specified requirements and renumbers remaining items in affected hierarchies.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["requirementIds"],
+          properties: {
+            requirementIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of requirement IDs to delete",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Requirements deleted successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid requirement IDs",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId } = request.params as { projectId: string };
       const body = request.body as {
         requirementIds: string[];
       };
-      const currentUser = getUser(request);
 
-      // Verify project access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const isMember = project.ProjectMember.some(
-        (pm) => pm.userId === currentUser.userId
-      );
-      if (!isMember && project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Verify all requirements belong to project and get their hierarchy IDs
       const requirements = await db.requirement.findMany({

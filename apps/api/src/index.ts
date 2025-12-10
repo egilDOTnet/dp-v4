@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import projectRoutes from "./routes/projects";
@@ -10,6 +12,7 @@ import vendorRoutes from "./routes/vendors";
 import rfiRoutes from "./routes/rfi";
 import notificationRoutes from "./routes/notifications";
 import { errorHandler } from "./middleware/error-handler";
+import { swaggerOptions, swaggerUiOptions } from "./config/swagger";
 
 const fastify = Fastify({
   logger: true,
@@ -35,6 +38,10 @@ const start = async () => {
     await fastify.register(jwt, {
       secret: process.env.JWT_SECRET || "your-secret-key-change-in-production",
     });
+
+    // Register Swagger for API documentation
+    await fastify.register(swagger, swaggerOptions);
+    await fastify.register(swaggerUi, swaggerUiOptions);
 
     // Health check
     fastify.get("/health", async () => {

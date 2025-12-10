@@ -3,8 +3,75 @@ import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
 
 export default async function notificationRoutes(fastify: FastifyInstance) {
-  // Get user's notifications
-  fastify.get("/", { preHandler: [authenticate] }, async (request, reply) => {
+  /**
+   * Get all notifications for the current user
+   * Returns notifications ordered by unread first, then by creation date
+   */
+  fastify.get(
+    "/",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all notifications for the current authenticated user. Ordered by unread status first, then by creation date (newest first).",
+        tags: ["notifications"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                type: {
+                  type: "string",
+                  enum: ["TASK_COMMENT", "TASK_MENTION"],
+                  description: "Notification type",
+                },
+                taskId: { type: "string", nullable: true },
+                commentId: { type: "string", nullable: true },
+                read: { type: "boolean" },
+                createdAt: { type: "string", format: "date-time" },
+                task: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                    phaseId: { type: "string" },
+                    project: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        name: { type: "string" },
+                      },
+                    },
+                  },
+                },
+                mentionedBy: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
     if (!request.user) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
@@ -96,8 +163,39 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
 
   });
 
-  // Get unread notification count
-  fastify.get("/unread-count", { preHandler: [authenticate] }, async (request, reply) => {
+  /**
+   * Get count of unread notifications
+   * Useful for displaying notification badges
+   */
+  fastify.get(
+    "/unread-count",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get the count of unread notifications for the current user. Useful for displaying notification badges.",
+        tags: ["notifications"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              count: {
+                type: "number",
+                description: "Number of unread notifications",
+              },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
     if (!request.user) {
       return reply.status(401).send({ error: "Unauthorized" });
     }
@@ -133,10 +231,56 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Mark notification as read
+  /**
+   * Mark a specific notification as read
+   * Notification must belong to the current user
+   */
   fastify.put<{ Params: { id: string } }>(
     "/:id/read",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Mark a specific notification as read. The notification must belong to the current user.",
+        tags: ["notifications"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Notification ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Notification marked as read",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - notification doesn't belong to user",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Notification not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
@@ -187,8 +331,32 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Mark all notifications as read
-  fastify.put("/read-all", { preHandler: [authenticate] }, async (request, reply) => {
+  /**
+   * Mark all notifications as read for the current user
+   */
+  fastify.put(
+    "/read-all",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Mark all unread notifications as read for the current user.",
+        tags: ["notifications"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          204: {
+            description: "All notifications marked as read",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
     if (!request.user) {
       return reply.status(401).send({ error: "Unauthorized" });
     }

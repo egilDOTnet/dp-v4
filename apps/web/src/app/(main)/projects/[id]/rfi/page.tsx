@@ -62,11 +62,31 @@ export default function RFIPage() {
       setLoading(true);
       setError("");
       const rfiData = await api.rfi.get(projectId);
+      
+      // Check if we got valid data
+      if (!rfiData || typeof rfiData !== 'object' || !rfiData.id) {
+        console.error("Invalid RFI data received:", rfiData);
+        setError("Received invalid RFI data from server. Please refresh the page.");
+        setLoading(false);
+        return;
+      }
+      
       setRfi(rfiData);
-      setDeadline(rfiData.deadline ? rfiData.deadline.split("T")[0] : "");
-      setAutoPublishDate(
-        rfiData.autoPublishDate ? rfiData.autoPublishDate.split("T")[0] : ""
-      );
+      
+      // Safely parse dates - handle both string and Date object formats
+      const parseDate = (date: string | Date | null | undefined): string => {
+        if (!date) return "";
+        if (typeof date === "string") {
+          return date.split("T")[0];
+        }
+        if (date instanceof Date) {
+          return date.toISOString().split("T")[0];
+        }
+        return "";
+      };
+      
+      setDeadline(parseDate(rfiData.deadline));
+      setAutoPublishDate(parseDate(rfiData.autoPublishDate));
       setEmailSubject(rfiData.emailSubject || "");
       setEmailText(rfiData.emailText || "");
       setRfiInformation(rfiData.rfiInformation || "");
@@ -460,10 +480,14 @@ export default function RFIPage() {
             )}
 
             {/* Questionnaire section */}
-            {rfi && (
+            {rfi && rfi.id ? (
               <div>
                 <h2 className="text-xl font-semibold mb-4">Questionnaire</h2>
                 <QuestionList projectId={projectId} rfiId={rfi.id} />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>Loading RFI data...</p>
               </div>
             )}
           </div>

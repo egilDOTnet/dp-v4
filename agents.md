@@ -6,6 +6,7 @@
 
 ## Design instructions
 - When doing design/layout work, be sure to reference `.skills/design.md`.
+- For frontend web work, always reference the `DESIGN_SYSTEM.md` file
 
 ## Testing instructions
 - CI pipeline configuration lives in `.github/workflows/`.

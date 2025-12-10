@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { db } from "@dp/db";
 import { loginSchema, magicLinkSchema, setPasswordSchema } from "@dp/lib";
 import { authenticate, getUser } from "../middleware/auth";
+import { formatUserResponse } from "../utils/user-utils";
 
 interface LoginBody {
   email: string;
@@ -54,9 +55,50 @@ function deriveNameFromEmail(email: string): { firstName: string; lastName: stri
 const magicLinks = new Map<string, { email: string; expiresAt: number }>();
 
 export default async function authRoutes(fastify: FastifyInstance) {
-  // Check user status (exists and has password)
+  /**
+   * Check if a user exists and has a password set
+   * Used to determine if user should use password login or magic link
+   */
   fastify.post<{ Body: { email: string } }>(
     "/check-user",
+    {
+      schema: {
+        description: "Check if a user exists and has a password set. Used to determine authentication method.",
+        tags: ["auth"],
+        body: {
+          type: "object",
+          required: ["email"],
+          properties: {
+            email: {
+              type: "string",
+              format: "email",
+              description: "User email address",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              exists: {
+                type: "boolean",
+                description: "Whether the user exists in the system",
+              },
+              hasPassword: {
+                type: "boolean",
+                description: "Whether the user has a password set",
+              },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+          },
+        },
+      },
+    },
     async (request: FastifyRequest<{ Body: { email: string } }>, reply: FastifyReply) => {
       const { email } = request.body;
 
@@ -75,9 +117,78 @@ export default async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Login
+  /**
+   * Authenticate user with email and password
+   * Returns JWT token and user information
+   */
   fastify.post<{ Body: LoginBody }>(
     "/login",
+    {
+      schema: {
+        description: "Authenticate user with email and password. Returns JWT token for subsequent API requests.",
+        tags: ["auth"],
+        body: {
+          type: "object",
+          required: ["email"],
+          properties: {
+            email: {
+              type: "string",
+              format: "email",
+              description: "User email address",
+            },
+            password: {
+              type: "string",
+              description: "User password (required if user has password set)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              token: {
+                type: "string",
+                description: "JWT authentication token",
+              },
+              user: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string" },
+                  name: { type: "string", nullable: true },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  role: { type: "string" },
+                  tenantId: { type: "string", nullable: true },
+                  companyName: { type: "string", nullable: true },
+                },
+              },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Password not set or password required",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid password",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "User not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) => {
       const body = loginSchema.parse(request.body);
       const { email, password } = body;
@@ -114,31 +225,64 @@ export default async function authRoutes(fastify: FastifyInstance) {
         role: user.role,
       });
 
-      // Compute name from firstName and lastName for backward compatibility
-      const userWithNames = user as typeof user & { firstName: string | null; lastName: string | null };
-      const displayName = userWithNames.firstName && userWithNames.lastName
-        ? `${userWithNames.firstName} ${userWithNames.lastName}`
-        : userWithNames.firstName || userWithNames.lastName || user.name || null;
-
       return reply.send({
         token,
-        user: {
+        user: formatUserResponse({
           id: user.id,
           email: user.email,
-          name: displayName,
-          firstName: userWithNames.firstName,
-          lastName: userWithNames.lastName,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          name: user.name,
           role: user.role,
           tenantId: user.tenantId,
           companyName: user.tenant?.name,
-        },
+        }),
       });
     }
   );
 
-  // Request magic link
+  /**
+   * Request a magic link for passwordless authentication
+   * In development mode, returns the link directly. In production, sends email.
+   */
   fastify.post<{ Body: MagicLinkBody }>(
     "/magic-link",
+    {
+      schema: {
+        description: "Request a magic link for passwordless authentication. In dev mode, returns link in response. In production, sends email.",
+        tags: ["auth"],
+        body: {
+          type: "object",
+          required: ["email"],
+          properties: {
+            email: {
+              type: "string",
+              format: "email",
+              description: "User email address",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              magicLink: { type: "string", nullable: true, description: "Only in development mode" },
+              token: { type: "string", nullable: true, description: "Only in development mode" },
+              userExists: { type: "boolean", nullable: true, description: "Only in development mode" },
+              hasPassword: { type: "boolean", nullable: true, description: "Only in development mode" },
+            },
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "User not found (production mode only)",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest<{ Body: MagicLinkBody }>, reply: FastifyReply) => {
       try {
         const body = magicLinkSchema.parse(request.body);
@@ -220,9 +364,44 @@ export default async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Verify magic link and set password
+  /**
+   * Verify magic link token validity
+   * Returns email and token if valid, used before password setup
+   */
   fastify.get(
     "/verify-magic-link",
+    {
+      schema: {
+        description: "Verify that a magic link token is valid and not expired. Returns email for password setup.",
+        tags: ["auth"],
+        querystring: {
+          type: "object",
+          required: ["token"],
+          properties: {
+            token: {
+              type: "string",
+              description: "Magic link token from email or dev response",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              email: { type: "string" },
+              token: { type: "string" },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid or expired token",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest<{ Querystring: { token: string } }>, reply: FastifyReply) => {
       const { token } = request.query;
 
@@ -252,9 +431,65 @@ export default async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Set password from magic link
+  /**
+   * Set password using magic link token
+   * Creates new user if doesn't exist, or updates existing user's password
+   * Returns JWT token for immediate authentication
+   */
   fastify.post<{ Body: SetPasswordBody }>(
     "/set-password",
+    {
+      schema: {
+        description: "Set or update user password using magic link token. Creates new user if email doesn't exist. Returns JWT token.",
+        tags: ["auth"],
+        body: {
+          type: "object",
+          required: ["token", "password"],
+          properties: {
+            token: {
+              type: "string",
+              description: "Magic link token from /api/auth/verify-magic-link",
+            },
+            password: {
+              type: "string",
+              minLength: 8,
+              description: "New password (minimum 8 characters)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              token: {
+                type: "string",
+                description: "JWT authentication token",
+              },
+              user: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string" },
+                  name: { type: "string", nullable: true },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  role: { type: "string" },
+                  tenantId: { type: "string", nullable: true },
+                  companyName: { type: "string", nullable: true },
+                },
+              },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid or expired token",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest<{ Body: SetPasswordBody }>, reply: FastifyReply) => {
       const body = setPasswordSchema.parse(request.body);
       const { token, password } = body;
@@ -324,27 +559,22 @@ export default async function authRoutes(fastify: FastifyInstance) {
           role: user.role,
         });
 
-        // Compute name from firstName and lastName for backward compatibility
         if (!user) {
           return reply.status(400).send({ error: "Invalid token" });
         }
-        const userWithNames = user as typeof user & { firstName: string | null; lastName: string | null };
-        const displayName = userWithNames.firstName && userWithNames.lastName
-          ? `${userWithNames.firstName} ${userWithNames.lastName}`
-          : userWithNames.firstName || userWithNames.lastName || user.name || null;
 
         return reply.send({
           token: authToken,
-          user: {
+          user: formatUserResponse({
             id: user.id,
             email: user.email,
-            name: displayName,
-            firstName: userWithNames.firstName,
-            lastName: userWithNames.lastName,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            name: user.name,
             role: user.role,
             tenantId: user.tenantId,
             companyName: user.tenant?.name,
-          },
+          }),
         });
       } catch {
         return reply.status(400).send({ error: "Invalid token" });
@@ -352,10 +582,49 @@ export default async function authRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get current user
+  /**
+   * Get current authenticated user information
+   * Requires valid JWT token
+   */
   fastify.get(
     "/me",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get current authenticated user's information. Requires valid JWT token.",
+        tags: ["auth"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              email: { type: "string" },
+              name: { type: "string", nullable: true },
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              role: { type: "string" },
+              tenantId: { type: "string", nullable: true },
+              companyName: { type: "string", nullable: true },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized - invalid or missing token",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "User not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
@@ -370,29 +639,51 @@ export default async function authRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "User not found" });
       }
 
-      // Compute name from firstName and lastName for backward compatibility
-      const userWithNames = user as typeof user & { firstName: string | null; lastName: string | null };
-      const displayName = userWithNames.firstName && userWithNames.lastName
-        ? `${userWithNames.firstName} ${userWithNames.lastName}`
-        : userWithNames.firstName || userWithNames.lastName || user.name || null;
-
-      return reply.send({
-        id: user.id,
-        email: user.email,
-        name: displayName,
-        firstName: userWithNames.firstName,
-        lastName: userWithNames.lastName,
-        role: user.role,
-        tenantId: user.tenantId,
-        companyName: user.tenant?.name,
-      });
+      return reply.send(
+        formatUserResponse({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          name: user.name,
+          role: user.role,
+          tenantId: user.tenantId,
+          companyName: user.tenant?.name,
+        })
+      );
     }
   );
 
-  // Logout
+  /**
+   * Logout current user
+   * In stateless JWT system, logout is handled client-side
+   * This endpoint exists for consistency and future token blacklist support
+   */
   fastify.post(
     "/logout",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Logout current user. In stateless JWT system, logout is primarily client-side. Token blacklist may be implemented in production.",
+        tags: ["auth"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized - invalid or missing token",
+          },
+        },
+      },
+    },
     async (_request: FastifyRequest, reply: FastifyReply) => {
       // In a stateless JWT system, logout is handled client-side
       // In production, you might want to maintain a token blacklist

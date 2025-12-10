@@ -37,12 +37,95 @@ interface BrregSearchResponse {
 }
 
 export default async function vendorRoutes(fastify: FastifyInstance) {
-  // Search brreg.no for companies
+  /**
+   * Search Norwegian company registry (brreg.no) for companies
+   * Returns company information including organization number, name, address, etc.
+   */
   fastify.get<{
     Querystring: { query: string };
   }>(
     "/search",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Search the Norwegian company registry (brreg.no) for companies by name. Returns up to 20 results with company details.",
+        tags: ["vendors"],
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          required: ["query"],
+          properties: {
+            query: {
+              type: "string",
+              minLength: 2,
+              description: "Company name to search for (minimum 2 characters)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              results: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    organizationNumber: { type: "string" },
+                    name: { type: "string" },
+                    organizationForm: { type: "string", nullable: true },
+                    address: {
+                      type: "object",
+                      nullable: true,
+                      properties: {
+                        street: { type: "string", nullable: true },
+                        postalCode: { type: "string", nullable: true },
+                        city: { type: "string", nullable: true },
+                        municipality: { type: "string", nullable: true },
+                      },
+                    },
+                    website: { type: "string", nullable: true },
+                    industry: { type: "string", nullable: true },
+                  },
+                },
+              },
+              total: {
+                type: "number",
+                description: "Total number of results available",
+              },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Query too short (must be at least 2 characters)",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          502: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Failed to search company registry",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Internal server error",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const { query } = request.query;
 
@@ -90,12 +173,94 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get detailed information for a specific organization number
+  /**
+   * Get detailed information for a specific organization number from brreg.no
+   * Returns comprehensive company details including address, industry, etc.
+   */
   fastify.get<{
     Params: { orgNumber: string };
   }>(
     "/brreg/:orgNumber",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get detailed information for a specific Norwegian organization number from brreg.no. Returns comprehensive company details.",
+        tags: ["vendors"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["orgNumber"],
+          properties: {
+            orgNumber: {
+              type: "string",
+              pattern: "^\\d{9}$",
+              description: "9-digit Norwegian organization number",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              organizationNumber: { type: "string" },
+              name: { type: "string" },
+              organizationForm: { type: "string", nullable: true },
+              address: {
+                type: "object",
+                nullable: true,
+                properties: {
+                  street: { type: "string", nullable: true },
+                  postalCode: { type: "string", nullable: true },
+                  city: { type: "string", nullable: true },
+                  municipality: { type: "string", nullable: true },
+                },
+              },
+              website: { type: "string", nullable: true },
+              industry: { type: "string", nullable: true },
+              rawData: {
+                type: "object",
+                description: "Raw data from brreg.no API for future AI analysis",
+              },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid organization number format",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Organization not found in brreg.no",
+          },
+          502: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Failed to fetch company details from brreg.no",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Internal server error",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const { orgNumber } = request.params;
 

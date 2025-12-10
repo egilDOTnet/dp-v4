@@ -819,7 +819,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
               )}
 
               {questions.map((question, index) => (
-                <div key={question.id} className="space-y-2">
+                <div key={question?.id || `question-${index}`} className="space-y-2">
                   {/* Add question link before this question - hide if form is shown here or at the beginning */}
                   {insertAfterIndex !== index - 1 && !(index === 0 && insertAfterIndex === -1) && (
                     <div className="text-center py-2">

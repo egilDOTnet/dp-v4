@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
 import { updateProfileSchema, createUserSchema } from "@dp/lib";
 import { authenticate, requireRole, requireTenant, getUser } from "../middleware/auth";
+import { formatUserResponse } from "../utils/user-utils";
 
 interface UpdateProfileBody {
   firstName?: string;
@@ -10,10 +11,49 @@ interface UpdateProfileBody {
 }
 
 export default async function userRoutes(fastify: FastifyInstance) {
-  // Get current user profile
+  /**
+   * Get current user's profile information
+   * Returns user details including name, email, role, and company information
+   */
   fastify.get(
     "/profile",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get current authenticated user's profile information including name, email, role, and company details.",
+        tags: ["users"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              email: { type: "string" },
+              name: { type: "string", nullable: true },
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              role: { type: "string" },
+              tenantId: { type: "string", nullable: true },
+              companyName: { type: "string", nullable: true },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "User not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
@@ -28,25 +68,25 @@ export default async function userRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "User not found" });
       }
 
-      // Compute name from firstName and lastName for backward compatibility
-      const displayName = user.firstName && user.lastName
-        ? `${user.firstName} ${user.lastName}`
-        : user.firstName || user.lastName || user.name || null;
-
-      return reply.send({
-        id: user.id,
-        email: user.email,
-        name: displayName,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        tenantId: user.tenantId,
-        companyName: user.tenant?.name,
-      });
+      return reply.send(
+        formatUserResponse({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          name: user.name,
+          role: user.role,
+          tenantId: user.tenantId,
+          companyName: user.tenant?.name,
+        })
+      );
     }
   );
 
-  // Update profile
+  /**
+   * Update current user's profile
+   * Users can update their name. Only company admins can update company name.
+   */
   fastify.put<{ Body: UpdateProfileBody }>(
     "/profile",
     {
@@ -72,6 +112,81 @@ export default async function userRoutes(fastify: FastifyInstance) {
           }
         },
       ],
+      schema: {
+        description: "Update current user's profile. Users can update their name. Only CompanyAdministrator or GlobalAdministrator roles can update company name.",
+        tags: ["users"],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object",
+          properties: {
+            firstName: {
+              type: "string",
+              nullable: true,
+              description: "User's first name",
+            },
+            lastName: {
+              type: "string",
+              nullable: true,
+              description: "User's last name",
+            },
+            companyName: {
+              type: "string",
+              nullable: true,
+              description: "Company name (only editable by company admins)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              email: { type: "string" },
+              name: { type: "string", nullable: true },
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              role: { type: "string" },
+              tenantId: { type: "string", nullable: true },
+              companyName: { type: "string", nullable: true },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - insufficient permissions",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "User not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Internal server error",
+          },
+        },
+      },
     },
     async (request: FastifyRequest<{ Body: UpdateProfileBody }>, reply: FastifyReply) => {
       try {
@@ -146,22 +261,19 @@ export default async function userRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: "User not found after update" });
         }
 
-        // Compute name from firstName and lastName for backward compatibility
-        const displayName = updatedUser.firstName && updatedUser.lastName
-          ? `${updatedUser.firstName} ${updatedUser.lastName}`
-          : updatedUser.firstName || updatedUser.lastName || updatedUser.name || null;
-
         request.log.info("Sending response");
-        return reply.send({
-          id: updatedUser.id,
-          email: updatedUser.email,
-          name: displayName,
-          firstName: updatedUser.firstName,
-          lastName: updatedUser.lastName,
-          role: updatedUser.role,
-          tenantId: updatedUser.tenantId,
-          companyName: updatedUser.tenant?.name,
-        });
+        return reply.send(
+          formatUserResponse({
+            id: updatedUser.id,
+            email: updatedUser.email,
+            firstName: updatedUser.firstName,
+            lastName: updatedUser.lastName,
+            name: updatedUser.name,
+            role: updatedUser.role,
+            tenantId: updatedUser.tenantId,
+            companyName: updatedUser.tenant?.name,
+          })
+        );
       } catch (error: any) {
         request.log.error("Error in update profile", error);
         return reply.status(500).send({ error: error.message || "Internal server error" });
@@ -169,7 +281,10 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get company users (for company admins)
+  /**
+   * Get all users in the current user's company
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   */
   fastify.get(
     "/company",
     {
@@ -178,6 +293,42 @@ export default async function userRoutes(fastify: FastifyInstance) {
         requireTenant,
         requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
       ],
+      schema: {
+        description: "Get all users in the current user's company/tenant. Requires CompanyAdministrator or GlobalAdministrator role.",
+        tags: ["users"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                email: { type: "string" },
+                name: { type: "string", nullable: true },
+                firstName: { type: "string", nullable: true },
+                lastName: { type: "string", nullable: true },
+                role: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+        },
+      },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const currentUser = getUser(request);
@@ -203,7 +354,11 @@ export default async function userRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Create new user
+  /**
+   * Create a new user in the current company
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * New user will need to set password via magic link
+   */
   fastify.post<{ Body: { email: string; firstName: string; lastName: string } }>(
     "/",
     {
@@ -212,6 +367,66 @@ export default async function userRoutes(fastify: FastifyInstance) {
         requireTenant,
         requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
       ],
+      schema: {
+        description: "Create a new user in the current company/tenant. Requires CompanyAdministrator or GlobalAdministrator role. User will need to set password via magic link.",
+        tags: ["users"],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object",
+          required: ["email", "firstName", "lastName"],
+          properties: {
+            email: {
+              type: "string",
+              format: "email",
+              description: "User email address (must be unique)",
+            },
+            firstName: {
+              type: "string",
+              description: "User's first name",
+            },
+            lastName: {
+              type: "string",
+              description: "User's last name",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              email: { type: "string" },
+              name: { type: "string", nullable: true },
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              role: { type: "string" },
+              tenantId: { type: "string", nullable: true },
+            },
+            description: "User created successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "User with this email already exists or validation error",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+        },
+      },
     },
     async (request: FastifyRequest<{ Body: { email: string; firstName: string; lastName: string } }>, reply: FastifyReply) => {
       const currentUser = getUser(request);
@@ -241,20 +456,17 @@ export default async function userRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // Compute name from firstName and lastName for backward compatibility
-      const displayName = newUser.firstName && newUser.lastName
-        ? `${newUser.firstName} ${newUser.lastName}`
-        : newUser.firstName || newUser.lastName || newUser.name || null;
-
-      return reply.status(201).send({
-        id: newUser.id,
-        email: newUser.email,
-        name: displayName,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        role: newUser.role,
-        tenantId: newUser.tenantId,
-      });
+      return reply.status(201).send(
+        formatUserResponse({
+          id: newUser.id,
+          email: newUser.email,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          name: newUser.name,
+          role: newUser.role,
+          tenantId: newUser.tenantId,
+        })
+      );
     }
   );
 }

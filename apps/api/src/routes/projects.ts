@@ -2,6 +2,8 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
 import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
+import { verifyProjectAccess } from "../middleware/project-access";
+import { computeDisplayName } from "../utils/user-utils";
 
 interface BrregEntity {
   organisasjonsnummer: string;
@@ -257,10 +259,58 @@ async function initializeProjectPhases(projectId: string) {
 }
 
 export default async function projectRoutes(fastify: FastifyInstance) {
-  // Get all projects for current user
+  /**
+   * Get all projects accessible to the current user
+   * Company admins see all company projects, regular users see only their assigned projects
+   */
   fastify.get(
     "/",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all projects accessible to the current user. Company administrators see all company projects, regular users see only projects they are members of.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                type: { type: "string", nullable: true },
+                startDate: { type: "string", format: "date-time", nullable: true },
+                endDate: { type: "string", format: "date-time", nullable: true },
+                tenantId: { type: "string", nullable: true },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+                members: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      email: { type: "string" },
+                      name: { type: "string", nullable: true },
+                      firstName: { type: "string", nullable: true },
+                      lastName: { type: "string", nullable: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
@@ -348,13 +398,10 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           updatedAt: p.updatedAt,
           members: "ProjectMember" in p && p.ProjectMember ? p.ProjectMember.map((m: any) => {
             const user = m.User as { id: string; email: string; name: string | null; firstName: string | null; lastName: string | null };
-            const displayName = user.firstName && user.lastName
-              ? `${user.firstName} ${user.lastName}`
-              : user.firstName || user.lastName || user.name || null;
             return {
               id: user.id,
               email: user.email,
-              name: displayName,
+              name: computeDisplayName(user),
               firstName: user.firstName,
               lastName: user.lastName,
             };
@@ -364,16 +411,90 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get single project
+  /**
+   * Get a single project by ID
+   * User must be a project member or company admin
+   */
   fastify.get(
     "/:id",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get a single project by ID. User must be a project member or a company administrator.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string", nullable: true },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              endDate: { type: "string", format: "date-time", nullable: true },
+              tenantId: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              members: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const id = (request.params as { id: string }).id;
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+      
+      // Fetch project with needed includes after access verification
       const project = await db.project.findUnique({
         where: { id },
         include: {
@@ -384,6 +505,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                   id: true,
                   email: true,
                   name: true,
+                  firstName: true,
+                  lastName: true,
                 },
               },
             },
@@ -394,23 +517,6 @@ export default async function projectRoutes(fastify: FastifyInstance) {
 
       if (!project) {
         return reply.status(404).send({ error: "Project not found" });
-      }
-
-      // Check access: user must be member or company admin
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: {
-          projectMembers: true,
-        },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
       }
 
       return reply.send({
@@ -424,13 +530,10 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         updatedAt: project.updatedAt,
         members: (project.ProjectMember || []).map((m) => {
           const user = m.User as typeof m.User & { firstName: string | null; lastName: string | null };
-          const displayName = user.firstName && user.lastName
-            ? `${user.firstName} ${user.lastName}`
-            : user.firstName || user.lastName || user.name || null;
           return {
             id: user.id,
             email: user.email,
-            name: displayName,
+            name: computeDisplayName(user),
             firstName: user.firstName,
             lastName: user.lastName,
           };
@@ -439,7 +542,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Create project
+  /**
+   * Create a new project
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * Automatically initializes phases and default tasks
+   */
   fastify.post<{ Body: CreateProjectBody }>(
     "/",
     {
@@ -448,6 +555,93 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         requireTenant,
         requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
       ],
+      schema: {
+        description: "Create a new project. Requires CompanyAdministrator or GlobalAdministrator role. Automatically initializes 9 phases with default tasks.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: {
+              type: "string",
+              description: "Project name",
+            },
+            type: {
+              type: "string",
+              nullable: true,
+              description: "Project type (e.g., 'Software', 'Hardware')",
+            },
+            startDate: {
+              type: "string",
+              format: "date",
+              nullable: true,
+              description: "Project start date (ISO 8601 date)",
+            },
+            endDate: {
+              type: "string",
+              format: "date",
+              nullable: true,
+              description: "Project end date (ISO 8601 date)",
+            },
+            memberIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of user IDs to add as project members",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string", nullable: true },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              endDate: { type: "string", format: "date-time", nullable: true },
+              tenantId: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              members: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+              },
+            },
+            description: "Project created successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid member IDs",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+        },
+      },
     },
     async (request: FastifyRequest<{ Body: CreateProjectBody }>, reply: FastifyReply) => {
       const currentUser = getUser(request);
@@ -513,13 +707,10 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         updatedAt: project.updatedAt,
         members: (project.ProjectMember || []).map((m) => {
           const user = m.User as typeof m.User & { firstName: string | null; lastName: string | null };
-          const displayName = user.firstName && user.lastName
-            ? `${user.firstName} ${user.lastName}`
-            : user.firstName || user.lastName || user.name || null;
           return {
             id: user.id,
             email: user.email,
-            name: displayName,
+            name: computeDisplayName(user),
             firstName: user.firstName,
             lastName: user.lastName,
           };
@@ -528,7 +719,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Add members to project
+  /**
+   * Add members to a project
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * Sends email notifications to newly added members
+   */
   fastify.post<{ Params: { id: string }; Body: { memberIds: string[] } }>(
     "/:id/members",
     {
@@ -537,6 +732,89 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         requireTenant,
         requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
       ],
+      schema: {
+        description: "Add members to a project. Requires CompanyAdministrator or GlobalAdministrator role. Automatically sends email notifications to newly added members.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["memberIds"],
+          properties: {
+            memberIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of user IDs to add as project members",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string", nullable: true },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              endDate: { type: "string", format: "date-time", nullable: true },
+              tenantId: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              members: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+              },
+            },
+            description: "Project with updated members list",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid member IDs",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
     },
     async (request: FastifyRequest<{ Params: { id: string }; Body: { memberIds: string[] } }>, reply: FastifyReply) => {
       const currentUser = getUser(request);
@@ -644,7 +922,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Remove members from project
+  /**
+   * Remove members from a project
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * Prevents removal if it would leave no admin members
+   */
   fastify.delete<{ Params: { id: string }; Body: { memberIds: string[] } }>(
     "/:id/members",
     {
@@ -653,6 +935,89 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         requireTenant,
         requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
       ],
+      schema: {
+        description: "Remove members from a project. Requires CompanyAdministrator or GlobalAdministrator role. Prevents removal if it would leave the project with no administrators.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["memberIds"],
+          properties: {
+            memberIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Array of user IDs to remove from the project",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string", nullable: true },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              endDate: { type: "string", format: "date-time", nullable: true },
+              tenantId: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              members: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+              },
+            },
+            description: "Project with updated members list",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or cannot remove last administrator",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
     },
     async (request: FastifyRequest<{ Params: { id: string }; Body: { memberIds: string[] } }>, reply: FastifyReply) => {
       const currentUser = getUser(request);
@@ -772,41 +1137,87 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get all phases for a project with task counts and status
+  /**
+   * Get all phases for a project with task counts and status
+   * User must be a project member or company admin
+   * Calculates phase status based on task completion and delays
+   */
   fastify.get<{
     Params: { id: string };
   }>(
     "/:id/phases",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all phases for a project with task counts and calculated status. User must be a project member or company administrator. Phase status is calculated based on task completion and delays.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                projectId: { type: "string" },
+                name: { type: "string" },
+                order: { type: "number" },
+                status: {
+                  type: "string",
+                  enum: ["not_started", "ongoing", "delayed", "completed"],
+                  description: "Phase status calculated from tasks",
+                },
+                taskCount: { type: "number", description: "Total number of tasks in phase" },
+                completedTaskCount: { type: "number", description: "Number of completed tasks" },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+              },
+            },
+            description: "Array of phases with status and task counts",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const projectId = request.params.id;
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get all phases with tasks
       const phases = await db.phase.findMany({
@@ -867,12 +1278,99 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get tasks for a specific phase
+  /**
+   * Get tasks for a specific phase
+   * User must be a project member or company admin
+   * Returns tasks ordered by order field
+   */
   fastify.get<{
     Params: { id: string; phaseId: string };
   }>(
     "/:id/phases/:phaseId/tasks",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all tasks for a specific phase. User must be a project member or company administrator. Tasks are returned ordered by their order field.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "phaseId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            phaseId: {
+              type: "string",
+              description: "Phase ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                phaseId: { type: "string" },
+                name: { type: "string" },
+                description: { type: "string", nullable: true },
+                ownerId: { type: "string", nullable: true },
+                owner: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+                startDate: { type: "string", format: "date-time", nullable: true },
+                plannedCompletionDate: { type: "string", format: "date-time", nullable: true },
+                actualCompletionDate: { type: "string", format: "date-time", nullable: true },
+                order: { type: "number" },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+              },
+            },
+            description: "Array of tasks for the phase",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or phase not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const projectId = request.params.id;
       const phaseId = request.params.phaseId;
@@ -880,29 +1378,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify phase belongs to project
       const phase = await db.phase.findUnique({
@@ -1006,7 +1483,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Create a task
+  /**
+   * Create a task in a phase
+   * User must be a project member or company admin
+   * Order is auto-calculated if not provided
+   */
   fastify.post<{
     Params: { id: string; phaseId: string };
     Body: {
@@ -1017,7 +1498,111 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/phases/:phaseId/tasks",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Create a new task in a phase. User must be a project member or company administrator. Order is automatically calculated if not provided.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "phaseId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            phaseId: {
+              type: "string",
+              description: "Phase ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: {
+              type: "string",
+              description: "Task name",
+            },
+            description: {
+              type: "string",
+              nullable: true,
+              description: "Task description",
+            },
+            ownerId: {
+              type: "string",
+              nullable: true,
+              description: "User ID of task owner (must belong to same tenant)",
+            },
+            order: {
+              type: "number",
+              nullable: true,
+              description: "Task order (auto-calculated if not provided)",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              phaseId: { type: "string" },
+              name: { type: "string" },
+              description: { type: "string", nullable: true },
+              ownerId: { type: "string", nullable: true },
+              owner: {
+                type: "object",
+                nullable: true,
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string" },
+                  name: { type: "string", nullable: true },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                },
+              },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              plannedCompletionDate: { type: "string", format: "date-time", nullable: true },
+              actualCompletionDate: { type: "string", format: "date-time", nullable: true },
+              order: { type: "number" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+            description: "Task created successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid owner",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or phase not found",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string; phaseId: string };
@@ -1036,29 +1621,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      const project = (request as any).project;
 
       // Verify phase belongs to project
       const phase = await db.phase.findUnique({
@@ -1136,7 +1701,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update a task
+  /**
+   * Update a task
+   * User must be a project member or company admin
+   * All fields are optional - only provided fields are updated
+   */
   fastify.put<{
     Params: { id: string; phaseId: string; taskId: string };
     Body: {
@@ -1150,7 +1719,141 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/phases/:phaseId/tasks/:taskId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update a task. User must be a project member or company administrator. All fields are optional - only provided fields are updated.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "phaseId", "taskId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            phaseId: {
+              type: "string",
+              description: "Phase ID",
+            },
+            taskId: {
+              type: "string",
+              description: "Task ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              nullable: true,
+              description: "Task name",
+            },
+            description: {
+              type: "string",
+              nullable: true,
+              description: "Task description (null to clear)",
+            },
+            ownerId: {
+              type: "string",
+              nullable: true,
+              description: "User ID of task owner (null to remove owner)",
+            },
+            startDate: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+              description: "Task start date (ISO 8601, null to clear)",
+            },
+            plannedCompletionDate: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+              description: "Planned completion date (ISO 8601, null to clear)",
+            },
+            actualCompletionDate: {
+              type: "string",
+              format: "date-time",
+              nullable: true,
+              description: "Actual completion date (ISO 8601, null to clear)",
+            },
+            order: {
+              type: "number",
+              nullable: true,
+              description: "Task order (must be between 1 and total task count)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              phaseId: { type: "string" },
+              name: { type: "string" },
+              description: { type: "string", nullable: true },
+              ownerId: { type: "string", nullable: true },
+              owner: {
+                type: "object",
+                nullable: true,
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string" },
+                  name: { type: "string", nullable: true },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                },
+              },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              plannedCompletionDate: { type: "string", format: "date-time", nullable: true },
+              actualCompletionDate: { type: "string", format: "date-time", nullable: true },
+              order: { type: "number" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+            description: "Updated task",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error or invalid owner/order",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, phase, or task not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string; phaseId: string; taskId: string };
@@ -1173,29 +1876,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      const project = (request as any).project;
 
       // Verify phase belongs to project
       const phase = await db.phase.findUnique({
@@ -1328,12 +2011,75 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Delete a task
+  /**
+   * Delete a task
+   * User must be a project member or company admin
+   * Cascades to delete related comments
+   */
   fastify.delete<{
     Params: { id: string; phaseId: string; taskId: string };
   }>(
     "/:id/phases/:phaseId/tasks/:taskId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Delete a task. User must be a project member or company administrator. Related comments are automatically deleted (cascade).",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "phaseId", "taskId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            phaseId: {
+              type: "string",
+              description: "Phase ID",
+            },
+            taskId: {
+              type: "string",
+              description: "Task ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Task deleted successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, phase, or task not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string; phaseId: string; taskId: string };
@@ -1347,29 +2093,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify phase belongs to project
       const phase = await db.phase.findUnique({
@@ -1422,12 +2147,87 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     return mentions;
   }
 
-  // Get comments for a task
+  /**
+   * Get comments for a task
+   * User must be a project member or company admin
+   * Returns comments ordered by creation date
+   */
   fastify.get<{
     Params: { id: string; phaseId: string; taskId: string };
   }>(
     "/:id/phases/:phaseId/tasks/:taskId/comments",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all comments for a task. User must be a project member or company administrator. Comments are returned ordered by creation date.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "phaseId", "taskId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            phaseId: {
+              type: "string",
+              description: "Phase ID",
+            },
+            taskId: {
+              type: "string",
+              description: "Task ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                content: { type: "string", description: "Comment content (HTML)" },
+                createdBy: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+              },
+            },
+            description: "Array of comments for the task",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, phase, or task not found",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const projectId = request.params.id;
       const phaseId = request.params.phaseId;
@@ -1436,29 +2236,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify phase belongs to project
       const phase = await db.phase.findUnique({
@@ -1532,7 +2311,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Create a comment for a task
+  /**
+   * Create a comment for a task
+   * User must be a project member or company admin
+   * Supports @-mentions and notification options
+   */
   fastify.post<{
     Params: { id: string; phaseId: string; taskId: string };
     Body: {
@@ -1541,7 +2324,97 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/phases/:phaseId/tasks/:taskId/comments",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Create a comment for a task. User must be a project member or company administrator. Supports @-mentions in HTML content and configurable notification options.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "phaseId", "taskId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            phaseId: {
+              type: "string",
+              description: "Phase ID",
+            },
+            taskId: {
+              type: "string",
+              description: "Task ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["content", "notifyOption"],
+          properties: {
+            content: {
+              type: "string",
+              description: "Comment content (HTML, supports @-mentions)",
+            },
+            notifyOption: {
+              type: "string",
+              enum: ["task_owner", "task_owner_mentions", "all_members", "none"],
+              description: "Notification option: task_owner (notify owner), task_owner_mentions (notify owner and @-mentioned users), all_members (notify all project members), none (no notifications)",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              content: { type: "string" },
+              createdBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string" },
+                  name: { type: "string", nullable: true },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                },
+              },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+            description: "Comment created successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Validation error",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, phase, or task not found",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const projectId = request.params.id;
       const phaseId = request.params.phaseId;
@@ -1552,29 +2425,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify phase belongs to project
       const phase = await db.phase.findUnique({
@@ -1716,8 +2568,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         }
 
         // Wait for notifications (filter out nulls from failed creates)
-        const notificationResults = await Promise.all(notificationPromises);
-        const successfulNotifications = notificationResults.filter((n) => n !== null);
+        await Promise.all(notificationPromises);
 
         return reply.status(201).send({
           id: comment.id,
@@ -1758,7 +2609,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update project
+  /**
+   * Update a project
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * All fields are optional - only provided fields are updated
+   */
   fastify.put<{
     Params: { id: string };
     Body: {
@@ -1775,6 +2630,98 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         requireTenant,
         requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
       ],
+      schema: {
+        description: "Update a project. Requires CompanyAdministrator or GlobalAdministrator role. All fields are optional - only provided fields are updated.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              nullable: true,
+              description: "Project name",
+            },
+            type: {
+              type: "string",
+              nullable: true,
+              description: "Project type (null to clear)",
+            },
+            startDate: {
+              type: "string",
+              format: "date",
+              nullable: true,
+              description: "Project start date (ISO 8601 date, null to clear)",
+            },
+            endDate: {
+              type: "string",
+              format: "date",
+              nullable: true,
+              description: "Project end date (ISO 8601 date, null to clear)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string", nullable: true },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              endDate: { type: "string", format: "date-time", nullable: true },
+              tenantId: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              members: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+              },
+            },
+            description: "Updated project",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
     },
     async (
       request: FastifyRequest<{
@@ -1859,7 +2806,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Delete project
+  /**
+   * Delete a project
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * Cascades to delete phases, tasks, and related data
+   */
   fastify.delete<{ Params: { id: string } }>(
     "/:id",
     {
@@ -1868,6 +2819,47 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         requireTenant,
         requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
       ],
+      schema: {
+        description: "Delete a project. Requires CompanyAdministrator or GlobalAdministrator role. Cascades to delete all phases, tasks, and related data.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Project deleted successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
     },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const projectId = request.params.id;
@@ -1898,12 +2890,101 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get dashboard stats for a project
+  /**
+   * Get dashboard statistics for a project
+   * User must be a project member or company admin
+   * Returns vendor, RFI, and requirements statistics
+   */
   fastify.get<{
     Params: { id: string };
   }>(
     "/:id/dashboard/stats",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get dashboard statistics for a project including vendor counts, RFI status, and requirements statistics. User must be a project member or company administrator.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              vendors: {
+                type: "object",
+                properties: {
+                  total: { type: "number" },
+                  byStatus: {
+                    type: "object",
+                    additionalProperties: { type: "number" },
+                    description: "Vendor counts grouped by status",
+                  },
+                },
+              },
+              rfi: {
+                type: "object",
+                properties: {
+                  questionCount: { type: "number" },
+                  status: {
+                    type: "string",
+                    enum: ["planning", "ongoing", "finished"],
+                  },
+                  deadline: { type: "string", format: "date-time", nullable: true },
+                },
+              },
+              requirements: {
+                type: "object",
+                properties: {
+                  total: { type: "number" },
+                  byStatus: {
+                    type: "object",
+                    additionalProperties: { type: "number" },
+                    description: "Requirement counts grouped by status",
+                  },
+                  byType: {
+                    type: "object",
+                    additionalProperties: { type: "number" },
+                    description: "Requirement counts grouped by type",
+                  },
+                  unresolvedComments: { type: "number" },
+                },
+              },
+            },
+            description: "Dashboard statistics",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const projectId = request.params.id;
       if (!request.user) {
@@ -1911,28 +2992,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       }
 
       // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get vendor stats
       const projectVendors = await db.projectVendor.findMany({
@@ -2018,41 +3080,113 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get all vendors for a project
+  /**
+   * Get all vendors for a project
+   * User must be a project member or company admin
+   * Returns vendors with their contact persons
+   */
   fastify.get<{
     Params: { id: string };
   }>(
     "/:id/vendors",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all vendors linked to a project. User must be a project member or company administrator. Returns vendors with their contact persons ordered by vendor name.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "ProjectVendor relationship ID" },
+                projectId: { type: "string" },
+                vendorId: { type: "string" },
+                status: { type: "string", description: "Vendor status in project" },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+                vendor: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                    organizationNumber: { type: "string", nullable: true },
+                    emailDomain: { type: "string", nullable: true },
+                    additionalData: { type: "object", nullable: true },
+                    contacts: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string" },
+                          firstName: { type: "string", nullable: true },
+                          lastName: { type: "string", nullable: true },
+                          email: { type: "string", nullable: true },
+                          isMainContact: { type: "boolean" },
+                          createdAt: { type: "string", format: "date-time" },
+                          updatedAt: { type: "string", format: "date-time" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            description: "Array of project vendors with contact information",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or database models not available",
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const projectId = request.params.id;
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: getUser(request).userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
 
       // Get all vendors for this project with contacts
       try {
@@ -2128,7 +3262,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Add/link vendor to project
+  /**
+   * Add/link vendor to project
+   * User must be a project member or company admin
+   * Can link existing vendor or create new one with brreg.no validation
+   */
   fastify.post<{
     Params: { id: string };
     Body: {
@@ -2141,7 +3279,125 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/vendors",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Add or link a vendor to a project. User must be a project member or company administrator. Can link an existing vendor by vendorId or create a new vendor. Organization numbers are validated with brreg.no.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            vendorId: {
+              type: "string",
+              nullable: true,
+              description: "Existing vendor ID to link (if not provided, creates new vendor)",
+            },
+            name: {
+              type: "string",
+              description: "Vendor name (required for new vendors)",
+            },
+            organizationNumber: {
+              type: "string",
+              nullable: true,
+              description: "Norwegian organization number (9 digits, validated with brreg.no)",
+            },
+            emailDomain: {
+              type: "string",
+              nullable: true,
+              description: "Vendor email domain",
+            },
+            additionalData: {
+              type: "object",
+              nullable: true,
+              description: "Additional vendor data (JSON object)",
+            },
+            status: {
+              type: "string",
+              nullable: true,
+              description: "Vendor status in project (defaults to 'Pending')",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "ProjectVendor relationship ID" },
+              projectId: { type: "string" },
+              vendorId: { type: "string" },
+              status: { type: "string" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              vendor: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  organizationNumber: { type: "string", nullable: true },
+                  emailDomain: { type: "string", nullable: true },
+                  additionalData: { type: "object", nullable: true },
+                  contacts: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string", nullable: true },
+                        lastName: { type: "string", nullable: true },
+                        email: { type: "string", nullable: true },
+                        isMainContact: { type: "boolean" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            description: "Vendor linked to project successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              brregName: { type: "string", nullable: true },
+            },
+            description: "Validation error, duplicate vendor, or invalid organization number",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied or tenant required",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or vendor not found",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string };
@@ -2166,33 +3422,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Tenant required" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       let vendor;
 
@@ -2383,7 +3614,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update vendor details
+  /**
+   * Update vendor details
+   * User must be a project member or company admin
+   * Updates vendor information with brreg.no validation for organization numbers
+   */
   fastify.put<{
     Params: { id: string; vendorId: string };
     Body: {
@@ -2394,7 +3629,121 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/vendors/:vendorId/details",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update vendor details (name, organization number, email domain, additional data). User must be a project member or company administrator. Organization numbers are validated with brreg.no. Prevents duplicate names or organization numbers within the project.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "vendorId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            vendorId: {
+              type: "string",
+              description: "Vendor ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              nullable: true,
+              description: "Vendor name (cannot be empty if provided)",
+            },
+            organizationNumber: {
+              type: "string",
+              nullable: true,
+              description: "Norwegian organization number (9 digits, validated with brreg.no)",
+            },
+            emailDomain: {
+              type: "string",
+              nullable: true,
+              description: "Vendor email domain",
+            },
+            additionalData: {
+              type: "object",
+              nullable: true,
+              description: "Additional vendor data (JSON object)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "ProjectVendor relationship ID" },
+              projectId: { type: "string" },
+              vendorId: { type: "string" },
+              status: { type: "string" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              vendor: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  organizationNumber: { type: "string", nullable: true },
+                  emailDomain: { type: "string", nullable: true },
+                  additionalData: { type: "object", nullable: true },
+                  contacts: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string", nullable: true },
+                        lastName: { type: "string", nullable: true },
+                        email: { type: "string", nullable: true },
+                        isMainContact: { type: "boolean" },
+                        createdAt: { type: "string", format: "date-time" },
+                        updatedAt: { type: "string", format: "date-time" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            description: "Updated project-vendor with vendor details",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              brregName: { type: "string", nullable: true },
+            },
+            description: "Validation error, duplicate vendor, or invalid organization number",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied or tenant required",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or vendor not found, or vendor not linked to project",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string; vendorId: string };
@@ -2418,33 +3767,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Tenant required" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify vendor exists and is linked to project
       const vendor = await db.vendor.findUnique({
@@ -2636,7 +3960,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update project-vendor relationship (mainly status)
+  /**
+   * Update project-vendor relationship status
+   * User must be a project member or company admin
+   * Updates only the status field of the project-vendor relationship
+   */
   fastify.put<{
     Params: { id: string; vendorId: string };
     Body: {
@@ -2644,7 +3972,98 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/vendors/:vendorId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update the status of a vendor in a project. User must be a project member or company administrator. Only updates the project-vendor relationship status, not the vendor details themselves.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "vendorId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            vendorId: {
+              type: "string",
+              description: "Vendor ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["status"],
+          properties: {
+            status: {
+              type: "string",
+              description: "New status for the vendor in this project",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "ProjectVendor relationship ID" },
+              projectId: { type: "string" },
+              vendorId: { type: "string" },
+              status: { type: "string" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              vendor: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  organizationNumber: { type: "string", nullable: true },
+                  emailDomain: { type: "string", nullable: true },
+                  additionalData: { type: "object", nullable: true },
+                  contacts: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        firstName: { type: "string", nullable: true },
+                        lastName: { type: "string", nullable: true },
+                        email: { type: "string", nullable: true },
+                        isMainContact: { type: "boolean" },
+                        createdAt: { type: "string", format: "date-time" },
+                        updatedAt: { type: "string", format: "date-time" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            description: "Updated project-vendor relationship",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied or tenant required",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or vendor not found, or vendor not linked to project",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string; vendorId: string };
@@ -2665,33 +4084,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Tenant required" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Update the project-vendor relationship
       const projectVendor = await db.projectVendor.update({
@@ -2740,10 +4134,61 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Remove vendor from project
+  /**
+   * Remove vendor from project
+   * User must be a project member or company admin
+   * Removes the project-vendor link but keeps the vendor for other projects
+   */
   fastify.delete<{ Params: { id: string; vendorId: string } }>(
     "/:id/vendors/:vendorId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Remove a vendor from a project. User must be a project member or company administrator. This removes the project-vendor relationship but keeps the vendor entity for use in other projects.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "vendorId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            vendorId: {
+              type: "string",
+              description: "Vendor ID",
+            },
+          },
+        },
+        response: {
+          204: {
+            description: "Vendor removed from project successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied or tenant required",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or vendor not found, or vendor not linked to project",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest<{ Params: { id: string; vendorId: string } }>, reply: FastifyReply) => {
       const projectId = request.params.id;
       const vendorId = request.params.vendorId;
@@ -2756,33 +4201,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Tenant required" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Delete the project-vendor link (vendor itself remains for other projects)
       await db.projectVendor.delete({
@@ -2798,7 +4218,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Add contact person to vendor
+  /**
+   * Add contact person to vendor
+   * User must be a project member or company admin
+   * First contact is automatically set as main contact if not specified
+   */
   fastify.post<{
     Params: { id: string; vendorId: string };
     Body: {
@@ -2809,7 +4233,89 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/vendors/:vendorId/contacts",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Add a contact person to a vendor. User must be a project member or company administrator. The first contact is automatically set as main contact if not specified. Setting a new contact as main contact will unset other main contacts.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "vendorId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            vendorId: {
+              type: "string",
+              description: "Vendor ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["firstName", "lastName", "email"],
+          properties: {
+            firstName: {
+              type: "string",
+              description: "Contact first name",
+            },
+            lastName: {
+              type: "string",
+              description: "Contact last name",
+            },
+            email: {
+              type: "string",
+              format: "email",
+              description: "Contact email address",
+            },
+            isMainContact: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether this contact is the main contact (defaults to true for first contact)",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              vendorId: { type: "string" },
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              email: { type: "string", nullable: true },
+              isMainContact: { type: "boolean" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+            description: "Contact person created successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied or tenant required",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or vendor not found, or vendor not linked to project",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string; vendorId: string };
@@ -2833,33 +4339,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Tenant required" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify vendor exists and is linked to project
       const vendor = await db.vendor.findUnique({
@@ -2927,7 +4408,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Update contact person
+  /**
+   * Update contact person
+   * User must be a project member or company admin
+   * Setting as main contact will unset other main contacts
+   */
   fastify.put<{
     Params: { id: string; vendorId: string; contactId: string };
     Body: {
@@ -2938,7 +4423,95 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     };
   }>(
     "/:id/vendors/:vendorId/contacts/:contactId",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update a contact person for a vendor. User must be a project member or company administrator. All fields are optional. Setting a contact as main contact will automatically unset other main contacts for the vendor.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "vendorId", "contactId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            vendorId: {
+              type: "string",
+              description: "Vendor ID",
+            },
+            contactId: {
+              type: "string",
+              description: "Contact person ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            firstName: {
+              type: "string",
+              nullable: true,
+              description: "Contact first name",
+            },
+            lastName: {
+              type: "string",
+              nullable: true,
+              description: "Contact last name",
+            },
+            email: {
+              type: "string",
+              format: "email",
+              nullable: true,
+              description: "Contact email address",
+            },
+            isMainContact: {
+              type: "boolean",
+              nullable: true,
+              description: "Whether this contact is the main contact",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              vendorId: { type: "string" },
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              email: { type: "string", nullable: true },
+              isMainContact: { type: "boolean" },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+            description: "Contact person updated successfully",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied or tenant required",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, vendor, or contact not found",
+          },
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { id: string; vendorId: string; contactId: string };
@@ -2951,7 +4524,6 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       }>,
       reply: FastifyReply
     ) => {
-      const projectId = request.params.id;
       const vendorId = request.params.vendorId;
       const contactId = request.params.contactId;
       if (!request.user) {
@@ -2963,33 +4535,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Tenant required" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify contact exists
       const existingContact = await db.vendorContactPerson.findUnique({
@@ -3046,7 +4593,6 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       request: FastifyRequest<{ Params: { id: string; vendorId: string; contactId: string } }>,
       reply: FastifyReply
     ) => {
-      const projectId = request.params.id;
       const vendorId = request.params.vendorId;
       const contactId = request.params.contactId;
       if (!request.user) {
@@ -3058,33 +4604,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Tenant required" });
       }
 
-      // Verify project exists and user has access
-      const project = await db.project.findUnique({
-        where: { id: projectId },
-        include: { ProjectMember: true },
-      });
-
-      if (!project) {
-        return reply.status(404).send({ error: "Project not found" });
-      }
-
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
-
-      const user = await db.user.findUnique({
-        where: { id: currentUser.userId },
-        include: { projectMembers: true },
-      });
-
-      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
-      const isAdmin =
-        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
-        user?.tenantId === project.tenantId;
-
-      if (!isMember && !isAdmin) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
 
       // Verify contact exists
       const existingContact = await db.vendorContactPerson.findUnique({
