@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Task, api, Project } from "@/lib/api";
+import { Task, api, Project, Comment } from "@/lib/api";
+import WysiwygEditor, { WysiwygEditorRef } from "./WysiwygEditor";
 import {
   DndContext,
   closestCenter,
@@ -120,17 +121,25 @@ export default function TaskList({
   const [formData, setFormData] = useState<Record<string, TaskFormData>>({});
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [editingDescriptions, setEditingDescriptions] = useState<Set<string>>(new Set());
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set());
+  const [newCommentContent, setNewCommentContent] = useState<Record<string, string>>({});
+  const [newCommentNotifyOption, setNewCommentNotifyOption] = useState<Record<string, "task_owner" | "task_owner_mentions" | "all_members" | "none">>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(new Set());
   const [isNewTaskAnimating, setIsNewTaskAnimating] = useState(false);
   const [hoveredOwnerButtonId, setHoveredOwnerButtonId] = useState<string | null>(null);
+  const [deletingTaskIds, setDeletingTaskIds] = useState<Set<string>>(new Set());
+  const [descriptionFocusSource, setDescriptionFocusSource] = useState<Record<string, "title" | "direct">>({});
   const taskRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const saveTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
   const startDateInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const endDateInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const newTaskInputRef = useRef<HTMLInputElement | null>(null);
+  const commentEditorRefs = useRef<Record<string, WysiwygEditorRef | null>>({});
 
   // Set up drag-and-drop sensors
   const sensors = useSensors(
@@ -152,6 +161,73 @@ export default function TaskList({
       });
     };
   }, []);
+
+  // Handle click outside to exit edit mode
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      
+      // Check if click is outside any task container
+      let clickedInsideTask = false;
+      Object.values(taskRefs.current).forEach((ref) => {
+        if (ref && ref.contains(target)) {
+          clickedInsideTask = true;
+        }
+      });
+
+      // Also check if clicking on the create form
+      if (isCreatingNewTask) {
+        // The new task form is part of the main container, so we don't need special handling
+        // But we should check if clicking on the new task input area
+        if (newTaskInputRef.current && newTaskInputRef.current.contains(target)) {
+          clickedInsideTask = true;
+        }
+      }
+
+      if (!clickedInsideTask) {
+        // Save any pending changes before exiting edit mode
+        Object.entries(editingFields).forEach(([taskId, fields]) => {
+          const data = formData[taskId];
+          const task = tasks.find((t) => t.id === taskId);
+          
+          if (data && task) {
+            fields.forEach((field) => {
+              if (field === "name" && data.name !== task.name) {
+                handleFieldSave(taskId, "name", data.name);
+              } else if (field === "ownerId" && data.ownerId !== task.ownerId) {
+                handleFieldSave(taskId, "ownerId", data.ownerId);
+              } else if (field === "startDate" && data.startDate !== formatDate(task.startDate)) {
+                handleFieldSave(taskId, "startDate", data.startDate);
+              } else if (field === "plannedCompletionDate" && data.plannedCompletionDate !== formatDate(task.plannedCompletionDate)) {
+                handleFieldSave(taskId, "plannedCompletionDate", data.plannedCompletionDate);
+              }
+            });
+          }
+        });
+
+        // Save any pending description changes
+        Object.keys(editingDescriptions).forEach((taskId) => {
+          const data = formData[taskId];
+          const task = tasks.find((t) => t.id === taskId);
+          
+          if (data && task && data.description !== (task.description || "")) {
+            handleFieldSave(taskId, "description", data.description);
+          }
+        });
+
+        // Exit all edit modes
+        setEditingFields({});
+        setEditingDescriptions(new Set());
+        // Don't collapse expanded descriptions - let user toggle those manually
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreatingNewTask, editingFields, editingDescriptions, formData, tasks]);
 
   // Handle external new task trigger
   useEffect(() => {
@@ -220,6 +296,60 @@ export default function TaskList({
     });
   }, [tasks]);
 
+  // Load comment counts for all tasks when tasks change
+  useEffect(() => {
+    const loadAllCommentCounts = async () => {
+      const tasksToLoad = tasks.filter(
+        (task) => task && task.id && !comments[task.id] && !loadingComments.has(task.id)
+      );
+
+      if (tasksToLoad.length === 0) return;
+
+      // Mark tasks as loading to prevent duplicate requests
+      setLoadingComments((prev) => {
+        const newSet = new Set(prev);
+        tasksToLoad.forEach((task) => newSet.add(task.id));
+        return newSet;
+      });
+
+      // Load comments for all tasks in parallel
+      const loadPromises = tasksToLoad.map(async (task) => {
+        try {
+          const taskComments = await api.projects.phases.tasks.comments.list(
+            projectId,
+            phaseId,
+            task.id
+          );
+          return { taskId: task.id, comments: taskComments };
+        } catch (err) {
+          console.error(`Failed to load comments for task ${task.id}:`, err);
+          return { taskId: task.id, comments: [] };
+        }
+      });
+
+      const results = await Promise.all(loadPromises);
+      
+      // Update comments state with all loaded comments
+      setComments((prev) => {
+        const newComments = { ...prev };
+        results.forEach(({ taskId, comments: taskComments }) => {
+          newComments[taskId] = taskComments;
+        });
+        return newComments;
+      });
+
+      // Clear loading state
+      setLoadingComments((prev) => {
+        const newSet = new Set(prev);
+        tasksToLoad.forEach((task) => newSet.delete(task.id));
+        return newSet;
+      });
+    };
+
+    loadAllCommentCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, projectId, phaseId]);
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "";
     return new Date(dateString).toISOString().split("T")[0];
@@ -229,6 +359,17 @@ export default function TaskList({
     if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const formatDateTimeISO = (dateString: string | null): string => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
   };
 
   // Filter tasks based on selected filter
@@ -613,7 +754,21 @@ export default function TaskList({
       if (!task) return;
 
       if (data.description !== (task.description || "")) {
-        handleFieldSave(taskId, "description", data.description);
+        handleFieldSave(taskId, "description", data.description).then(() => {
+          // Collapse description after saving
+          setExpandedDescriptions((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(taskId);
+            return newSet;
+          });
+        });
+      } else {
+        // No changes, just collapse if it was expanded
+        setExpandedDescriptions((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(taskId);
+          return newSet;
+        });
       }
     }, 150);
 
@@ -789,6 +944,170 @@ export default function TaskList({
     return now > planned && !task.actualCompletionDate;
   };
 
+  const loadComments = async (taskId: string, markAsViewed: boolean = false): Promise<void> => {
+    if (loadingComments.has(taskId)) return;
+    
+    setLoadingComments((prev) => new Set(prev).add(taskId));
+    try {
+      const taskComments = await api.projects.phases.tasks.comments.list(projectId, phaseId, taskId);
+      setComments((prev) => ({
+        ...prev,
+        [taskId]: taskComments,
+      }));
+      // Only mark as viewed if explicitly requested (when user expands comments)
+      if (markAsViewed) {
+        setLastViewedComments(taskId);
+      }
+    } catch (err: any) {
+      console.error("Failed to load comments:", err);
+    } finally {
+      setLoadingComments((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    }
+  };
+
+  const toggleComments = (taskId: string) => {
+    setExpandedComments((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+        // Load comments if not already loaded, and mark as viewed when expanding
+        if (!comments[taskId]) {
+          loadComments(taskId, true).then(() => {
+            // Focus after comments are loaded and editor is rendered
+            setTimeout(() => {
+              commentEditorRefs.current[taskId]?.focus();
+            }, 100);
+          });
+        } else {
+          // Comments already loaded, just mark as viewed
+          setLastViewedComments(taskId);
+          // Focus the comment editor after a short delay to ensure it's rendered
+          setTimeout(() => {
+            commentEditorRefs.current[taskId]?.focus();
+          }, 100);
+        }
+      }
+      return newSet;
+    });
+  };
+
+  const handleCreateComment = async (taskId: string) => {
+    const content = newCommentContent[taskId]?.trim();
+    if (!content) return;
+
+    const notifyOption = newCommentNotifyOption[taskId] || "task_owner_mentions";
+
+    setLoadingComments((prev) => new Set(prev).add(taskId));
+    try {
+      const newComment = await api.projects.phases.tasks.comments.create(projectId, phaseId, taskId, {
+        content,
+        notifyOption,
+      });
+      
+      setComments((prev) => ({
+        ...prev,
+        [taskId]: [...(prev[taskId] || []), newComment],
+      }));
+      
+      // Update last viewed when comment is created (user sees it immediately)
+      setLastViewedComments(taskId);
+      
+      // Clear form
+      setNewCommentContent((prev) => {
+        const newContent = { ...prev };
+        delete newContent[taskId];
+        return newContent;
+      });
+      setNewCommentNotifyOption((prev) => {
+        const newOptions = { ...prev };
+        delete newOptions[taskId];
+        return newOptions;
+      });
+    } catch (err: any) {
+      console.error("Failed to create comment:", err);
+      setError(err.message || "Failed to create comment");
+    } finally {
+      setLoadingComments((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    }
+  };
+
+  const getCommentCount = (taskId: string): number => {
+    return comments[taskId]?.length || 0;
+  };
+
+  // Track last viewed comments timestamp per task
+  const getLastViewedComments = (taskId: string): Date | null => {
+    if (typeof window === "undefined") return null;
+    const key = `lastViewedComments_${taskId}`;
+    const timestamp = localStorage.getItem(key);
+    return timestamp ? new Date(timestamp) : null;
+  };
+
+  const setLastViewedComments = (taskId: string) => {
+    if (typeof window === "undefined") return;
+    const key = `lastViewedComments_${taskId}`;
+    localStorage.setItem(key, new Date().toISOString());
+  };
+
+  // Check if there are new comments since last view
+  const hasNewComments = (taskId: string): boolean => {
+    const lastViewed = getLastViewedComments(taskId);
+    if (!comments[taskId] || comments[taskId].length === 0) {
+      return false;
+    }
+    // If never viewed before, all comments are "new"
+    if (!lastViewed) {
+      return true;
+    }
+    // Check if any comment was created after last viewed time
+    return comments[taskId].some(
+      (comment) => new Date(comment.createdAt) > lastViewed
+    );
+  };
+
+  const handleDelete = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this task?")) {
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // Start fade-out animation
+      setDeletingTaskIds((prev) => new Set(prev).add(taskId));
+      // Wait for animation to complete before deleting
+      setTimeout(async () => {
+        await api.projects.phases.deleteTask(projectId, phaseId, taskId);
+        setDeletingTaskIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(taskId);
+          return newSet;
+        });
+        onTaskUpdate();
+        setLoading(false);
+      }, 300);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete task");
+      setDeletingTaskIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-background-secondary rounded-lg shadow-md p-6 border border-border-primary">
       <div className="flex items-center justify-between mb-4">
@@ -861,7 +1180,7 @@ export default function TaskList({
             </div>
 
             {/* Right side: Task form */}
-            <div className="flex-1 px-4 py-3">
+            <div className="flex-1 px-4 py-3 bg-background-tertiary">
               <div className="flex items-center gap-3 mb-1">
                 {/* Checkmark button for marking as done */}
                 <button
@@ -1043,9 +1362,10 @@ export default function TaskList({
                       className={`
                         border-2 border-primary-500 rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-300 ease-out
                         ${isCompleting ? "opacity-0 scale-95" : ""}
+                        ${deletingTaskIds.has(task.id) ? "opacity-0 scale-95" : ""}
                         ${isNewlyCreated ? "shadow-lg scale-105" : ""}
                         ${isDragging ? "opacity-50 shadow-md" : ""}
-                        ${isDelayed && !isNewlyCreated && !isDragging && !isCompleting ? "border-red-400" : ""}
+                        ${isDelayed && !isNewlyCreated && !isDragging && !isCompleting && !deletingTaskIds.has(task.id) ? "border-red-400" : ""}
                         ${isCompleted && !isNewlyCreated && !isDragging ? "border-primary-400" : ""}
                       `}
                     >
@@ -1090,7 +1410,7 @@ export default function TaskList({
                       )}
 
                       {/* Right side: Task content */}
-                      <div className="flex-1 px-4 py-3">
+                      <div className="flex-1 px-4 py-3 bg-background-tertiary">
                         <div className="flex items-center gap-3 mb-1">
                           {/* Checkmark button for marking as done */}
                           {!isCompleted && (
@@ -1166,49 +1486,145 @@ export default function TaskList({
                           </div>
 
                           {/* Task Name */}
-                          <input
-                            type="text"
-                            value={taskFormData.name}
-                            onChange={(e) => updateFormField(task.id, "name", e.target.value)}
-                            onFocus={() => handleFieldFocus(task.id, "name", task)}
-                            onBlur={(e) => handleFieldBlur(task.id, "name", e)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") {
-                                e.currentTarget.blur();
-                              }
-                            }}
-                            className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
-                              editingFields[task.id]?.has("name")
-                                ? "border-border-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-border-primary focus:bg-background-secondary"
-                            } ${
-                              isCompleted ? "line-through" : ""
-                            }`}
-                          />
-
-                          {/* Right-aligned icons: Description and Dates */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            {/* Description icon */}
-                            <button
-                              type="button"
-                              onClick={() => handleDescriptionClick(task)}
-                              className="flex-shrink-0 text-text-secondary hover:text-text-primary"
-                              title="Description"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 6h16M4 12h16M4 18h16"
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {editingFields[task.id]?.has("name") ? (
+                                <input
+                                  type="text"
+                                  value={taskFormData.name}
+                                  onChange={(e) => updateFormField(task.id, "name", e.target.value)}
+                                  onBlur={(e) => {
+                                    handleFieldBlur(task.id, "name", e);
+                                    // Clear focus source after blur
+                                    setDescriptionFocusSource((prev) => {
+                                      const newSource = { ...prev };
+                                      delete newSource[task.id];
+                                      return newSource;
+                                    });
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  className={`w-full px-2 py-1 rounded text-sm font-semibold border border-border-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                                    isCompleted ? "line-through" : ""
+                                  }`}
+                                  autoFocus
                                 />
-                              </svg>
-                            </button>
+                              ) : (
+                                <>
+                                  <span
+                                    className={`text-sm font-semibold px-2 py-1 ${
+                                      isCompleted ? "line-through" : ""
+                                    }`}
+                                    onClick={() => {
+                                      // Put all fields in edit mode when title is clicked
+                                      ensureFormData(task);
+                                      handleFieldFocus(task.id, "name", task);
+                                      handleFieldFocus(task.id, "description", task);
+                                      handleFieldFocus(task.id, "ownerId", task);
+                                      handleFieldFocus(task.id, "startDate", task);
+                                      handleFieldFocus(task.id, "plannedCompletionDate", task);
+                                      // Expand description so it's visible for editing
+                                      setExpandedDescriptions((prev) => new Set(prev).add(task.id));
+                                      setEditingDescriptions((prev) => new Set(prev).add(task.id));
+                                      // Mark that we entered edit mode via title click
+                                      setDescriptionFocusSource((prev) => ({ ...prev, [task.id]: "title" }));
+                                    }}
+                                  >
+                                    {taskFormData.name || task.name}
+                                  </span>
+                                  {/* Description icon - only show when description exists, inline after title */}
+                                  {task.description && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleDescription(task.id);
+                                      }}
+                                      className="flex-shrink-0 text-text-secondary hover:text-text-primary self-center"
+                                      title="Toggle description"
+                                    >
+                                      <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M4 6h16M4 12h16M4 18h16"
+                                        />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right-aligned icons: Comments and Dates */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {/* Comment icon */}
+                            {getCommentCount(task.id) > 0 ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleComments(task.id);
+                                }}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-background-secondary border border-border-primary hover:bg-background-primary transition-colors relative z-10"
+                                title="Comments"
+                              >
+                                <svg
+                                  className={`w-4 h-4 ${
+                                    hasNewComments(task.id)
+                                      ? "text-primary-600 fill-primary-600"
+                                      : "text-gray-500 fill-gray-500"
+                                  }`}
+                                  fill="currentColor"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                  />
+                                </svg>
+                                <span className="text-xs text-text-primary font-medium">
+                                  {getCommentCount(task.id)}
+                                </span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleComments(task.id);
+                                }}
+                                className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity relative z-10"
+                                title="Comments"
+                              >
+                                <svg
+                                  className="w-4 h-4 text-gray-500"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                  />
+                                </svg>
+                              </button>
+                            )}
 
                             {/* Date icons */}
                             <div className="flex items-center gap-3 text-sm">
@@ -1371,39 +1787,138 @@ export default function TaskList({
                           </div>
                         </div>
 
-                        {/* Description content (shown when expanded) */}
-                        {isDescriptionExpanded && (
-                          <div className="mb-3 ml-10">
-                            {isDescriptionEditing ? (
-                              <textarea
-                                value={formData[task.id]?.description ?? task.description ?? ""}
-                                onChange={(e) => updateFormField(task.id, "description", e.target.value)}
-                                onFocus={() => {
-                                  ensureFormData(task);
-                                  setEditingDescriptions((prev) => new Set(prev).add(task.id));
-                                }}
-                                onBlur={(e) => handleDescriptionBlur(task.id, e)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Escape") {
-                                    e.currentTarget.blur();
-                                  }
-                                }}
-                                rows={3}
-                                placeholder="Add a description..."
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                autoFocus
-                              />
-                            ) : (
-                              <p
-                                className="text-sm text-text-primary whitespace-pre-wrap cursor-pointer hover:text-text-primary"
-                                onClick={() => {
-                                  ensureFormData(task);
-                                  setEditingDescriptions((prev) => new Set(prev).add(task.id));
-                                }}
-                              >
-                                {task.description || "Click to add description"}
+                        {/* Description content (shown when expanded or in edit mode) */}
+                        {(expandedDescriptions.has(task.id) || editingDescriptions.has(task.id)) && (
+                          <div className={`${editingDescriptions.has(task.id) ? "mb-3" : task.description ? "mb-3" : ""}`}>
+                            {editingDescriptions.has(task.id) ? (
+                              <div className="flex items-end gap-2">
+                                {/* Spacer to align with title field container (checkmark w-7 + gap-3 + owner w-7 + gap-2) */}
+                                <div className="w-[4.75rem] flex-shrink-0"></div>
+                                <div className="flex-1 min-w-0">
+                                  <textarea
+                                    value={formData[task.id]?.description ?? task.description ?? ""}
+                                    onChange={(e) => updateFormField(task.id, "description", e.target.value)}
+                                    onFocus={() => {
+                                      ensureFormData(task);
+                                      setEditingDescriptions((prev) => new Set(prev).add(task.id));
+                                      // Mark that we entered edit mode directly via description
+                                      setDescriptionFocusSource((prev) => ({ ...prev, [task.id]: "direct" }));
+                                    }}
+                                    onBlur={(e) => {
+                                      handleDescriptionBlur(task.id, e);
+                                      // Clear focus source after blur
+                                      setDescriptionFocusSource((prev) => {
+                                        const newSource = { ...prev };
+                                        delete newSource[task.id];
+                                        return newSource;
+                                      });
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Escape") {
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                    rows={3}
+                                    placeholder="Add a description..."
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    autoFocus={descriptionFocusSource[task.id] === "direct"}
+                                  />
+                                </div>
+                                {/* Delete button in lower right corner during edit mode */}
+                                <button
+                                  onClick={() => handleDelete(task.id)}
+                                  disabled={loading || deletingTaskIds.has(task.id)}
+                                  className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm mb-1 flex-shrink-0"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ) : task.description ? (
+                              <p className="text-sm text-text-primary whitespace-pre-wrap ml-[5.625rem]">
+                                {task.description}
                               </p>
+                            ) : null}
+                          </div>
+                        )}
+
+                        {/* Comments section (shown when expanded) */}
+                        {expandedComments.has(task.id) && (
+                          <div className="mb-3 ml-0 border-t border-gray-200 pt-3 mt-3">
+                            <h4 className="text-sm font-semibold text-text-primary mb-3">Comments</h4>
+                            
+                            {/* Existing comments */}
+                            {loadingComments.has(task.id) && (!comments[task.id] || comments[task.id].length === 0) ? (
+                              <div className="text-sm text-text-secondary mb-3">Loading comments...</div>
+                            ) : comments[task.id] && comments[task.id].length > 0 ? (
+                              <div className="space-y-3 mb-4">
+                                {comments[task.id].map((comment) => {
+                                  const displayName = comment.createdBy.firstName && comment.createdBy.lastName
+                                    ? `${comment.createdBy.firstName} ${comment.createdBy.lastName}`
+                                    : comment.createdBy.firstName || comment.createdBy.lastName || comment.createdBy.name || comment.createdBy.email;
+                                  const date = formatDateTimeISO(comment.createdAt);
+                                  
+                                  return (
+                                    <div key={comment.id} className="bg-background-tertiary rounded-md p-3">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-semibold text-text-primary">
+                                          {displayName}
+                                        </span>
+                                        <span className="text-xs text-text-secondary">{date}</span>
+                                      </div>
+                                      <div
+                                        className="text-sm text-text-primary prose prose-sm max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: comment.content }}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-text-secondary mb-3">No comments yet.</div>
                             )}
+
+                            {/* New comment form */}
+                            <div className="space-y-3">
+                              <WysiwygEditor
+                                ref={(el) => {
+                                  commentEditorRefs.current[task.id] = el;
+                                }}
+                                value={newCommentContent[task.id] || ""}
+                                onChange={(value) => {
+                                  setNewCommentContent((prev) => ({
+                                    ...prev,
+                                    [task.id]: value,
+                                  }));
+                                }}
+                                placeholder="Add a comment... Use @ to mention team members"
+                                projectMembers={projectMembers}
+                                onSubmit={() => handleCreateComment(task.id)}
+                              />
+                              <div className="flex items-center justify-between">
+                                <select
+                                  value={newCommentNotifyOption[task.id] || "task_owner_mentions"}
+                                  onChange={(e) => {
+                                    setNewCommentNotifyOption((prev) => ({
+                                      ...prev,
+                                      [task.id]: e.target.value as "task_owner" | "task_owner_mentions" | "all_members" | "none",
+                                    }));
+                                  }}
+                                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-background-secondary text-text-primary"
+                                >
+                                  <option value="task_owner">Task owner</option>
+                                  <option value="task_owner_mentions">Task owner + @-mentions</option>
+                                  <option value="all_members">All project members</option>
+                                  <option value="none">None</option>
+                                </select>
+                                <button
+                                  onClick={() => handleCreateComment(task.id)}
+                                  disabled={loadingComments.has(task.id) || !newCommentContent[task.id]?.trim()}
+                                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {loadingComments.has(task.id) ? "Posting..." : "Post comment"}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1421,6 +1936,8 @@ export default function TaskList({
                 const isDelayed = isTaskDelayed(task);
                 const isCompleted = task.actualCompletionDate !== null;
                 const owner = getOwnerDisplay(task);
+                const isDescriptionExpanded = expandedDescriptions.has(task.id);
+                const isDescriptionEditing = editingDescriptions.has(task.id);
                 
                 const taskFormData = formData[task.id] || {
                   name: task.name || "",
@@ -1446,8 +1963,9 @@ export default function TaskList({
                       }}
                       className={`
                         border-2 rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-500 ease-out
+                        ${deletingTaskIds.has(task.id) ? "opacity-0 scale-95" : ""}
                         ${isNewlyCreated ? "border-primary-500 shadow-lg scale-105" : ""}
-                        ${isDelayed && !isNewlyCreated ? "border-red-400" : ""}
+                        ${isDelayed && !isNewlyCreated && !deletingTaskIds.has(task.id) ? "border-red-400" : ""}
                         ${isCompleted && !isNewlyCreated ? "border-primary-400" : ""}
                         ${!isNewlyCreated && !isDelayed && !isCompleted ? "border-gray-200" : ""}
                       `}
@@ -1464,7 +1982,7 @@ export default function TaskList({
                       </div>
 
                       {/* Right side: Task content */}
-                      <div className="flex-1 px-4 py-3">
+                      <div className="flex-1 px-4 py-3 bg-background-tertiary">
                         <div className="flex items-center gap-3 mb-1">
                           {isCompleted && (
                             <button
@@ -1525,24 +2043,282 @@ export default function TaskList({
                             </select>
                           </div>
 
-                          <input
-                            type="text"
-                            value={taskFormData.name}
-                            onChange={(e) => updateFormField(task.id, "name", e.target.value)}
-                            onFocus={() => handleFieldFocus(task.id, "name", task)}
-                            onBlur={(e) => handleFieldBlur(task.id, "name", e)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") {
-                                e.currentTarget.blur();
-                              }
-                            }}
-                            className={`flex-1 min-w-0 px-2 py-1 rounded text-sm font-semibold border ${
-                              editingFields[task.id]?.has("name")
-                                ? "border-border-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                : "border-transparent bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-border-primary focus:bg-background-secondary"
-                            } ${isCompleted ? "line-through" : ""}`}
-                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {editingFields[task.id]?.has("name") ? (
+                                <input
+                                  type="text"
+                                  value={taskFormData.name}
+                                  onChange={(e) => updateFormField(task.id, "name", e.target.value)}
+                                  onBlur={(e) => {
+                                    handleFieldBlur(task.id, "name", e);
+                                    // Clear focus source after blur
+                                    setDescriptionFocusSource((prev) => {
+                                      const newSource = { ...prev };
+                                      delete newSource[task.id];
+                                      return newSource;
+                                    });
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      e.currentTarget.blur();
+                                    }
+                                  }}
+                                  className={`w-full px-2 py-1 rounded text-sm font-semibold border border-border-primary bg-background-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                                    isCompleted ? "line-through" : ""
+                                  }`}
+                                  autoFocus
+                                />
+                              ) : (
+                                <>
+                                  <span
+                                    className={`text-sm font-semibold px-2 py-1 ${
+                                      isCompleted ? "line-through" : ""
+                                    }`}
+                                    onClick={() => {
+                                      // Put all fields in edit mode when title is clicked
+                                      ensureFormData(task);
+                                      handleFieldFocus(task.id, "name", task);
+                                      handleFieldFocus(task.id, "description", task);
+                                      handleFieldFocus(task.id, "ownerId", task);
+                                      handleFieldFocus(task.id, "startDate", task);
+                                      handleFieldFocus(task.id, "plannedCompletionDate", task);
+                                      // Expand description so it's visible for editing
+                                      setExpandedDescriptions((prev) => new Set(prev).add(task.id));
+                                      setEditingDescriptions((prev) => new Set(prev).add(task.id));
+                                      // Mark that we entered edit mode via title click
+                                      setDescriptionFocusSource((prev) => ({ ...prev, [task.id]: "title" }));
+                                    }}
+                                  >
+                                    {taskFormData.name || task.name}
+                                  </span>
+                                  {/* Description icon - only show when description exists, inline after title */}
+                                  {task.description && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleDescription(task.id);
+                                      }}
+                                      className="flex-shrink-0 text-text-secondary hover:text-text-primary self-center"
+                                      title="Toggle description"
+                                    >
+                                      <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M4 6h16M4 12h16M4 18h16"
+                                        />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right-aligned icons: Comments and Dates */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {/* Comment icon */}
+                            {getCommentCount(task.id) > 0 ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleComments(task.id);
+                                }}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-background-secondary border border-border-primary hover:bg-background-primary transition-colors relative z-10"
+                                title="Comments"
+                              >
+                                <svg
+                                  className={`w-4 h-4 ${
+                                    hasNewComments(task.id)
+                                      ? "text-primary-600 fill-primary-600"
+                                      : "text-gray-500 fill-gray-500"
+                                  }`}
+                                  fill="currentColor"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                  />
+                                </svg>
+                                <span className="text-xs text-text-primary font-medium">
+                                  {getCommentCount(task.id)}
+                                </span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleComments(task.id);
+                                }}
+                                className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity relative z-10"
+                                title="Comments"
+                              >
+                                <svg
+                                  className="w-4 h-4 text-gray-500"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Description content (shown when expanded or in edit mode) */}
+                        {(expandedDescriptions.has(task.id) || editingDescriptions.has(task.id)) && (
+                          <div className={`${editingDescriptions.has(task.id) ? "mb-3" : task.description ? "mb-3" : ""}`}>
+                            {editingDescriptions.has(task.id) ? (
+                              <div className="flex items-end gap-2">
+                                {/* Spacer to align with title field container (checkmark w-7 + gap-3 + owner w-7 + gap-2) */}
+                                <div className="w-[4.75rem] flex-shrink-0"></div>
+                                <div className="flex-1 min-w-0">
+                                  <textarea
+                                    value={formData[task.id]?.description ?? task.description ?? ""}
+                                    onChange={(e) => updateFormField(task.id, "description", e.target.value)}
+                                    onFocus={() => {
+                                      ensureFormData(task);
+                                      setEditingDescriptions((prev) => new Set(prev).add(task.id));
+                                      // Mark that we entered edit mode directly via description
+                                      setDescriptionFocusSource((prev) => ({ ...prev, [task.id]: "direct" }));
+                                    }}
+                                    onBlur={(e) => {
+                                      handleDescriptionBlur(task.id, e);
+                                      // Clear focus source after blur
+                                      setDescriptionFocusSource((prev) => {
+                                        const newSource = { ...prev };
+                                        delete newSource[task.id];
+                                        return newSource;
+                                      });
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Escape") {
+                                        e.currentTarget.blur();
+                                      }
+                                    }}
+                                    rows={3}
+                                    placeholder="Add a description..."
+                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    autoFocus={descriptionFocusSource[task.id] === "direct"}
+                                  />
+                                </div>
+                                {/* Delete button in lower right corner during edit mode */}
+                                <button
+                                  onClick={() => handleDelete(task.id)}
+                                  disabled={loading || deletingTaskIds.has(task.id)}
+                                  className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm mb-1 flex-shrink-0"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ) : task.description ? (
+                              <p className="text-sm text-text-primary whitespace-pre-wrap ml-[5.625rem]">
+                                {task.description}
+                              </p>
+                            ) : null}
+                          </div>
+                        )}
+
+                        {/* Comments section (shown when expanded) */}
+                        {expandedComments.has(task.id) && (
+                          <div className="mb-3 ml-0 border-t border-gray-200 pt-3 mt-3">
+                            <h4 className="text-sm font-semibold text-text-primary mb-3">Comments</h4>
+                            
+                            {/* Existing comments */}
+                            {loadingComments.has(task.id) && (!comments[task.id] || comments[task.id].length === 0) ? (
+                              <div className="text-sm text-text-secondary mb-3">Loading comments...</div>
+                            ) : comments[task.id] && comments[task.id].length > 0 ? (
+                              <div className="space-y-3 mb-4">
+                                {comments[task.id].map((comment) => {
+                                  const displayName = comment.createdBy.firstName && comment.createdBy.lastName
+                                    ? `${comment.createdBy.firstName} ${comment.createdBy.lastName}`
+                                    : comment.createdBy.firstName || comment.createdBy.lastName || comment.createdBy.name || comment.createdBy.email;
+                                  const date = formatDateTimeISO(comment.createdAt);
+                                  
+                                  return (
+                                    <div key={comment.id} className="bg-background-tertiary rounded-md p-3">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-semibold text-text-primary">
+                                          {displayName}
+                                        </span>
+                                        <span className="text-xs text-text-secondary">{date}</span>
+                                      </div>
+                                      <div
+                                        className="text-sm text-text-primary prose prose-sm max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: comment.content }}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-text-secondary mb-3">No comments yet.</div>
+                            )}
+
+                            {/* New comment form */}
+                            <div className="space-y-3">
+                              <WysiwygEditor
+                                ref={(el) => {
+                                  commentEditorRefs.current[task.id] = el;
+                                }}
+                                value={newCommentContent[task.id] || ""}
+                                onChange={(value) => {
+                                  setNewCommentContent((prev) => ({
+                                    ...prev,
+                                    [task.id]: value,
+                                  }));
+                                }}
+                                placeholder="Add a comment... Use @ to mention team members"
+                                projectMembers={projectMembers}
+                                onSubmit={() => handleCreateComment(task.id)}
+                              />
+                              <div className="flex items-center justify-between">
+                                <select
+                                  value={newCommentNotifyOption[task.id] || "task_owner_mentions"}
+                                  onChange={(e) => {
+                                    setNewCommentNotifyOption((prev) => ({
+                                      ...prev,
+                                      [task.id]: e.target.value as "task_owner" | "task_owner_mentions" | "all_members" | "none",
+                                    }));
+                                  }}
+                                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-background-secondary text-text-primary"
+                                >
+                                  <option value="task_owner">Task owner</option>
+                                  <option value="task_owner_mentions">Task owner + @-mentions</option>
+                                  <option value="all_members">All project members</option>
+                                  <option value="none">None</option>
+                                </select>
+                                <button
+                                  onClick={() => handleCreateComment(task.id)}
+                                  disabled={loadingComments.has(task.id) || !newCommentContent[task.id]?.trim()}
+                                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {loadingComments.has(task.id) ? "Posting..." : "Post comment"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     )}

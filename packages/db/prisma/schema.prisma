@@ -69,7 +69,9 @@ model Task {
   updatedAt            DateTime  @updatedAt
 
   phase Phase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  owner User?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  owner User?  @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  comments TaskComment[]
+  notifications Notification[]
 
   @@index([phaseId])
   @@index([phaseId, order])
@@ -119,10 +121,13 @@ model User {
 
   tenant                Tenant?                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   projectMembers        ProjectMember[]
-  ownedTasks            Task[]
+  ownedTasks            Task[]                 @relation("TaskOwner")
   createdRequirements   Requirement[]           @relation("RequirementCreator")
   modifiedRequirements  Requirement[]            @relation("RequirementModifier")
   requirementHistories  RequirementHistory[]
+  taskComments          TaskComment[]
+  notifications         Notification[]          @relation("NotificationRecipient")
+  mentionedInNotifications Notification[]       @relation("NotificationMentionedBy")
 
   @@index([email])
   @@index([tenantId])
@@ -289,6 +294,11 @@ enum RFIVendorResponseStatus {
   Rejected
 }
 
+enum NotificationType {
+  TASK_MENTION
+  TASK_COMMENT
+}
+
 model RFI {
   id               String            @id @default(cuid())
   projectId        String            @unique
@@ -389,4 +399,40 @@ model RFIResponse {
   @@unique([vendorResponseId, questionId])
   @@index([vendorResponseId])
   @@index([questionId])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  content   String   // HTML content from WYSIWYG editor
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  notifications Notification[]
+
+  @@index([taskId])
+  @@index([createdById])
+}
+
+model Notification {
+  id                String           @id @default(cuid())
+  userId            String
+  type              NotificationType
+  taskId            String?
+  commentId         String?
+  mentionedByUserId String?
+  read              Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+
+  user              User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  task              Task?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  comment           TaskComment?     @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  mentionedBy       User?            @relation("NotificationMentionedBy", fields: [mentionedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([read])
+  @@index([taskId])
 }

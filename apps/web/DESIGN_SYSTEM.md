@@ -11,6 +11,37 @@ This document describes the comprehensive design system implemented for Dynamic 
 - **Consistent**: Same patterns everywhere - learn once, use everywhere
 - **Accessible**: WCAG compliant, keyboard navigable, clear focus states
 
+## Keyboard Shortcuts
+
+### Form Submission
+
+All input forms throughout the application support the following keyboard shortcut for submission:
+
+- **Mac**: `Cmd + Enter` (⌘ + ⏎)
+- **Windows/Linux**: `Ctrl + Enter` (Ctrl + ⏎)
+
+This shortcut should be implemented for:
+- Comment forms
+- Message/compose forms
+- Any multi-line text input with a submit action
+
+The shortcut should only trigger when:
+- The form is focused
+- No dropdown menus (like @-mention autocomplete) are open
+- The form has valid content to submit
+
+Implementation example:
+```tsx
+const handleKeyDown = (e: React.KeyboardEvent) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    if (onSubmit && !isDropdownOpen) {
+      e.preventDefault();
+      onSubmit();
+    }
+  }
+};
+```
+
 ## Theme System
 
 ### User-Selectable Themes
@@ -210,6 +241,8 @@ All forms use a consistent inline editing pattern:
 4. Escape to cancel, Enter to save (where appropriate)
 5. Show loading states during save
 
+**Title Click to Edit Mode**: Clicking on a title/heading puts all related fields into edit mode simultaneously. This allows users to quickly edit multiple fields at once (e.g., title, description, owner, dates for tasks).
+
 ### Search Everywhere
 All list views include instant search:
 - Search bar at the top
@@ -217,6 +250,33 @@ All list views include instant search:
 - Shows count of filtered items
 - Cmd+K / Ctrl+K to focus search
 - Clear button to reset
+
+### List Element Backgrounds
+List items should use the lightest background shade (`background-tertiary`) to create visual separation from their container:
+
+- **Container**: Uses `bg-background-secondary` (cards, panels, list containers)
+- **List Items**: Use `bg-background-tertiary` for the content area of individual items
+- **Purpose**: Creates visual hierarchy and makes list items stand out from their container
+
+**Implementation:**
+```tsx
+// List container
+<div className="bg-background-secondary rounded-lg p-6">
+  {/* List items */}
+  {items.map((item) => (
+    <div className="border-2 border-primary-500 rounded-lg bg-background-secondary">
+      {/* Item content area - uses tertiary for elevation */}
+      <div className="flex-1 px-4 py-3 bg-background-tertiary">
+        {/* Item content */}
+      </div>
+    </div>
+  ))}
+</div>
+```
+
+This pattern ensures list items are visually distinct in both light and dark modes:
+- **Light Mode**: White (`background-tertiary`) items on light gray (`background-secondary`) container
+- **Dark Mode**: Gray-800 (`background-tertiary`) items on Gray-900 (`background-secondary`) container
 
 ### Responsive Design
 All components are mobile-first responsive:
@@ -477,6 +537,142 @@ When editing multiple items, use "Don't change" as the default option for all fi
 ```
 
 Only fields that are not "Don't change" (empty string) should be included in the update payload.
+
+### Description Icon/Symbol Pattern
+
+The description icon/symbol is used to toggle visibility of description content. This pattern is used consistently across tasks, requirements, and questions:
+
+- **Placement**: Appears immediately after the title/heading text
+- **Visibility**: Only shown when a description exists
+- **Icon**: Hamburger/lines icon (three horizontal lines) matching the date/action icon style
+- **Behavior**: 
+  - Click toggles description visibility in non-edit mode
+  - When expanded, description appears below the title, left-aligned with the title
+  - Click again to hide the description
+- **Implementation**: Uses a toggle state (Set<string>) to track expanded items
+
+```tsx
+{task.description && (
+  <button
+    onClick={() => toggleDescription(task.id)}
+    title="Toggle description"
+  >
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
+)}
+```
+
+### Comments System
+
+Tasks support a comments system with @-mentions and notifications:
+
+- **Comment Icon**: Chat bubble icon positioned before date fields (right-aligned section)
+- **Visual Indicator**: Shows comment count badge when comments exist (count > 0)
+- **Expansion**: Clicking the icon expands a comments section below the task
+- **Features**:
+  - List of existing comments with creator name, date, and HTML-rendered content
+  - WYSIWYG editor with @-mention support for creating new comments
+  - Notification options: task owner, task owner + @-mentions, all project members, or none (default: task owner + @-mentions)
+
+### Notifications
+
+The notification system provides real-time updates for @-mentions and comments:
+
+- **Bell Icon**: Located in the header between "Create Project" button and user menu
+- **Visual States**:
+  - Grey/dim when no unread notifications
+  - Red when unread notifications exist
+  - Jiggle animation (1 second) when new notifications appear
+- **Dropdown**:
+  - "Clear all notifications" button at the top
+  - List of notifications (most recent first)
+  - Unread notifications highlighted with primary color accent
+  - Clicking a notification navigates to the related task page
+- **Polling**: Automatically refreshes every 30 seconds
+
+### @-Mention Support
+
+The WYSIWYG editor supports @-mentions of project team members:
+
+- **Trigger**: Type `@` to show mention dropdown
+- **Filtering**: Dropdown filters members as you type (searches firstName, lastName, name, email)
+- **Display in Dropdown**: Shows first and last name in **bold** (font-semibold), with email below in smaller text
+- **Selection**: 
+  - Tab or Enter to select from dropdown
+  - Mouse click to select
+  - Escape to close dropdown
+- **Rendering**: Mentions are stored as HTML spans with `data-mention="true"` and `data-user-id` attributes
+- **Display Name Logic**: 
+  - If first name is unique among project members: displays first name only
+  - If first name is not unique: displays full name (first + last)
+- **Styling**: Mentions appear in primary green color with medium font weight
+- **Insertion**: Automatically adds a space after the mention to prevent styling from affecting subsequent text
+
+### Delete Button in List Items
+
+Delete buttons in list items (tasks, requirements, etc.) follow a consistent pattern:
+
+- **Placement**: Appears in the lower left corner during edit mode
+- **Visibility**: Only shown when the item is in edit mode
+- **Styling**: 
+  - Red text color: `text-red-600`
+  - Hover state: `hover:text-red-800`
+  - Underline: `underline`
+  - Small text: `text-sm`
+  - Disabled state: `disabled:opacity-50`
+- **Behavior**:
+  - Shows confirmation dialog before deleting
+  - Fade-out animation (300ms) before actual deletion
+  - Uses opacity and scale transforms for smooth animation
+- **Implementation**: 
+  - Positioned below the main edit field (description, etc.)
+  - Uses `mt-2` for spacing from the field above
+  - Left-aligned within the edit container
+
+```tsx
+{/* Delete button in lower left corner during edit mode */}
+<div className="mt-2 flex items-center">
+  <button
+    onClick={() => handleDelete(item.id)}
+    disabled={loading || deletingItemIds.has(item.id)}
+    className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm"
+  >
+    Delete
+  </button>
+</div>
+```
+
+## Date Display Patterns
+
+### Standard Date Formatting
+
+All dates displayed in the application follow these standards:
+
+**With Timestamp (DateTime)**:
+- Format: `YYYY-MM-DD HH:MM`
+- Example: `2024-12-10 14:30`
+- Used for: Comments, activity logs, timestamps with time information
+- Implementation: Use `formatDateTimeISO(dateString)` utility function
+
+**Without Timestamp (Date Only)**:
+- Format: `YYYY-MM-DD`
+- Example: `2024-12-10`
+- Used for: Date inputs, date-only displays, calendar views
+- Implementation: Use `formatDate(dateString)` utility function
+
+**Short Display Format** (for compact views):
+- Format: `MMM DD` (e.g., "Dec 10")
+- Used for: Task lists, compact cards, when space is limited
+- Implementation: Use `formatDateDisplay(dateString)` utility function
+
+### Comment Date Display
+
+Comment dates specifically use the ISO format with timestamp:
+- User name: `text-sm font-semibold text-text-primary` (prominent)
+- Date: `text-xs text-text-secondary` (less prominent, visually distinct from content)
+- Format: `YYYY-MM-DD HH:MM`
 
 ## Future Enhancements
 

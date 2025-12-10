@@ -282,6 +282,18 @@ body {
   }
 }
 
+@keyframes jiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: rotate(-5deg);
+  }
+  20%, 40%, 60%, 80% {
+    transform: rotate(5deg);
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
@@ -292,6 +304,14 @@ body {
 
 .animate-slide-down {
   animation: slideDown 0.3s ease-out;
+}
+
+.animate-jiggle {
+  animation: jiggle 1s ease-in-out;
+}
+
+.animate-jiggle {
+  animation: jiggle 1s ease-in-out;
 }
 
 @theme inline {

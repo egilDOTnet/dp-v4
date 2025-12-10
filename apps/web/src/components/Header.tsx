@@ -6,19 +6,107 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { api, Notification } from "@/lib/api";
 
 export function Header() {
   const { user, logout } = useAuth();
   const { setPreference, resolvedTheme } = useTheme();
   const router = useRouter();
   const [showMenu, setShowMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
-  // Close menu when clicking outside
+  // Load notifications
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+      loadUnreadCount();
+      
+      // Poll for new notifications every 30 seconds
+      const interval = setInterval(() => {
+        loadNotifications();
+        loadUnreadCount();
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // Check for new notifications and trigger animation
+  useEffect(() => {
+    if (unreadCount > 0) {
+      setHasNewNotifications(true);
+      // Stop jiggling after 1 second
+      const timer = setTimeout(() => {
+        setHasNewNotifications(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [unreadCount]);
+
+  const loadNotifications = async () => {
+    try {
+      const data = await api.notifications.list();
+      setNotifications(data);
+      console.log("Loaded notifications:", data.length, data);
+    } catch (err: any) {
+      console.error("Failed to load notifications:", err);
+      // Set empty array on error to prevent stale data
+      setNotifications([]);
+    }
+  };
+
+  const loadUnreadCount = async () => {
+    try {
+      const data = await api.notifications.getUnreadCount();
+      setUnreadCount(data.count);
+      console.log("Unread count:", data.count);
+    } catch (err: any) {
+      console.error("Failed to load unread count:", err);
+      // Set to 0 on error
+      setUnreadCount(0);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.notifications.markAllRead();
+      await loadNotifications();
+      await loadUnreadCount();
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.taskId || !notification.task) return;
+    
+    // Mark as read
+    try {
+      await api.notifications.markRead(notification.id);
+      await loadNotifications();
+      await loadUnreadCount();
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+    
+    // Navigate to task
+    router.push(`/projects/${notification.task.project.id}/tasks?phase=${notification.task.phaseId}`);
+    setShowNotifications(false);
+  };
+
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
       }
     };
 
@@ -81,6 +169,110 @@ export function Header() {
                 Create Project
               </Link>
             )}
+            {/* Notifications bell */}
+            <div className="relative" ref={notificationsRef}>
+              <button
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  setShowMenu(false);
+                  if (!showNotifications) {
+                    loadNotifications();
+                  }
+                }}
+                className={`relative p-2 rounded-md hover:bg-background-primary transition-colors ${
+                  hasNewNotifications ? "animate-jiggle" : ""
+                }`}
+                aria-expanded={showNotifications}
+                aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+              >
+                <svg
+                  className={`w-5 h-5 transition-colors ${
+                    unreadCount > 0 ? "text-red-600" : "text-text-secondary"
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-600 ring-2 ring-background-tertiary" />
+                )}
+              </button>
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-background-tertiary rounded-lg shadow-2xl border border-border-primary py-1 z-50 animate-fade-in backdrop-blur-sm max-h-96 overflow-y-auto">
+                  {/* Clear all button */}
+                  {notifications.length > 0 && (
+                    <div className="border-b border-border-primary">
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-background-primary transition-colors"
+                      >
+                        Clear all notifications
+                      </button>
+                    </div>
+                  )}
+                  {/* Notifications list */}
+                  {notifications.length > 0 ? (
+                    <div className="py-1">
+                      {notifications.map((notification) => {
+                        const displayName = notification.mentionedBy
+                          ? notification.mentionedBy.firstName && notification.mentionedBy.lastName
+                            ? `${notification.mentionedBy.firstName} ${notification.mentionedBy.lastName}`
+                            : notification.mentionedBy.firstName || notification.mentionedBy.lastName || notification.mentionedBy.name || notification.mentionedBy.email
+                          : "Someone";
+                        const date = new Date(notification.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                        const text =
+                          notification.type === "TASK_MENTION"
+                            ? `${displayName} mentioned you in a comment`
+                            : `${displayName} commented on a task`;
+                        
+                        return (
+                          <button
+                            key={notification.id}
+                            onClick={() => handleNotificationClick(notification)}
+                            className={`w-full text-left px-4 py-3 hover:bg-background-primary transition-colors ${
+                              !notification.read ? "bg-primary-50/50" : ""
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-text-primary">{text}</p>
+                                {notification.task && (
+                                  <p className="text-xs text-text-secondary mt-1 truncate">
+                                    {notification.task.name}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex-shrink-0 text-xs text-text-secondary">
+                                {date}
+                              </div>
+                            </div>
+                            {!notification.read && (
+                              <div className="mt-2 h-0.5 w-full bg-primary-600" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-8 text-center text-sm text-text-secondary">
+                      No notifications
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}

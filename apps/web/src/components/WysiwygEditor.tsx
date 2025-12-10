@@ -1,20 +1,93 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from "react";
+import { useSearch } from "@/hooks/useSearch";
+
+interface ProjectMember {
+  id: string;
+  email: string;
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}
 
 interface WysiwygEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  projectMembers?: ProjectMember[];
+  onSubmit?: () => void;
 }
 
-export default function WysiwygEditor({
+export interface WysiwygEditorRef {
+  focus: () => void;
+}
+
+const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
   value,
   onChange,
   placeholder = "Start typing...",
-}: WysiwygEditorProps) {
+  projectMembers = [],
+  onSubmit,
+}, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const mentionDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Format member name for display (full name for dropdown)
+  const getMemberDisplayName = (member: ProjectMember): string => {
+    if (member.firstName && member.lastName) {
+      return `${member.firstName} ${member.lastName}`;
+    }
+    return member.firstName || member.lastName || member.name || member.email;
+  };
+
+  // Get mention display name (first name if unique, full name if not)
+  const getMentionDisplayName = (member: ProjectMember, allMembers: ProjectMember[]): string => {
+    if (!member.firstName) {
+      // No first name, use full display name
+      return getMemberDisplayName(member);
+    }
+
+    // Check if first name is unique
+    const firstNameCount = allMembers.filter(
+      (m) => m.firstName && m.firstName.toLowerCase() === member.firstName.toLowerCase()
+    ).length;
+
+    if (firstNameCount === 1) {
+      // First name is unique, use just first name
+      return member.firstName;
+    } else {
+      // First name is not unique, use full name
+      return getMemberDisplayName(member);
+    }
+  };
+
+  // Search/filter members
+  const { filteredItems: filteredMembers, setSearchTerm } = useSearch(
+    projectMembers,
+    {
+      searchKeys: ["firstName", "lastName", "name", "email"],
+      caseSensitive: false,
+      minChars: 0,
+    }
+  );
+
+  // Update search when mention query changes
+  useEffect(() => {
+    setSearchTerm(mentionQuery);
+  }, [mentionQuery, setSearchTerm]);
+
+  // Expose focus method to parent
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      editorRef.current?.focus();
+    },
+  }));
 
   // Sync value to editor content
   useEffect(() => {
@@ -23,11 +96,170 @@ export default function WysiwygEditor({
     }
   }, [value]);
 
-  const handleInput = () => {
-    if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
+  const handleInput = useCallback(() => {
+    if (!editorRef.current) return;
+
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      onChange(editor.innerHTML);
+      return;
     }
-  };
+
+    const range = selection.getRangeAt(0);
+    const textNode = range.startContainer;
+    const text = textNode.textContent || "";
+
+    // Check if we're in a mention span (don't trigger inside mentions)
+    let currentNode: Node | null = range.startContainer;
+    while (currentNode && currentNode !== editor) {
+      if (
+        currentNode.nodeType === Node.ELEMENT_NODE &&
+        (currentNode as Element).hasAttribute("data-mention")
+      ) {
+        onChange(editor.innerHTML);
+        return;
+      }
+      currentNode = currentNode.parentNode;
+    }
+
+    // Find @ trigger
+    const cursorPosition = range.startOffset;
+    const textBeforeCursor = text.substring(0, cursorPosition);
+    const match = textBeforeCursor.match(/@(\w*)$/);
+
+    if (match && projectMembers.length > 0) {
+      const query = match[1];
+      setMentionQuery(query);
+      setShowMentionDropdown(true);
+
+      // Calculate dropdown position
+      const rect = range.getBoundingClientRect();
+      const editorRect = editor.getBoundingClientRect();
+      setMentionPosition({
+        top: rect.bottom - editorRect.top + 5,
+        left: rect.left - editorRect.left,
+      });
+      setSelectedMentionIndex(0);
+    } else {
+      setShowMentionDropdown(false);
+      setMentionQuery("");
+    }
+
+    onChange(editor.innerHTML);
+  }, [onChange, projectMembers]);
+
+  const insertMention = useCallback(
+    (member: ProjectMember) => {
+      if (!editorRef.current) return;
+
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+
+      const range = selection.getRangeAt(0);
+      const displayName = getMentionDisplayName(member, projectMembers);
+
+      // Find the @ character and delete everything from @ to cursor
+      // The @ should be in the current text node since we just typed it
+      const textNode = range.startContainer;
+      if (textNode.nodeType === Node.TEXT_NODE) {
+        const text = textNode.textContent || "";
+        const cursorPosition = range.startOffset;
+        const textBeforeCursor = text.substring(0, cursorPosition);
+        const atIndex = textBeforeCursor.lastIndexOf("@");
+        
+        if (atIndex !== -1) {
+          // Create a new range that starts at @ and ends at cursor
+          const deleteRange = document.createRange();
+          deleteRange.setStart(textNode, atIndex);
+          deleteRange.setEnd(textNode, cursorPosition);
+          deleteRange.deleteContents();
+          
+          // Set the selection to the start of the deleted range
+          range.setStart(textNode, atIndex);
+          range.collapse(true);
+        }
+      } else {
+        // If not in a text node, try to find the @ in the editor content
+        // This handles edge cases where the DOM structure might be different
+        const editorText = editorRef.current.textContent || "";
+        const cursorPos = editorRef.current.textContent?.length || 0;
+        const textBefore = editorText.substring(0, cursorPos);
+        const atIndex = textBefore.lastIndexOf("@");
+        
+        if (atIndex !== -1) {
+          // Find the text node and offset corresponding to atIndex
+          const walker = document.createTreeWalker(
+            editorRef.current,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
+          
+          let currentPos = 0;
+          let targetNode: Node | null = null;
+          let targetOffset = 0;
+          
+          while (walker.nextNode()) {
+            const node = walker.currentNode;
+            const nodeLength = node.textContent?.length || 0;
+            
+            if (currentPos + nodeLength >= atIndex) {
+              targetNode = node;
+              targetOffset = atIndex - currentPos;
+              break;
+            }
+            
+            currentPos += nodeLength;
+          }
+          
+          if (targetNode && targetNode.nodeType === Node.TEXT_NODE) {
+            const deleteRange = document.createRange();
+            deleteRange.setStart(targetNode, targetOffset);
+            deleteRange.setEnd(range.startContainer, range.startOffset);
+            deleteRange.deleteContents();
+            
+            range.setStart(targetNode, targetOffset);
+            range.collapse(true);
+          }
+        }
+      }
+
+      // Create mention span
+      const mentionSpan = document.createElement("span");
+      mentionSpan.setAttribute("data-mention", "true");
+      mentionSpan.setAttribute("data-user-id", member.id);
+      mentionSpan.className = "mention";
+      mentionSpan.textContent = `@${displayName}`;
+      mentionSpan.style.color = "var(--color-primary-600, #65d405)";
+      mentionSpan.style.fontWeight = "500";
+
+      // Insert the mention
+      range.insertNode(mentionSpan);
+
+      // Add a space after the mention to break any styling
+      const spaceNode = document.createTextNode(" ");
+      range.setStartAfter(mentionSpan);
+      range.insertNode(spaceNode);
+
+      // Move cursor after the space
+      range.setStartAfter(spaceNode);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // Close dropdown and reset state
+      setShowMentionDropdown(false);
+      setMentionQuery("");
+      setSelectedMentionIndex(0);
+
+      // Update content
+      if (editorRef.current) {
+        onChange(editorRef.current.innerHTML);
+      }
+      editorRef.current?.focus();
+    },
+    [onChange, projectMembers]
+  );
 
   const execCommand = (command: string, value?: string) => {
     document.execCommand(command, false, value);
@@ -44,6 +276,39 @@ export default function WysiwygEditor({
     const text = e.clipboardData.getData("text/plain");
     document.execCommand("insertText", false, text);
     handleInput();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Handle Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux) for form submission
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      if (onSubmit && !showMentionDropdown) {
+        e.preventDefault();
+        onSubmit();
+      }
+      return;
+    }
+
+    if (showMentionDropdown && filteredMembers.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedMentionIndex((prev) =>
+          prev < filteredMembers.length - 1 ? prev + 1 : prev
+        );
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedMentionIndex((prev) => (prev > 0 ? prev - 1 : 0));
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        if (filteredMembers[selectedMentionIndex]) {
+          insertMention(filteredMembers[selectedMentionIndex]);
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setShowMentionDropdown(false);
+        setMentionQuery("");
+        setSelectedMentionIndex(0);
+      }
+    }
   };
 
   const ToolbarButton = ({
@@ -220,29 +485,90 @@ export default function WysiwygEditor({
       </div>
 
       {/* Editor */}
-      <div
-        ref={editorRef}
-        contentEditable
-        onInput={handleInput}
-        onPaste={handlePaste}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        className={`min-h-[200px] p-4 outline-none ${
-          isFocused ? "ring-2 ring-primary-500" : ""
-        }`}
-        style={{
-          whiteSpace: "pre-wrap",
-        }}
-        data-placeholder={!value ? placeholder : ""}
-        suppressContentEditableWarning
-      />
+      <div className="relative">
+        <div
+          ref={editorRef}
+          contentEditable
+          onInput={handleInput}
+          onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={(e) => {
+            // Don't close dropdown if clicking on it
+            if (mentionDropdownRef.current?.contains(e.relatedTarget as Node)) {
+              return;
+            }
+            setIsFocused(false);
+            // Small delay to allow click on dropdown
+            setTimeout(() => {
+              if (document.activeElement !== editorRef.current) {
+                setShowMentionDropdown(false);
+              }
+            }, 200);
+          }}
+          className={`min-h-[200px] p-4 outline-none ${
+            isFocused ? "ring-2 ring-primary-500" : ""
+          }`}
+          style={{
+            whiteSpace: "pre-wrap",
+          }}
+          data-placeholder={!value ? placeholder : ""}
+          suppressContentEditableWarning
+        />
+        {/* Mention dropdown */}
+        {showMentionDropdown && projectMembers.length > 0 && (
+          <div
+            ref={mentionDropdownRef}
+            className="absolute z-50 bg-background-tertiary border border-border-primary rounded-md shadow-lg max-h-60 overflow-y-auto"
+            style={{
+              top: `${mentionPosition.top}px`,
+              left: `${mentionPosition.left}px`,
+              minWidth: "200px",
+            }}
+          >
+            {filteredMembers.length > 0 ? (
+              filteredMembers.map((member, index) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => insertMention(member)}
+                  onMouseEnter={() => setSelectedMentionIndex(index)}
+                  className={`w-full text-left px-3 py-2 hover:bg-background-primary transition-colors ${
+                    index === selectedMentionIndex ? "bg-background-primary" : ""
+                  }`}
+                >
+                  <div className="font-semibold text-text-primary">
+                    {getMemberDisplayName(member)}
+                  </div>
+                  <div className="text-xs text-text-secondary">{member.email}</div>
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-sm text-text-secondary">
+                No matches found
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <style jsx>{`
         [contenteditable][data-placeholder]:empty:before {
           content: attr(data-placeholder);
           color: #9ca3af;
           pointer-events: none;
         }
+        :global(.mention) {
+          color: var(--color-primary-600, #65d405) !important;
+          font-weight: 500;
+        }
+        :global(.mention *) {
+          color: var(--color-primary-600, #65d405) !important;
+        }
       `}</style>
     </div>
   );
-}
+});
+
+WysiwygEditor.displayName = "WysiwygEditor";
+
+export default WysiwygEditor;

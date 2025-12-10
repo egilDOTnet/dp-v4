@@ -200,6 +200,34 @@ export const api = {
           method: "PUT",
           body: JSON.stringify(data),
         }),
+      deleteTask: (projectId: string, phaseId: string, taskId: string) =>
+        apiRequest<void>(`/api/projects/${projectId}/phases/${phaseId}/tasks/${taskId}`, {
+          method: "DELETE",
+        }),
+      tasks: {
+        comments: {
+          list: (projectId: string, phaseId: string, taskId: string) =>
+            apiRequest<Comment[]>(
+              `/api/projects/${projectId}/phases/${phaseId}/tasks/${taskId}/comments`
+            ),
+          create: (
+            projectId: string,
+            phaseId: string,
+            taskId: string,
+            data: {
+              content: string;
+              notifyOption: "task_owner" | "task_owner_mentions" | "all_members" | "none";
+            }
+          ) =>
+            apiRequest<Comment>(
+              `/api/projects/${projectId}/phases/${phaseId}/tasks/${taskId}/comments`,
+              {
+                method: "POST",
+                body: JSON.stringify(data),
+              }
+            ),
+        },
+      },
     },
     vendors: {
       list: (projectId: string) => apiRequest<ProjectVendor[]>(`/api/projects/${projectId}/vendors`),
@@ -604,6 +632,18 @@ export const api = {
     preview: (projectId: string) =>
       apiRequest<RFI>(`/api/projects/${projectId}/rfi/preview`),
   },
+  notifications: {
+    list: () => apiRequest<Notification[]>("/api/notifications"),
+    getUnreadCount: () => apiRequest<{ count: number }>("/api/notifications/unread-count"),
+    markRead: (id: string) =>
+      apiRequest<void>(`/api/notifications/${id}/read`, {
+        method: "PUT",
+      }),
+    markAllRead: () =>
+      apiRequest<void>("/api/notifications/read-all", {
+        method: "PUT",
+      }),
+  },
 };
 
 export interface User {
@@ -675,6 +715,47 @@ export interface Task {
   order: number;
   createdAt: string;
   updatedAt: string;
+  comments?: Comment[];
+  commentCount?: number;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  createdBy: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  type: "TASK_MENTION" | "TASK_COMMENT";
+  taskId: string | null;
+  commentId: string | null;
+  read: boolean;
+  createdAt: string;
+  task: {
+    id: string;
+    name: string;
+    phaseId: string;
+    project: {
+      id: string;
+      name: string;
+    };
+  } | null;
+  mentionedBy: {
+    id: string;
+    email: string;
+    name: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
 }
 
 export interface RequirementHierarchy {

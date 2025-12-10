@@ -127,13 +127,18 @@ Uses the primary green from logo for consistency:
 ### Background Colors
 - **Light Mode:**
   - `background-primary`: `#f3f4f6` (Gray-100) - Page background
-  - `background-secondary`: `#f9fafb` (Gray-50) - Cards/content
-  - `background-tertiary`: `#ffffff` (White) - Elevated elements
+  - `background-secondary`: `#f9fafb` (Gray-50) - Cards/content containers
+  - `background-tertiary`: `#ffffff` (White) - Elevated elements, list item content areas
 
 - **Dark Mode:**
   - `background-primary`: `#0f172a` (Gray-950) - Page background
-  - `background-secondary`: `#1e293b` (Gray-900) - Cards/content
-  - `background-tertiary`: `#334155` (Gray-800) - Elevated elements
+  - `background-secondary`: `#1e293b` (Gray-900) - Cards/content containers
+  - `background-tertiary`: `#334155` (Gray-800) - Elevated elements, list item content areas
+
+**Usage Guidelines:**
+- Use `background-primary` for the main page/application background
+- Use `background-secondary` for card containers, panels, and list containers
+- Use `background-tertiary` for individual list items and elevated content areas to create visual separation from their containers
 
 ### Text Colors
 - **Light Mode:**

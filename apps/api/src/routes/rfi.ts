@@ -1275,7 +1275,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       });
 
       return reply.send(
-        vendorResponses.map((vr) => ({
+        vendorResponses.map((vr: any) => ({
           id: vr.id,
           vendorId: vr.projectVendor.vendorId,
           vendorName: vr.projectVendor.vendor.name,

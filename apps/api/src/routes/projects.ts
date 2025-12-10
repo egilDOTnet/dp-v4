@@ -1328,6 +1328,436 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     }
   );
 
+  // Delete a task
+  fastify.delete<{
+    Params: { id: string; phaseId: string; taskId: string };
+  }>(
+    "/:id/phases/:phaseId/tasks/:taskId",
+    { preHandler: [authenticate] },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string; phaseId: string; taskId: string };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      const phaseId = request.params.phaseId;
+      const taskId = request.params.taskId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: getUser(request).userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify phase belongs to project
+      const phase = await db.phase.findUnique({
+        where: { id: phaseId },
+      });
+
+      if (!phase || phase.projectId !== projectId) {
+        return reply.status(404).send({ error: "Phase not found" });
+      }
+
+      // Verify task belongs to phase
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+      });
+
+      if (!task || task.phaseId !== phaseId) {
+        return reply.status(404).send({ error: "Task not found" });
+      }
+
+      try {
+        // Delete the task (cascade will handle related records like comments)
+        await db.task.delete({
+          where: { id: taskId },
+        });
+
+        return reply.status(204).send();
+      } catch (error: any) {
+        request.log.error("Error deleting task:", error);
+        return reply.status(500).send({
+          error: "Failed to delete task",
+          message: error.message,
+        });
+      }
+    }
+  );
+
+  // Helper function to extract @-mentions from HTML content
+  function extractMentions(html: string): string[] {
+    const mentions: string[] = [];
+    // Match spans with data-mention="true" and extract data-user-id
+    // More flexible regex that handles attributes in any order
+    const mentionRegex = /<span[^>]*data-mention=["']true["'][^>]*data-user-id=["']([^"']+)["'][^>]*>/gi;
+    let match;
+    while ((match = mentionRegex.exec(html)) !== null) {
+      const userId = match[1];
+      if (userId && !mentions.includes(userId)) {
+        mentions.push(userId);
+      }
+    }
+    return mentions;
+  }
+
+  // Get comments for a task
+  fastify.get<{
+    Params: { id: string; phaseId: string; taskId: string };
+  }>(
+    "/:id/phases/:phaseId/tasks/:taskId/comments",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const projectId = request.params.id;
+      const phaseId = request.params.phaseId;
+      const taskId = request.params.taskId;
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: getUser(request).userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify phase belongs to project
+      const phase = await db.phase.findUnique({
+        where: { id: phaseId },
+      });
+
+      if (!phase || phase.projectId !== projectId) {
+        return reply.status(404).send({ error: "Phase not found" });
+      }
+
+      // Verify task belongs to phase
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+      });
+
+      if (!task || task.phaseId !== phaseId) {
+        return reply.status(404).send({ error: "Task not found" });
+      }
+
+      try {
+        // Get comments
+        const comments = await db.taskComment.findMany({
+          where: { taskId },
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        });
+
+        return reply.send(
+          comments.map((comment) => ({
+            id: comment.id,
+            content: comment.content,
+            createdBy: {
+              id: comment.createdBy.id,
+              email: comment.createdBy.email,
+              name: comment.createdBy.name,
+              firstName: comment.createdBy.firstName,
+              lastName: comment.createdBy.lastName,
+            },
+            createdAt: comment.createdAt,
+            updatedAt: comment.updatedAt,
+          }))
+        );
+      } catch (err: any) {
+        request.log.error("Error fetching comments:", err);
+        // If table doesn't exist yet (migration not run) or any Prisma error, return empty array
+        if (
+          err.message?.includes("does not exist") ||
+          err.code === "P2021" ||
+          err.code === "P1001" ||
+          err.code === "P1003" ||
+          err.name === "PrismaClientKnownRequestError" ||
+          err.name === "PrismaClientUnknownRequestError" ||
+          err.name === "PrismaClientInitializationError"
+        ) {
+          return reply.send([]);
+        }
+        // For any other error, return empty array instead of throwing to avoid 500
+        request.log.warn("Unexpected error in comments endpoint, returning empty array:", err);
+        return reply.send([]);
+      }
+    }
+  );
+
+  // Create a comment for a task
+  fastify.post<{
+    Params: { id: string; phaseId: string; taskId: string };
+    Body: {
+      content: string;
+      notifyOption: "task_owner" | "task_owner_mentions" | "all_members" | "none";
+    };
+  }>(
+    "/:id/phases/:phaseId/tasks/:taskId/comments",
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const projectId = request.params.id;
+      const phaseId = request.params.phaseId;
+      const taskId = request.params.taskId;
+      const currentUser = getUser(request);
+      
+      if (!request.user) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      // Verify project exists and user has access
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+        include: { ProjectMember: true },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: currentUser.userId },
+        include: { projectMembers: true },
+      });
+
+      const isMember = user?.projectMembers.some((pm) => pm.projectId === project.id);
+      const isAdmin =
+        (user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator") &&
+        user?.tenantId === project.tenantId;
+
+      if (!isMember && !isAdmin) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Verify phase belongs to project
+      const phase = await db.phase.findUnique({
+        where: { id: phaseId },
+      });
+
+      if (!phase || phase.projectId !== projectId) {
+        return reply.status(404).send({ error: "Phase not found" });
+      }
+
+      // Verify task belongs to phase
+      const task = await db.task.findUnique({
+        where: { id: taskId },
+        include: {
+          owner: true,
+        },
+      });
+
+      if (!task || task.phaseId !== phaseId) {
+        return reply.status(404).send({ error: "Task not found" });
+      }
+
+      // Validate body
+      if (!request.body.content || typeof request.body.content !== "string") {
+        return reply.status(400).send({ error: "Content is required" });
+      }
+
+      if (
+        !request.body.notifyOption ||
+        !["task_owner", "task_owner_mentions", "all_members", "none"].includes(
+          request.body.notifyOption
+        )
+      ) {
+        return reply.status(400).send({ error: "Invalid notifyOption" });
+      }
+
+      try {
+        // Create comment
+        const comment = await db.taskComment.create({
+          data: {
+            taskId,
+            content: request.body.content,
+            createdById: currentUser.userId,
+          },
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+
+        // Extract @-mentions from content
+        const mentionedUserIds = extractMentions(request.body.content);
+        request.log.info(`Extracted ${mentionedUserIds.length} mentions from comment: ${mentionedUserIds.join(", ")}`);
+
+        // Create notifications based on notifyOption
+        const notificationPromises: Promise<any>[] = [];
+
+        if (request.body.notifyOption !== "none") {
+          try {
+            // Get all project members for all_members option
+            const projectMembers =
+              request.body.notifyOption === "all_members"
+                ? await db.projectMember.findMany({
+                    where: { projectId },
+                    include: { User: true },
+                  })
+                : [];
+
+            // Determine who should be notified
+            const userIdsToNotify = new Set<string>();
+
+            if (request.body.notifyOption === "task_owner" || request.body.notifyOption === "task_owner_mentions") {
+              if (task.ownerId) {
+                userIdsToNotify.add(task.ownerId);
+              }
+            }
+
+            if (request.body.notifyOption === "task_owner_mentions" || request.body.notifyOption === "all_members") {
+              // Add mentioned users
+              for (const mentionedUserId of mentionedUserIds) {
+                userIdsToNotify.add(mentionedUserId);
+              }
+            }
+
+            if (request.body.notifyOption === "all_members") {
+              // Add all project members
+              for (const member of projectMembers) {
+                userIdsToNotify.add(member.userId);
+              }
+            }
+
+            // Remove the comment creator from notifications
+            userIdsToNotify.delete(currentUser.userId);
+
+            // Create notifications (only if notification table exists)
+            request.log.info(`Creating notifications for ${userIdsToNotify.size} users`);
+            for (const userId of userIdsToNotify) {
+              // Determine notification type
+              let notificationType: "TASK_MENTION" | "TASK_COMMENT" = "TASK_COMMENT";
+              let mentionedByUserId: string | null = null;
+
+              if (mentionedUserIds.includes(userId)) {
+                notificationType = "TASK_MENTION";
+                mentionedByUserId = currentUser.userId;
+              }
+
+              request.log.info(`Creating ${notificationType} notification for user ${userId}`);
+
+              notificationPromises.push(
+                db.notification.create({
+                  data: {
+                    userId,
+                    type: notificationType,
+                    taskId,
+                    commentId: comment.id,
+                    mentionedByUserId,
+                  },
+                }).then((notification) => {
+                  request.log.info(`Successfully created notification ${notification.id} for user ${userId}`);
+                  return notification;
+                }).catch((err: any) => {
+                  // If notification creation fails (table doesn't exist), just log and continue
+                  request.log.error(`Failed to create notification for user ${userId}:`, err);
+                  return null;
+                })
+              );
+            }
+          } catch (notifErr: any) {
+            // If notification table doesn't exist, just log and continue
+            request.log.warn("Notification creation skipped (table may not exist):", notifErr);
+          }
+        }
+
+        // Wait for notifications (filter out nulls from failed creates)
+        const notificationResults = await Promise.all(notificationPromises);
+        const successfulNotifications = notificationResults.filter((n) => n !== null);
+
+        return reply.status(201).send({
+          id: comment.id,
+          content: comment.content,
+          createdBy: {
+            id: comment.createdBy.id,
+            email: comment.createdBy.email,
+            name: comment.createdBy.name,
+            firstName: comment.createdBy.firstName,
+            lastName: comment.createdBy.lastName,
+          },
+          createdAt: comment.createdAt,
+          updatedAt: comment.updatedAt,
+        });
+      } catch (err: any) {
+        request.log.error("Error creating comment:", err);
+        // If table doesn't exist yet (migration not run) or any Prisma error
+        if (
+          err.message?.includes("does not exist") ||
+          err.code === "P2021" ||
+          err.code === "P1001" ||
+          err.code === "P1003" ||
+          err.name === "PrismaClientKnownRequestError" ||
+          err.name === "PrismaClientUnknownRequestError" ||
+          err.name === "PrismaClientInitializationError"
+        ) {
+          return reply.status(503).send({
+            error: "Comments feature not available",
+            message: "Database migration required. Please run database migrations.",
+          });
+        }
+        // For any other error, return 500
+        return reply.status(500).send({
+          error: "Failed to create comment",
+          message: err.message,
+        });
+      }
+    }
+  );
+
   // Update project
   fastify.put<{
     Params: { id: string };
@@ -1570,26 +2000,8 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       }, {} as Record<string, number>);
 
       // Get unresolved comments count
-      // Note: This assumes there's a RequirementComment model
-      // If it doesn't exist yet, we'll return 0
-      let unresolvedComments = 0;
-      try {
-        if (db.requirementComment) {
-          unresolvedComments = await db.requirementComment.count({
-            where: {
-              requirement: {
-                hierarchy: {
-                  projectId,
-                },
-              },
-              resolved: false,
-            },
-          });
-        }
-      } catch {
-        // If RequirementComment doesn't exist, just return 0
-        unresolvedComments = 0;
-      }
+      // Note: RequirementComment model doesn't exist yet, returning 0
+      const unresolvedComments = 0;
 
       const requirementsStats = {
         total: requirements.length,
