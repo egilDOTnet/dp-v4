@@ -107,6 +107,7 @@ export const TabsTrigger: React.FC<TabsTriggerProps> = ({
         px-4 py-2 text-sm font-medium transition-colors duration-150
         border-b-2 -mb-px
         focus:outline-none
+        cursor-pointer
         ${
           isActive
             ? "border-primary-600 text-primary-600"
