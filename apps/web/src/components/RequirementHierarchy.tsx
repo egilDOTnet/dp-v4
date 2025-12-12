@@ -505,18 +505,11 @@ export default function RequirementHierarchyComponent({
 
     // Check if this is a level 2 requirement being dragged
     const draggedRequirement = requirements.find(r => r.id === active.id);
-    const level2HierarchiesInParent = hierarchies.filter(h => h.parentId === parentId);
-    const isLevel2Requirement = draggedRequirement && level2HierarchiesInParent.some(h => h.id === draggedRequirement.hierarchyId);
-    
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('handleChildDragEnd:', {
-        activeId: active.id,
-        overId: over.id,
-        draggedRequirement,
-        isLevel2Requirement,
-        level2HierarchiesInParent: level2HierarchiesInParent.map(h => h.id)
-      });
-    }
+    // Find the hierarchy that this requirement belongs to
+    const draggedRequirementHierarchy = draggedRequirement ? hierarchies.find(h => h.id === draggedRequirement.hierarchyId) : null;
+    // Check if it's a level 2 requirement by checking if its hierarchy has a parent that matches parentId
+    const isLevel2Requirement = draggedRequirementHierarchy && draggedRequirementHierarchy.parentId === parentId;
+    const level2HierarchiesInParent = level2Hierarchies.filter(h => h.parentId === parentId);
     
     if (isLevel2Requirement) {
       // Handle level 2 requirement drag - determine target hierarchy
@@ -548,14 +541,6 @@ export default function RequirementHierarchyComponent({
       try {
         const sourceHierarchyId = draggedRequirement!.hierarchyId;
         
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('Level 2 requirement drag:', {
-            sourceHierarchyId,
-            targetHierarchyId,
-            isCrossHierarchy: sourceHierarchyId !== targetHierarchyId
-          });
-        }
-        
         // Check if this is a cross-hierarchy move
         if (sourceHierarchyId !== targetHierarchyId) {
           // Cross-hierarchy move
@@ -581,38 +566,16 @@ export default function RequirementHierarchyComponent({
           const oldIndex = hierarchyRequirements.findIndex(r => r.id === active.id);
           const newIndex = hierarchyRequirements.findIndex(r => r.id === over.id);
 
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('Reordering in same hierarchy:', {
-              hierarchyId: targetHierarchyId,
-              requirementCount: hierarchyRequirements.length,
-              oldIndex,
-              newIndex,
-              activeId: active.id,
-              overId: over.id,
-              requirementIds: hierarchyRequirements.map(r => r.id)
-            });
-          }
-
           if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
             const reordered = arrayMove(hierarchyRequirements, oldIndex, newIndex);
-            if (process.env.NODE_ENV !== 'production') {
-              console.log('Calling reorder API with:', reordered.map(r => r.id));
-            }
             await api.requirements.reorder(projectId, {
               requirementIds: reordered.map(r => r.id),
               hierarchyId: targetHierarchyId,
             });
           } else if (oldIndex === -1 || newIndex === -1) {
             // If we can't find the indices, don't do anything
-            if (process.env.NODE_ENV !== 'production') {
-              console.warn('Could not find requirement indices for reordering', { oldIndex, newIndex, active: active.id, over: over.id });
-            }
             setLoading(false);
             return;
-          } else {
-            if (process.env.NODE_ENV !== 'production') {
-              console.log('No reorder needed - indices are the same');
-            }
           }
         }
 
@@ -629,7 +592,7 @@ export default function RequirementHierarchyComponent({
 
     // Check if dragging a level 1 requirement
     const isDraggingLevel1Requirement = draggedRequirement && draggedRequirement.hierarchyId === parentId;
-    const subHierarchies = level2Hierarchies;
+    const subHierarchies = level2Hierarchies.filter(h => h.parentId === parentId);
     
     if (isDraggingLevel1Requirement && subHierarchies.length > 0) {
       setError("Cannot add requirements to a hierarchy that has sub-hierarchies");

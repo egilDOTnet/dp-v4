@@ -158,7 +158,13 @@ import { SearchBar } from '@/components/ui';
   placeholder="Search..."
 />
 ```
-**Features**: Auto-focus with Cmd+K / Ctrl+K, clear button, keyboard shortcuts indicator
+**Features**: 
+- Auto-focus with Cmd+K / Ctrl+K
+- Clear button when text is entered
+- Keyboard shortcuts indicator (⌘K)
+- **White background** (`bg-background-tertiary`) when input is focused or contains text
+- **Cmd-A / Ctrl-A** keyboard shortcut to select all text in the input
+- Smooth transitions between background states
 
 #### Table
 ```tsx
@@ -177,6 +183,26 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
   </TableBody>
 </Table>
 ```
+
+#### Tabs
+```tsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
+
+<Tabs defaultValue="tab1">
+  <TabsList>
+    <TabsTrigger value="tab1">Tab 1</TabsTrigger>
+    <TabsTrigger value="tab2">Tab 2</TabsTrigger>
+  </TabsList>
+  <TabsContent value="tab1">Content for tab 1</TabsContent>
+  <TabsContent value="tab2">Content for tab 2</TabsContent>
+</Tabs>
+```
+**Features**: 
+- Active state styling with primary color border and text
+- No focus ring on click (matches RFI tab pattern)
+- Keyboard navigation support (Enter/Space to activate)
+- Accessible ARIA attributes
+- Smooth transitions between states
 
 #### Other Components
 - **Badge**: Status indicators with color variants
@@ -250,6 +276,33 @@ All list views include instant search:
 - Shows count of filtered items
 - Cmd+K / Ctrl+K to focus search
 - Clear button to reset
+
+### Filtering Pattern
+When filtering is needed in addition to search, use a filter component with dropdowns:
+
+- **Placement**: Right-aligned next to action buttons (e.g., "Check all")
+- **Default State**: Gray background (`bg-background-secondary`) with border
+- **Active State**: Blue background (`bg-accent-600`) when any filter is selected
+- **Structure**: Filter icon, "Filter by" text, and dropdown selects
+- **Behavior**: 
+  - Filters combine with search (both apply simultaneously)
+  - Filtered results expand hierarchies to show matching items
+  - "Check all" button changes to "Check result" when filtering is active
+  - Shows "X of Y items" count when filtering
+
+**Implementation Example**:
+```tsx
+<div className={`flex items-center gap-2 px-4 py-2 rounded-md border border-border-primary ${
+  isFiltering ? 'bg-accent-600' : 'bg-background-secondary'
+}`}>
+  <FilterIcon />
+  <span>Filter by</span>
+  <select value={filterStatus || ""} onChange={...}>
+    <option value="">Status</option>
+    {/* options */}
+  </select>
+</div>
+```
 
 ### List Element Backgrounds
 List items should use the lightest background shade (`background-tertiary`) to create visual separation from their container:
@@ -368,6 +421,9 @@ All checkboxes used for selecting items (requirements, hierarchies, etc.) use **
 ### Global
 - **Cmd+K / Ctrl+K**: Focus search bar (where available)
 - **Escape**: Close modals, menus, cancel edits
+
+### Search
+- **Cmd+A / Ctrl+A**: Select all text in search bar (when search bar is focused)
 
 ### Forms
 - **Enter**: Submit form (single-line inputs)
@@ -776,6 +832,69 @@ Comment dates specifically use the ISO format with timestamp:
 - Virtual scrolling for large lists
 - More animation presets
 - High-quality SVG logo version
+
+#### Tabs
+```tsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
+
+<Tabs defaultValue="tab1">
+  <TabsList>
+    <TabsTrigger value="tab1">Tab 1</TabsTrigger>
+    <TabsTrigger value="tab2">Tab 2</TabsTrigger>
+  </TabsList>
+  <TabsContent value="tab1">Content for tab 1</TabsContent>
+  <TabsContent value="tab2">Content for tab 2</TabsContent>
+</Tabs>
+```
+**Features**: Active state styling, keyboard navigation, accessible ARIA attributes
+
+## Import/Export Pattern
+
+The application supports importing data from CSV files for Tasks, RFI Questionnaires, and Requirements + Hierarchy.
+
+### Import Wizard
+
+The `ImportWizard` component provides a multi-step process for importing data:
+
+1. **Data Type Selection**: Choose what type of data to import
+2. **File Selection**: Upload and validate CSV file
+3. **Phase Selection** (Tasks only): Select target phase
+4. **Column Mapping**: Map CSV columns to data fields with preview
+5. **Review**: Confirm import settings
+6. **Success**: View results and navigate to imported data
+
+### CSV Format Requirements
+
+#### Tasks
+- **Required**: `name` (task name)
+- Imported tasks are added to the selected phase in order
+
+#### RFI Questionnaires
+- **Required**: `title` (question title)
+- Defaults: `required=false`, `type=SingleText`
+- Questions are added to the project's RFI in order
+
+#### Requirements + Hierarchy
+- **Required**: `level1` (hierarchy title), `requirement` (requirement description)
+- **Optional**: `level2` (sub-hierarchy title)
+- Status is automatically set to `Imported`
+- Hierarchies are created/found as needed, requirements are added in order
+
+### CSV Parser
+
+The CSV parser utility (`apps/web/src/lib/csv-parser.ts`) provides:
+- Automatic delimiter detection (comma, semicolon, tab)
+- Unicode support (UTF-8, UTF-8 BOM)
+- Quoted field handling
+- Structure validation
+
+### Help Dialogs
+
+Each import type has a help dialog (`ImportHelpDialog`) showing:
+- Required vs optional fields
+- Column header suggestions
+- Example CSV format
+- Import-specific notes
 
 ## Support
 

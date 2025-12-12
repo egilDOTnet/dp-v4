@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 export interface SearchBarProps {
   value: string;
@@ -22,6 +22,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   showShortcutHint = true,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Handle keyboard shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -36,11 +37,22 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Handle Cmd-A/Ctrl-A to select all text
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+      e.preventDefault();
+      inputRef.current?.select();
+    }
+  };
+
   const handleClear = () => {
     onChange("");
     onClear?.();
     inputRef.current?.focus();
   };
+
+  // Determine if we should show white background (focused or has text)
+  const hasWhiteBackground = isFocused || value.length > 0;
 
   return (
     <div className={`relative ${className}`}>
@@ -64,14 +76,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className="
+        className={`
           w-full 
           pl-10 
           pr-24 
           py-2 
-          bg-background-secondary
+          ${hasWhiteBackground ? 'bg-background-tertiary' : 'bg-background-secondary'}
           text-text-primary
           border 
           border-border-primary
@@ -83,7 +98,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           focus:ring-primary-500 
           focus:border-primary-500
           placeholder:text-text-tertiary
-        "
+        `}
       />
       <div className="absolute inset-y-0 right-0 flex items-center pr-3 gap-2">
         {showShortcutHint && !value && (

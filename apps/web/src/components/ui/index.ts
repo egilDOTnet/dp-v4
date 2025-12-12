@@ -2,7 +2,7 @@
 // Consistent, reusable components for the Dynamic Purchase application
 
 // Dialog Components
-export { Dialog, DialogHeader, DialogFooter, ConfirmDialog } from "./Dialog";
+export { Dialog, DialogHeader, DialogFooter, DialogContent, DialogTitle, DialogDescription, ConfirmDialog } from "./Dialog";
 export type { DialogVariant, DialogSize } from "./Dialog";
 
 // SlideOver Components
@@ -73,3 +73,7 @@ export { SearchableList } from "./SearchableList";
 
 // Hero Banner
 export { HeroBanner } from "../HeroBanner";
+
+// Tabs Components
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
+export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } from "./Tabs";

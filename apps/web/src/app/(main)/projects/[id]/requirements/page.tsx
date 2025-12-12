@@ -24,6 +24,8 @@ export default function RequirementsPage() {
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<Set<string>>(new Set());
   const [showMultiEditModal, setShowMultiEditModal] = useState(false);
   const [showMultiDeleteModal, setShowMultiDeleteModal] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<"Approved" | "ForReview" | "New" | "Imported" | null>(null);
+  const [filterType, setFilterType] = useState<"Information" | "Mandatory" | "Important" | "Wish" | null>(null);
 
   // Search functionality
   const { searchTerm, setSearchTerm, filteredItems: filteredRequirements, clearSearch, isSearching } =
@@ -31,12 +33,43 @@ export default function RequirementsPage() {
       searchKeys: ["description"],
     });
 
-  // When searching, auto-expand all hierarchies that contain matching requirements
+  // Check if filtering is active
+  const isFiltering = filterStatus !== null || filterType !== null;
+  const isFilteringOrSearching = isSearching || isFiltering;
+
+  // Apply filters to requirements
+  const filteredByStatusAndType = useMemo(() => {
+    if (!isFiltering) return requirements;
+    
+    return requirements.filter((req) => {
+      const statusMatch = filterStatus === null || req.status === filterStatus;
+      const typeMatch = filterType === null || req.type === filterType;
+      return statusMatch && typeMatch;
+    });
+  }, [requirements, filterStatus, filterType, isFiltering]);
+
+  // Combine search and filter results
+  const finalFilteredRequirements = useMemo(() => {
+    let result = isFiltering ? filteredByStatusAndType : requirements;
+    
+    if (isSearching) {
+      // Apply search to the already filtered results
+      const searchTermLower = searchTerm.toLowerCase();
+      result = result.filter((req) => {
+        const description = req.description?.toLowerCase() || "";
+        return description.includes(searchTermLower);
+      });
+    }
+    
+    return result;
+  }, [isSearching, isFiltering, searchTerm, filteredByStatusAndType, requirements]);
+
+  // When searching or filtering, auto-expand all hierarchies that contain matching requirements
   const searchExpandedHierarchies = useMemo(() => {
-    if (!isSearching) return expandedHierarchies;
+    if (!isFilteringOrSearching) return expandedHierarchies;
     
     const hierarchiesWithMatches = new Set<string>();
-    filteredRequirements.forEach((req) => {
+    finalFilteredRequirements.forEach((req) => {
       // Add the requirement's direct hierarchy
       hierarchiesWithMatches.add(req.hierarchyId);
       // Also add parent hierarchies
@@ -46,15 +79,15 @@ export default function RequirementsPage() {
       }
     });
     return hierarchiesWithMatches;
-  }, [isSearching, filteredRequirements, hierarchies, expandedHierarchies]);
+  }, [isFilteringOrSearching, finalFilteredRequirements, hierarchies, expandedHierarchies]);
 
-  // Filter hierarchies to only show those with matching requirements when searching
+  // Filter hierarchies to only show those with matching requirements when searching or filtering
   const displayHierarchies = useMemo(() => {
-    if (!isSearching) return hierarchies;
+    if (!isFilteringOrSearching) return hierarchies;
     
     // Get all hierarchy IDs that have matching requirements
     const hierarchiesWithMatches = new Set<string>();
-    filteredRequirements.forEach((req) => {
+    finalFilteredRequirements.forEach((req) => {
       hierarchiesWithMatches.add(req.hierarchyId);
     });
     
@@ -73,10 +106,10 @@ export default function RequirementsPage() {
       // Level 2 hierarchy: include only if it has matching requirements
       return hierarchiesWithMatches.has(hierarchy.id);
     });
-  }, [isSearching, hierarchies, filteredRequirements]);
+  }, [isFilteringOrSearching, hierarchies, finalFilteredRequirements]);
 
-  // Filter requirements to only show matches when searching
-  const displayRequirements = isSearching ? filteredRequirements : requirements;
+  // Filter requirements to only show matches when searching or filtering
+  const displayRequirements = isFilteringOrSearching ? finalFilteredRequirements : requirements;
 
   const loadData = async () => {
     try {
@@ -164,7 +197,7 @@ export default function RequirementsPage() {
 
   const getCheckButtonLabel = () => {
     if (selectedRequirementIds.size > 0) return "Uncheck all";
-    if (isSearching) return "Check result";
+    if (isFilteringOrSearching) return "Check result";
     return "Check all";
   };
 
@@ -172,12 +205,12 @@ export default function RequirementsPage() {
     if (selectedRequirementIds.size > 0) {
       // Uncheck all
       setSelectedRequirementIds(new Set());
-    } else if (isSearching) {
+    } else if (isFilteringOrSearching) {
       // Check all filtered results
-      setSelectedRequirementIds(new Set(filteredRequirements.map((r) => r.id)));
+      setSelectedRequirementIds(new Set(finalFilteredRequirements.map((r) => r.id)));
       // Expand all hierarchies that contain matching requirements
       const hierarchiesWithMatches = new Set<string>();
-      filteredRequirements.forEach((req) => {
+      finalFilteredRequirements.forEach((req) => {
         hierarchiesWithMatches.add(req.hierarchyId);
         const hierarchy = hierarchies.find(h => h.id === req.hierarchyId);
         if (hierarchy?.parentId) {
@@ -317,9 +350,9 @@ export default function RequirementsPage() {
         <h1 className="text-3xl font-bold">Requirements</h1>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar and Filters */}
       <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 max-w-md">
+        <div className="flex-1 max-w-sm">
           <SearchBar
             value={searchTerm}
             onChange={setSearchTerm}
@@ -327,12 +360,61 @@ export default function RequirementsPage() {
             placeholder="Search requirements..."
           />
         </div>
-        {isSearching && (
-          <span className="text-sm text-gray-500">
-            {filteredRequirements.length} of {requirements.length} requirements
+        {(isSearching || isFiltering) && (
+          <span className="text-sm text-text-secondary">
+            {finalFilteredRequirements.length} of {requirements.length} requirements
           </span>
         )}
         <div className="flex items-center gap-2 ml-auto">
+          {/* Filter Component - hidden when requirements are selected */}
+          {selectedRequirementIds.size === 0 && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-md border border-border-primary transition-colors ${
+              isFiltering ? 'bg-accent-600' : 'bg-background-secondary'
+            }`}>
+              <svg
+                className={`h-4 w-4 ${isFiltering ? 'text-white' : 'text-text-primary'}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              <span className={`text-sm ${isFiltering ? 'text-white' : 'text-text-primary'}`}>
+                Filter by
+              </span>
+              <select
+                value={filterType || ""}
+                onChange={(e) => setFilterType(e.target.value as typeof filterType || null)}
+                className={`text-sm rounded px-2 py-1 border border-border-primary h-8 ${
+                  isFiltering ? 'bg-white text-text-primary' : 'bg-background-tertiary text-text-primary'
+                }`}
+              >
+                <option value="">Type:</option>
+                <option value="Information">Information</option>
+                <option value="Mandatory">Mandatory</option>
+                <option value="Important">Important</option>
+                <option value="Wish">Wish</option>
+              </select>
+              <select
+                value={filterStatus || ""}
+                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus || null)}
+                className={`text-sm rounded px-2 py-1 border border-border-primary h-8 ${
+                  isFiltering ? 'bg-white text-text-primary' : 'bg-background-tertiary text-text-primary'
+                }`}
+              >
+                <option value="">Status:</option>
+                <option value="Approved">Approved</option>
+                <option value="ForReview">For Review</option>
+                <option value="New">New</option>
+                <option value="Imported">Imported</option>
+              </select>
+            </div>
+          )}
           {/* Multi edit and delete - only when selected */}
           {selectedRequirementIds.size > 0 && (
             <>
@@ -413,9 +495,9 @@ export default function RequirementsPage() {
             }}
             createForHierarchyId={createForHierarchyId}
             onCreateFormClose={() => setCreateForHierarchyId(null)}
-            expandedHierarchies={isSearching ? searchExpandedHierarchies : expandedHierarchies}
+            expandedHierarchies={isFilteringOrSearching ? searchExpandedHierarchies : expandedHierarchies}
             onExpandedHierarchiesChange={setExpandedHierarchies}
-            disableDragAndDrop={isSearching}
+            disableDragAndDrop={isFilteringOrSearching}
             selectedRequirementIds={selectedRequirementIds}
             onRequirementToggle={handleRequirementToggle}
             onHierarchyToggle={handleHierarchyToggle}

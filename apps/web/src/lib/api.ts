@@ -317,6 +317,36 @@ export const api = {
           }),
       },
     },
+    importTasks: (
+      projectId: string,
+      phaseId: string,
+      tasks: Array<{ name: string }>
+    ) =>
+      apiRequest<{ count: number }>(`/api/projects/${projectId}/import/tasks`, {
+        method: "POST",
+        body: JSON.stringify({ phaseId, tasks }),
+      }),
+    importRFIQuestions: (
+      projectId: string,
+      questions: Array<{ title: string }>
+    ) =>
+      apiRequest<{ count: number }>(`/api/projects/${projectId}/import/rfi-questions`, {
+        method: "POST",
+        body: JSON.stringify({ questions }),
+      }),
+    importRequirements: (
+      projectId: string,
+      requirements: Array<{
+        level1: string;
+        level2?: string;
+        requirement: string;
+        type?: string;
+      }>
+    ) =>
+      apiRequest<{ count: number }>(`/api/projects/${projectId}/import/requirements`, {
+        method: "POST",
+        body: JSON.stringify({ requirements }),
+      }),
   },
   templates: {
     list: () => apiRequest<Template[]>("/api/templates"),

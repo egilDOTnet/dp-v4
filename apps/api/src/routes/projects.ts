@@ -1,9 +1,75 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
+import { RequirementStatus } from "@prisma/client";
 import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
 import { computeDisplayName } from "../utils/user-utils";
+
+// Helper functions for requirement hierarchy (duplicated from requirements.ts for import functionality)
+async function generateHierarchyNumber(
+  projectId: string,
+  parentId: string | null
+): Promise<string> {
+  if (parentId === null) {
+    const count = await db.requirementHierarchy.count({
+      where: {
+        projectId,
+        parentId: null,
+      },
+    });
+    return `${count + 1}.`;
+  } else {
+    const parent = await db.requirementHierarchy.findUnique({
+      where: { id: parentId },
+    });
+    if (!parent) {
+      throw new Error("Parent hierarchy not found");
+    }
+    
+    const siblingHierarchyCount = await db.requirementHierarchy.count({
+      where: {
+        projectId,
+        parentId,
+      },
+    });
+    
+    const requirementCount = await db.requirement.count({
+      where: {
+        hierarchyId: parentId,
+      },
+    });
+    
+    const parentNumberBase = parent.number.endsWith('.') ? parent.number.slice(0, -1) : parent.number;
+    const totalCount = siblingHierarchyCount + requirementCount;
+    return `${parentNumberBase}.${totalCount + 1}.`;
+  }
+}
+
+async function generateRequirementNumber(
+  hierarchyId: string
+): Promise<string> {
+  const hierarchy = await db.requirementHierarchy.findUnique({
+    where: { id: hierarchyId },
+  });
+  if (!hierarchy) {
+    throw new Error("Hierarchy not found");
+  }
+
+  const subHierarchyCount = await db.requirementHierarchy.count({
+    where: {
+      parentId: hierarchyId,
+    },
+  });
+  
+  const requirementCount = await db.requirement.count({
+    where: { hierarchyId },
+  });
+
+  const hierarchyNumberBase = hierarchy.number.endsWith('.') ? hierarchy.number.slice(0, -1) : hierarchy.number;
+  const totalCount = subHierarchyCount + requirementCount;
+  return `${hierarchyNumberBase}.${totalCount + 1}.`;
+}
 
 interface BrregEntity {
   organisasjonsnummer: string;
@@ -4637,6 +4703,420 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       }
 
       return reply.status(204).send();
+    }
+  );
+
+  // Bulk import endpoints
+  /**
+   * Bulk import tasks
+   */
+  fastify.post<{
+    Params: { id: string };
+    Body: {
+      phaseId: string;
+      tasks: Array<{ name: string }>;
+    };
+  }>(
+    "/:id/import/tasks",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk import tasks into a phase",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["phaseId", "tasks"],
+          properties: {
+            phaseId: { type: "string" },
+            tasks: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["name"],
+                properties: {
+                  name: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              count: { type: "number" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const projectId = request.params.id;
+      const phaseId = request.body.phaseId;
+
+      await verifyProjectAccess(request, reply);
+      const project = (request as any).project;
+
+      // Verify phase belongs to project
+      const phase = await db.phase.findUnique({
+        where: { id: phaseId },
+      });
+
+      if (!phase || phase.projectId !== projectId) {
+        return reply.status(404).send({ error: "Phase not found" });
+      }
+
+      // Get current max order
+      const maxOrderTask = await db.task.findFirst({
+        where: { phaseId },
+        orderBy: { order: "desc" },
+      });
+      let currentOrder = maxOrderTask ? maxOrderTask.order + 1 : 1;
+
+      // Create tasks in order
+      let count = 0;
+      for (const taskData of request.body.tasks) {
+        if (!taskData.name || !taskData.name.trim()) {
+          continue; // Skip empty names
+        }
+
+        await db.task.create({
+          data: {
+            phaseId,
+            name: taskData.name.trim(),
+            order: currentOrder++,
+          },
+        });
+        count++;
+      }
+
+      return reply.status(200).send({ count });
+    }
+  );
+
+  /**
+   * Bulk import RFI questions
+   */
+  fastify.post<{
+    Params: { id: string };
+    Body: {
+      questions: Array<{ title: string }>;
+    };
+  }>(
+    "/:id/import/rfi-questions",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk import RFI questions",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["questions"],
+          properties: {
+            questions: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["title"],
+                properties: {
+                  title: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              count: { type: "number" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const projectId = request.params.id;
+
+      await verifyProjectAccess(request, reply);
+
+      // Get or create RFI
+      let rfi = await db.rFI.findUnique({
+        where: { projectId },
+      });
+
+      if (!rfi) {
+        rfi = await db.rFI.create({
+          data: {
+            projectId,
+            emailSubject: "",
+            emailText: "",
+            rfiInformation: "",
+          },
+        });
+      }
+
+      // Get max order
+      const maxOrderQuestion = await db.rFIQuestion.findFirst({
+        where: { rfiId: rfi.id },
+        orderBy: { order: "desc" },
+      });
+      let currentOrder = maxOrderQuestion ? maxOrderQuestion.order + 1 : 1;
+
+      // Create questions in order
+      let count = 0;
+      for (const questionData of request.body.questions) {
+        if (!questionData.title || !questionData.title.trim()) {
+          continue; // Skip empty titles
+        }
+
+        await db.rFIQuestion.create({
+          data: {
+            rfiId: rfi.id,
+            title: questionData.title.trim(),
+            type: "SingleText",
+            required: false,
+            order: currentOrder++,
+          },
+        });
+        count++;
+      }
+
+      return reply.status(200).send({ count });
+    }
+  );
+
+  /**
+   * Bulk import requirements with hierarchy
+   */
+  fastify.post<{
+    Params: { id: string };
+    Body: {
+      requirements: Array<{
+        level1: string;
+        level2?: string;
+        requirement: string;
+        type?: string;
+      }>;
+    };
+  }>(
+    "/:id/import/requirements",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk import requirements with hierarchy",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["requirements"],
+          properties: {
+            requirements: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["level1", "requirement"],
+                properties: {
+                  level1: { type: "string" },
+                  level2: { type: "string" },
+                  requirement: { type: "string" },
+                  type: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              count: { type: "number" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        
+        if (!request.user) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        const currentUser = getUser(request);
+
+        // Validate request body
+        if (!request.body || !Array.isArray(request.body.requirements)) {
+          return reply.status(400).send({ error: "Invalid request body: requirements array is required" });
+        }
+
+        // Track created hierarchies to avoid duplicates
+        const level1Hierarchies = new Map<string, string>(); // level1 title -> hierarchy id
+        const level2Hierarchies = new Map<string, string>(); // "level1|level2" -> hierarchy id
+
+        let count = 0;
+
+        for (const reqData of request.body.requirements) {
+        if (!reqData.level1 || !reqData.level1.trim() || !reqData.requirement || !reqData.requirement.trim()) {
+          continue; // Skip invalid entries
+        }
+
+        const level1Title = reqData.level1.trim();
+        const level2Title = reqData.level2?.trim() || "";
+        const requirementDesc = reqData.requirement.trim();
+
+        // Get or create level 1 hierarchy
+        let level1HierarchyId = level1Hierarchies.get(level1Title);
+        if (!level1HierarchyId) {
+          // Check if it already exists
+          const existing = await db.requirementHierarchy.findFirst({
+            where: {
+              projectId,
+              parentId: null,
+              title: level1Title,
+            },
+          });
+
+          if (existing) {
+            level1HierarchyId = existing.id;
+          } else {
+            // Create new level 1 hierarchy
+            const number = await generateHierarchyNumber(projectId, null);
+            const maxOrder = await db.requirementHierarchy.findFirst({
+              where: { projectId, parentId: null },
+              orderBy: { order: "desc" },
+            });
+            const order = maxOrder ? maxOrder.order + 1 : 1;
+
+            const newHierarchy = await db.requirementHierarchy.create({
+              data: {
+                projectId,
+                parentId: null,
+                number,
+                title: level1Title,
+                order,
+              },
+            });
+            level1HierarchyId = newHierarchy.id;
+          }
+          level1Hierarchies.set(level1Title, level1HierarchyId);
+        }
+
+        // Get or create level 2 hierarchy if needed
+        let targetHierarchyId = level1HierarchyId;
+        if (level2Title) {
+          const level2Key = `${level1Title}|${level2Title}`;
+          let level2HierarchyId = level2Hierarchies.get(level2Key);
+          if (!level2HierarchyId) {
+            // Check if it already exists
+            const existing = await db.requirementHierarchy.findFirst({
+              where: {
+                projectId,
+                parentId: level1HierarchyId,
+                title: level2Title,
+              },
+            });
+
+            if (existing) {
+              level2HierarchyId = existing.id;
+            } else {
+              // Create new level 2 hierarchy
+              const number = await generateHierarchyNumber(projectId, level1HierarchyId);
+              const maxOrder = await db.requirementHierarchy.findFirst({
+                where: { projectId, parentId: level1HierarchyId },
+                orderBy: { order: "desc" },
+              });
+              const order = maxOrder ? maxOrder.order + 1 : 1;
+
+              const newHierarchy = await db.requirementHierarchy.create({
+                data: {
+                  projectId,
+                  parentId: level1HierarchyId,
+                  number,
+                  title: level2Title,
+                  order,
+                },
+              });
+              level2HierarchyId = newHierarchy.id;
+            }
+            level2Hierarchies.set(level2Key, level2HierarchyId);
+          }
+          targetHierarchyId = level2HierarchyId;
+        }
+
+        // Create requirement
+        const hierarchy = await db.requirementHierarchy.findUnique({
+          where: { id: targetHierarchyId },
+        });
+        if (!hierarchy) {
+          continue; // Skip if hierarchy not found
+        }
+
+        const requirementNumber = await generateRequirementNumber(targetHierarchyId);
+        const maxOrder = await db.requirement.findFirst({
+          where: { hierarchyId: targetHierarchyId },
+          orderBy: { order: "desc" },
+        });
+        const order = maxOrder ? maxOrder.order + 1 : 1;
+
+        // Validate and set requirement type
+        const validTypes = ["Information", "Mandatory", "Important", "Wish"];
+        const requirementType = reqData.type && validTypes.includes(reqData.type)
+          ? (reqData.type as any)
+          : "Information";
+
+        await db.requirement.create({
+          data: {
+            hierarchyId: targetHierarchyId,
+            number: requirementNumber,
+            description: requirementDesc,
+            type: requirementType,
+            status: RequirementStatus.Imported,
+            order,
+            createdById: currentUser.userId,
+            lastModifiedById: currentUser.userId,
+          },
+        });
+
+          count++;
+        }
+
+        return reply.status(200).send({ count });
+      } catch (error: any) {
+        request.log.error(error, "Error importing requirements");
+        return reply.status(500).send({ 
+          error: "Failed to import requirements",
+          message: error.message || "An unexpected error occurred"
+        });
+      }
     }
   );
 }

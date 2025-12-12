@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, Project } from "@/lib/api";
-import { HeroBanner } from "@/components/ui";
+import { api, Project, User } from "@/lib/api";
+import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, LoadingSpinner, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button } from "@/components/ui";
+import { ImportWizard } from "@/components/ImportWizard";
+import { useSearch } from "@/hooks/useSearch";
 
 export default function ManageProjectPage() {
   const params = useParams();
@@ -19,6 +21,15 @@ export default function ManageProjectPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [newMemberForm, setNewMemberForm] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+  });
+  const [addingMember, setAddingMember] = useState(false);
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
 
   const isAdmin =
     user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
@@ -36,24 +47,37 @@ export default function ManageProjectPage() {
     endDate: "",
   });
 
+  // Search for members
+  const { searchTerm, setSearchTerm, filteredItems: filteredMembers, clearSearch, isSearching } = useSearch(
+    project?.members || [],
+    {
+      searchKeys: ["firstName", "lastName", "name", "email"],
+    }
+  );
+
+  const displayMembers = isSearching ? filteredMembers : (project?.members || []);
+
   useEffect(() => {
     if (!isAdmin) {
       router.push(`/projects/${projectId}`);
       return;
     }
 
-    api.projects
-      .get(projectId)
-      .then((data) => {
-        setProject(data);
+    Promise.all([
+      api.projects.get(projectId),
+      api.users.getCompanyUsers(),
+    ])
+      .then(([projectData, users]) => {
+        setProject(projectData);
+        setAvailableUsers(users);
         setFormData({
-          name: data.name,
-          type: data.type || "",
-          startDate: data.startDate
-            ? new Date(data.startDate).toISOString().split("T")[0]
+          name: projectData.name,
+          type: projectData.type || "",
+          startDate: projectData.startDate
+            ? new Date(projectData.startDate).toISOString().split("T")[0]
             : getCurrentDate(),
-          endDate: data.endDate
-            ? new Date(data.endDate).toISOString().split("T")[0]
+          endDate: projectData.endDate
+            ? new Date(projectData.endDate).toISOString().split("T")[0]
             : "",
         });
         setLoading(false);
@@ -95,6 +119,25 @@ export default function ManageProjectPage() {
       setFormError(err.message || "Failed to delete project");
       setDeleting(false);
       setShowDeleteConfirm(false);
+    }
+  };
+
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm("Are you sure you want to remove this member from the project?")) {
+      return;
+    }
+
+    try {
+      await api.projects.removeMembers(projectId, [memberId]);
+      const [updatedProject, updatedUsers] = await Promise.all([
+        api.projects.get(projectId),
+        api.users.getCompanyUsers(),
+      ]);
+      setProject(updatedProject);
+      setAvailableUsers(updatedUsers);
+    } catch (err: any) {
+      setFormError(err.message || "Failed to remove member");
     }
   };
 
@@ -172,170 +215,472 @@ export default function ManageProjectPage() {
         }
       />
 
-      <div className="bg-background-secondary rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-2xl font-semibold mb-4">Project Details</h2>
-        <form onSubmit={handleSave} className="space-y-4">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Project Name *
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+      <Tabs defaultValue="details" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="import-export">Import/Export</TabsTrigger>
+        </TabsList>
 
-          <div>
-            <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
-              Type
-            </label>
-            <input
-              id="type"
-              type="text"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              placeholder="e.g., CRM system"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
+        <TabsContent value="details">
+          <div className="space-y-6">
+            <div className="bg-background-secondary rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4">Project Details</h2>
+              <form onSubmit={handleSave} className="space-y-4">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                    Project Name *
+                  </label>
+                  <input
+                    id="name"
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="startDate"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Start Date
-              </label>
-              <input
-                id="startDate"
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+                <div>
+                  <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                    Type
+                  </label>
+                  <input
+                    id="type"
+                    type="text"
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    placeholder="e.g., CRM system"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      htmlFor="startDate"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Start Date
+                    </label>
+                    <input
+                      id="startDate"
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="endDate"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      End Date
+                    </label>
+                    <input
+                      id="endDate"
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+
+                {formError && <p className="text-sm text-red-600">{formError}</p>}
+
+                <div className="flex gap-2 pt-4">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {saving ? "Saving..." : "Save Changes"}
+                  </button>
+                  <Link
+                    href={`/projects/${projectId}`}
+                    className="px-4 py-2 border border-gray-300 rounded-md hover:bg-background-primary inline-flex items-center"
+                  >
+                    Cancel
+                  </Link>
+                </div>
+              </form>
             </div>
-            <div>
-              <label
-                htmlFor="endDate"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                End Date
-              </label>
-              <input
-                id="endDate"
-                type="date"
-                value={formData.endDate}
-                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          </div>
 
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-          <div className="flex gap-2 pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-            <Link
-              href={`/projects/${projectId}`}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-background-primary inline-flex items-center"
-            >
-              Cancel
-            </Link>
-          </div>
-        </form>
-      </div>
-
-      {/* Member Management Section */}
-      <div className="bg-background-secondary rounded-lg shadow-md p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-semibold">Project Members</h2>
-          <Link
-            href={`/projects/${projectId}/members?edit=true`}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
-          >
-            Manage Members
-          </Link>
-        </div>
-        {project.members && project.members.length > 0 ? (
-          <ul className="space-y-2">
-            {project.members.map((member) => {
-              const displayName =
-                member.firstName && member.lastName
-                  ? `${member.firstName} ${member.lastName}`
-                  : member.firstName || member.lastName || member.name || member.email;
-              return (
-                <li key={member.id} className="text-gray-900 flex items-center space-x-2">
-                  <span className="w-2 h-2 bg-primary-600 rounded-full"></span>
-                  <span>{displayName}</span>
-                  <span className="text-gray-500 text-sm">({member.email})</span>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="text-gray-400 italic">No members assigned to this project</p>
-        )}
-      </div>
-
-      {/* Danger Zone */}
-      <div className="bg-red-50 border border-red-200 rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-semibold text-red-900 mb-4">Danger Zone</h2>
-        <p className="text-gray-700 mb-4">
-          Deleting this project will permanently remove all associated data including phases, tasks,
-          requirements, and vendor information. This action cannot be undone.
-        </p>
-        <button
-          type="button"
-          onClick={() => setShowDeleteConfirm(true)}
-          disabled={deleting}
-          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-        >
-          Delete Project
-        </button>
-      </div>
-
-      {/* Delete Confirmation Dialog */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background-tertiary rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Delete Project</h3>
-            <p className="text-gray-700 mb-6">
-              Are you sure you want to delete "{project.name}"? This action cannot be undone and
-              will delete all associated phases and tasks.
-            </p>
-            <div className="flex gap-2 justify-end">
+            {/* Danger Zone */}
+            <div className="bg-red-50 border border-red-200 rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-semibold text-red-900 mb-4">Danger Zone</h2>
+              <p className="text-gray-700 mb-4">
+                Deleting this project will permanently remove all associated data including phases, tasks,
+                requirements, and vendor information. This action cannot be undone.
+              </p>
               <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-background-primary disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
                 disabled={deleting}
                 className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
               >
-                {deleting ? "Deleting..." : "Delete"}
+                Delete Project
               </button>
             </div>
           </div>
-        </div>
+        </TabsContent>
+
+        <TabsContent value="members">
+          <div className="space-y-6">
+            {/* Search Bar and Add Button */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 max-w-md">
+                <SearchBar
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  onClear={clearSearch}
+                  placeholder="Search members..."
+                />
+              </div>
+              {isSearching && (
+                <span className="text-sm text-text-secondary">
+                  {displayMembers.length} of {project.members?.length || 0} members
+                </span>
+              )}
+              <button
+                onClick={() => setShowAddMemberForm(true)}
+                disabled={showAddMemberForm}
+                className="ml-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Add Member
+              </button>
+            </div>
+
+            {/* Members List */}
+            <div className="bg-background-secondary rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold mb-4">Project Members</h2>
+              {displayMembers.length === 0 && !showAddMemberForm ? (
+                <p className="text-text-secondary italic">No members found</p>
+              ) : (
+                <div className="space-y-2">
+                  {/* Inline Add Member Form */}
+                  {showAddMemberForm && (
+                    <div className="border-2 border-primary-500 rounded-lg bg-background-secondary animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="px-4 py-3 bg-background-tertiary">
+                        <form
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!newMemberForm.email || !newMemberForm.firstName || !newMemberForm.lastName) {
+                              setFormError("All fields are required");
+                              return;
+                            }
+                            setAddingMember(true);
+                            setFormError("");
+                            try {
+                              // Check if user exists, if not create
+                              let userToAdd: User;
+                              const existingUser = availableUsers.find(u => u.email === newMemberForm.email);
+                              if (existingUser) {
+                                userToAdd = existingUser;
+                              } else {
+                                userToAdd = await api.users.create({
+                                  email: newMemberForm.email,
+                                  firstName: newMemberForm.firstName,
+                                  lastName: newMemberForm.lastName,
+                                });
+                              }
+                              
+                              await api.projects.addMembers(projectId, [userToAdd.id]);
+                              
+                              // Reload project and available users
+                              const [updatedProject, updatedUsers] = await Promise.all([
+                                api.projects.get(projectId),
+                                api.users.getCompanyUsers(),
+                              ]);
+                              setProject(updatedProject);
+                              setAvailableUsers(updatedUsers);
+                              
+                              setNewMemberForm({ email: "", firstName: "", lastName: "" });
+                              setShowAddMemberForm(false);
+                              setFormError("");
+                            } catch (err: any) {
+                              setFormError(err.message || "Failed to add member");
+                            } finally {
+                              setAddingMember(false);
+                            }
+                          }}
+                          className="space-y-3"
+                        >
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-text-primary mb-1">
+                                Email *
+                              </label>
+                              <input
+                                type="email"
+                                value={newMemberForm.email}
+                                onChange={(e) => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                                required
+                                className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                placeholder="email@example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-text-primary mb-1">
+                                First Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={newMemberForm.firstName}
+                                onChange={(e) => setNewMemberForm({ ...newMemberForm, firstName: e.target.value })}
+                                required
+                                className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-text-primary mb-1">
+                                Last Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={newMemberForm.lastName}
+                                onChange={(e) => setNewMemberForm({ ...newMemberForm, lastName: e.target.value })}
+                                required
+                                className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="submit"
+                              disabled={addingMember}
+                              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 text-sm"
+                            >
+                              {addingMember ? "Adding..." : "Add"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddMemberForm(false);
+                                setNewMemberForm({ email: "", firstName: "", lastName: "" });
+                                setFormError("");
+                              }}
+                              className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
+                            >
+                              Cancel
+                            </button>
+                            {formError && (
+                              <span className="text-sm text-red-600">{formError}</span>
+                            )}
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Member from Company Users */}
+                  {showAddMemberForm && (() => {
+                    const availableCompanyUsers = availableUsers.filter(u => !project.members?.some(m => m.id === u.id));
+                    return availableCompanyUsers.length > 0;
+                  })() && (
+                    <div className="border-2 border-primary-500 rounded-lg bg-background-secondary animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="px-4 py-3 bg-background-tertiary">
+                        <form
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const select = e.currentTarget.querySelector('select') as HTMLSelectElement;
+                            const userId = select.value;
+                            if (!userId) {
+                              setFormError("Please select a user");
+                              return;
+                            }
+                            setAddingMember(true);
+                            setFormError("");
+                            try {
+                              await api.projects.addMembers(projectId, [userId]);
+                              
+                              // Reload project and available users
+                              const [updatedProject, updatedUsers] = await Promise.all([
+                                api.projects.get(projectId),
+                                api.users.getCompanyUsers(),
+                              ]);
+                              setProject(updatedProject);
+                              setAvailableUsers(updatedUsers);
+                              
+                              setShowAddMemberForm(false);
+                              setFormError("");
+                            } catch (err: any) {
+                              setFormError(err.message || "Failed to add member");
+                            } finally {
+                              setAddingMember(false);
+                            }
+                          }}
+                          className="space-y-3"
+                        >
+                          <div>
+                            <label className="block text-sm font-medium text-text-primary mb-1">
+                              Select from Company Users
+                            </label>
+                            <select
+                              required
+                              className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                              defaultValue=""
+                            >
+                              <option value="">Select a user...</option>
+                              {availableUsers
+                                .filter(u => !project.members?.some(m => m.id === u.id))
+                                .map((user) => {
+                                  const displayName =
+                                    user.firstName && user.lastName
+                                      ? `${user.firstName} ${user.lastName}`
+                                      : user.firstName || user.lastName || user.name || user.email;
+                                  return (
+                                    <option key={user.id} value={user.id}>
+                                      {displayName} ({user.email}) - {user.role}
+                                    </option>
+                                  );
+                                })}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="submit"
+                              disabled={addingMember}
+                              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 text-sm"
+                            >
+                              {addingMember ? "Adding..." : "Add"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddMemberForm(false);
+                                setFormError("");
+                              }}
+                              className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
+                            >
+                              Cancel
+                            </button>
+                            {formError && (
+                              <span className="text-sm text-red-600">{formError}</span>
+                            )}
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing Members */}
+                  {displayMembers.map((member) => {
+                    const displayName =
+                      member.firstName && member.lastName
+                        ? `${member.firstName} ${member.lastName}`
+                        : member.firstName || member.lastName || member.name || member.email;
+                    // Find full user object to get role
+                    const fullUser = availableUsers.find(u => u.id === member.id);
+                    const role = fullUser?.role || "User";
+                    return (
+                      <div
+                        key={member.id}
+                        className="border-2 border-primary-500 rounded-lg bg-background-secondary"
+                      >
+                        <div className="flex items-center justify-between px-4 py-3 bg-background-tertiary">
+                          <div className="flex items-center space-x-3">
+                            <span className="w-2 h-2 bg-primary-600 rounded-full"></span>
+                            <div>
+                              <span className="font-medium text-text-primary">{displayName}</span>
+                              <span className="text-text-secondary text-sm ml-2">({member.email})</span>
+                              <span className="text-text-tertiary text-sm ml-2">- {role}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveMember(member.id)}
+                            className="text-red-600 hover:text-red-800 text-sm underline"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="import-export">
+          <div className="space-y-6">
+            <div className="bg-background-secondary rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4">Import Data</h2>
+              <p className="text-text-secondary mb-4">
+                Import Tasks, RFI Questionnaires, or Requirements + Hierarchy from CSV files.
+              </p>
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              >
+                Start Import
+              </button>
+            </div>
+
+            <div className="bg-background-secondary rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4">Export Data</h2>
+              <p className="text-text-secondary">
+                Export functionality coming soon.
+              </p>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Project</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{project.name}"? This action cannot be undone and
+                will delete all associated phases and tasks.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
+
+
+      {/* Import Wizard */}
+      <ImportWizard
+        projectId={projectId}
+        open={showImportWizard}
+        onOpenChange={setShowImportWizard}
+      />
     </div>
   );
 }
-
-
-
