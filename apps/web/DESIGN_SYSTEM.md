@@ -644,6 +644,98 @@ Delete buttons in list items (tasks, requirements, etc.) follow a consistent pat
 </div>
 ```
 
+## Hero Banners
+
+Hero banners are informational banners that introduce users to different sections of the application. They provide context about the section's purpose and guide users on what they can accomplish there.
+
+### Color Scheme
+
+All hero banners use **blue (accent) colors** to distinguish them from primary green actions:
+- **Background**: `from-accent-50 to-accent-100` gradient (light mode), `from-accent-900/20 to-accent-800/20` (dark mode)
+- **Border**: `accent-200` (light mode), `accent-700` (dark mode)
+- **Icon circle**: `bg-accent-600`
+- **Tip box background**: `bg-white` (light mode, almost white with blue border accent), `bg-gray-800` (dark mode)
+- **Tip box border**: `accent-300` (light mode), `accent-700` (dark mode)
+- **Button**: `bg-accent-600 hover:bg-accent-700`
+
+### Component
+
+Use the `HeroBanner` component from `@/components/ui`:
+
+```tsx
+import { HeroBanner } from "@/components/ui";
+
+<HeroBanner
+  storageKey="section-hero-banner"
+  title="Welcome to Section Name"
+  description={
+    <>
+      Main description text with <strong>bold</strong> emphasis.
+    </>
+  }
+  features={[
+    {
+      label: "Feature name",
+      description: "Feature description",
+    },
+    // ... more features
+  ]}
+  tip={
+    <>
+      <div className="font-bold not-italic mb-1">Tip:</div>
+      <div>Tip content here.</div>
+    </>
+  }
+/>
+```
+
+### Structure
+
+Hero banners include:
+1. **Icon**: Blue circular icon with information symbol
+2. **Title**: Section welcome message
+3. **Description**: Main explanation text (supports JSX/strong tags)
+4. **Features**: Bulleted list of key capabilities (optional)
+5. **Tip box**: Highlighted tip section (optional)
+6. **Dismiss button**: "Understood" button that persists dismissal to localStorage
+
+### Dismissal
+
+Hero banners are dismissible and persist their state to localStorage:
+- Storage key format: `{section}-hero-banner-dismissed`
+- Example keys: `dashboard-hero-banner-dismissed`, `tasks-hero-banner-dismissed`, etc.
+- Once dismissed, the banner does not reappear unless localStorage is cleared
+
+### Usage Example
+
+```tsx
+<HeroBanner
+  storageKey="dashboard-hero-banner"
+  title="Welcome to Your Project Dashboard"
+  description={
+    <>
+      This is your <strong>central hub</strong> for monitoring project progress.
+    </>
+  }
+  features={[
+    {
+      label: "Phase Timeline",
+      description: "Track progress through procurement phases",
+    },
+    {
+      label: "Vendor Overview",
+      description: "Quick access to vendor management",
+    },
+  ]}
+  tip={
+    <>
+      <div className="font-bold not-italic mb-1">Tip:</div>
+      <div>Use the dashboard widgets to quickly identify areas that need attention.</div>
+    </>
+  }
+/>
+```
+
 ## Date Display Patterns
 
 ### Standard Date Formatting

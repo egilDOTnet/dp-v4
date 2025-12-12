@@ -70,3 +70,6 @@ export {
 
 // Searchable List
 export { SearchableList } from "./SearchableList";
+
+// Hero Banner
+export { HeroBanner } from "../HeroBanner";

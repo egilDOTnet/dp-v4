@@ -6,7 +6,7 @@ import Link from "next/link";
 import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
 import { useSearch } from "@/hooks/useSearch";
-import { SearchBar } from "@/components/ui";
+import { SearchBar, HeroBanner } from "@/components/ui";
 import MultiEditRequirementModal from "@/components/MultiEditRequirementModal";
 import MultiDeleteRequirementModal from "@/components/MultiDeleteRequirementModal";
 
@@ -20,7 +20,6 @@ export default function RequirementsPage() {
   const [error, setError] = useState("");
   const [selectedHierarchyId, setSelectedHierarchyId] = useState<string | null>(null);
   const [createForHierarchyId, setCreateForHierarchyId] = useState<string | null>(null);
-  const [showHeroBanner, setShowHeroBanner] = useState(true);
   const [expandedHierarchies, setExpandedHierarchies] = useState<Set<string>>(new Set());
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<Set<string>>(new Set());
   const [showMultiEditModal, setShowMultiEditModal] = useState(false);
@@ -103,19 +102,6 @@ export default function RequirementsPage() {
       loadData();
     }
   }, [projectId]);
-
-  useEffect(() => {
-    // Check if user has dismissed the hero banner before
-    const dismissed = localStorage.getItem("requirements-hero-banner-dismissed");
-    if (dismissed === "true") {
-      setShowHeroBanner(false);
-    }
-  }, []);
-
-  const handleDismissHeroBanner = () => {
-    localStorage.setItem("requirements-hero-banner-dismissed", "true");
-    setShowHeroBanner(false);
-  };
 
   const handleHierarchyUpdate = () => {
     loadData();
@@ -375,50 +361,40 @@ export default function RequirementsPage() {
       </div>
 
       {/* Hero Banner */}
-      {showHeroBanner && (
-        <div className="mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Welcome to Requirements</h3>
-              <p className="text-gray-700 mb-3">
-                <strong>Requirements</strong> are the foundation of your procurement process. This section helps you organize your needs in structured hierarchies, making it easier to evaluate vendor capabilities and ensure nothing is overlooked.
-              </p>
-              <p className="text-gray-700 mb-3">
-                <strong>Here's what you can do:</strong>
-              </p>
-              <ul className="list-disc list-inside text-gray-700 space-y-1 mb-4 ml-2">
-                <li><strong>Create hierarchies:</strong> Organize requirements into logical categories and subcategories</li>
-                <li><strong>Add requirements:</strong> Define specific needs with descriptions and details</li>
-                <li><strong>Set priorities:</strong> Mark requirements as Must Have, Should Have, or Nice to Have</li>
-                <li><strong>Track status:</strong> Monitor requirement statuses throughout the procurement process</li>
-              </ul>
-              <div className="bg-white/60 border border-primary-300 rounded-md p-3 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="text-3xl flex-shrink-0">💡</div>
-                  <div className="flex-1 text-sm text-gray-700 italic">
-                    <div className="font-bold not-italic mb-1">Tip:</div>
-                    <div>Well-defined requirements lead to better vendor responses!</div>
-                    <div>Take time to organize and prioritize your needs clearly.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={handleDismissHeroBanner}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors shadow-sm"
-            >
-              Understood
-            </button>
-          </div>
-        </div>
-      )}
+      <HeroBanner
+        storageKey="requirements-hero-banner"
+        title="Welcome to Requirements"
+        description={
+          <>
+            <strong>Requirements</strong> are the foundation of your procurement process. This section helps you organize your needs in structured hierarchies, making it easier to evaluate vendor capabilities and ensure nothing is overlooked.
+          </>
+        }
+        features={[
+          {
+            label: "Create hierarchies",
+            description: "Organize requirements into logical categories and subcategories",
+          },
+          {
+            label: "Add requirements",
+            description: "Define specific needs with descriptions and details",
+          },
+          {
+            label: "Set priorities",
+            description: "Mark requirements as Must Have, Should Have, or Nice to Have",
+          },
+          {
+            label: "Track status",
+            description: "Monitor requirement statuses throughout the procurement process",
+          },
+        ]}
+        tip={
+          <>
+            <div className="font-bold not-italic mb-1">Tip:</div>
+            <div>Well-defined requirements lead to better vendor responses!</div>
+            <div>Take time to organize and prioritize your needs clearly.</div>
+          </>
+        }
+      />
 
       <div className="space-y-6">
         {/* Hierarchy Structure */}

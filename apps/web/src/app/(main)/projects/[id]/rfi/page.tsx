@@ -6,9 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { api, Project, RFI } from "@/lib/api";
 import QuestionList from "@/components/QuestionList";
 import RFIStatusTable from "@/components/RFIStatusTable";
+import QuestionResponseSummary from "@/components/QuestionResponseSummary";
 import WysiwygEditor from "@/components/WysiwygEditor";
+import { HeroBanner } from "@/components/ui";
 
-type TabType = "email" | "rfi-info" | "questionnaire";
+type TabType = "email" | "rfi-info" | "questionnaire" | "status";
 
 export default function RFIPage() {
   const params = useParams();
@@ -26,7 +28,6 @@ export default function RFIPage() {
   const [emailText, setEmailText] = useState("");
   const [rfiInformation, setRfiInformation] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [showHeroBanner, setShowHeroBanner] = useState(true);
 
   useEffect(() => {
     if (projectId) {
@@ -34,19 +35,6 @@ export default function RFIPage() {
       loadRFI();
     }
   }, [projectId]);
-
-  useEffect(() => {
-    // Check if user has dismissed the hero banner before
-    const dismissed = localStorage.getItem("rfi-hero-banner-dismissed");
-    if (dismissed === "true") {
-      setShowHeroBanner(false);
-    }
-  }, []);
-
-  const handleDismissHeroBanner = () => {
-    localStorage.setItem("rfi-hero-banner-dismissed", "true");
-    setShowHeroBanner(false);
-  };
 
   const loadProject = async () => {
     try {
@@ -72,6 +60,13 @@ export default function RFIPage() {
       }
       
       setRfi(rfiData);
+      
+      // Set default tab based on published status
+      if (rfiData.isPublished) {
+        setActiveTab("status");
+      } else {
+        setActiveTab("questionnaire");
+      }
       
       // Safely parse dates - handle both string and Date object formats
       const parseDate = (date: string | Date | null | undefined): string => {
@@ -254,50 +249,40 @@ export default function RFIPage() {
         <h1 className="text-3xl font-bold mb-4">Request for Information (RFI)</h1>
 
         {/* Hero Banner */}
-        {showHeroBanner && (
-          <div className="mb-6 bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-lg p-6 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-text-primary mb-2">Welcome to the RFI Module</h3>
-                <p className="text-text-primary mb-3">
-                  A <strong>Request for Information (RFI)</strong> is your first step in the procurement process. It helps you gather preliminary information from potential vendors about their capabilities, experience, and solutions before diving into detailed proposals.
-                </p>
-                <p className="text-text-primary mb-3">
-                  <strong>Here's how this module works:</strong>
-                </p>
-                <ul className="list-disc list-inside text-text-primary space-y-1 mb-4 ml-2">
-                  <li><strong>Email text:</strong> Compose the invitation email that vendors will receive</li>
-                  <li><strong>RFI information:</strong> Add context about your project and what you're looking for</li>
-                  <li><strong>Questionnaire:</strong> Create questions to understand vendors' capabilities</li>
-                  <li><strong>Publish & Send:</strong> When ready, set a deadline and publish to send the RFI to all your vendors</li>
-                </ul>
-                <div className="bg-background-primary/60 border border-primary-300 rounded-md p-3 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="text-3xl flex-shrink-0">💡</div>
-                    <div className="flex-1 text-sm text-text-primary italic">
-                      <div className="font-bold not-italic mb-1">Tip:</div>
-                      <div>Take your time crafting clear questions.</div>
-                      <div>Good questions lead to valuable insights that help you make informed decisions!</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={handleDismissHeroBanner}
-                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors shadow-sm"
-              >
-                Understood
-              </button>
-            </div>
-          </div>
-        )}
+        <HeroBanner
+          storageKey="rfi-hero-banner"
+          title="Welcome to the RFI Module"
+          description={
+            <>
+              A <strong>Request for Information (RFI)</strong> is your first step in the procurement process. It helps you gather preliminary information from potential vendors about their capabilities, experience, and solutions before diving into detailed proposals.
+            </>
+          }
+          features={[
+            {
+              label: "Email text",
+              description: "Compose the invitation email that vendors will receive",
+            },
+            {
+              label: "RFI information",
+              description: "Add context about your project and what you're looking for",
+            },
+            {
+              label: "Questionnaire",
+              description: "Create questions to understand vendors' capabilities",
+            },
+            {
+              label: "Publish & Send",
+              description: "When ready, set a deadline and publish to send the RFI to all your vendors",
+            },
+          ]}
+          tip={
+            <>
+              <div className="font-bold not-italic mb-1">Tip:</div>
+              <div>Take your time crafting clear questions.</div>
+              <div>Good questions lead to valuable insights that help you make informed decisions!</div>
+            </>
+          }
+        />
 
         {/* Tab bar with action buttons */}
         <div className="flex items-end justify-between border-b border-gray-200">
@@ -333,6 +318,18 @@ export default function RFIPage() {
             >
               Questionnaire
             </button>
+            {rfi?.isPublished && (
+              <button
+                onClick={() => setActiveTab("status")}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "status"
+                    ? "border-primary-600 text-primary-600"
+                    : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+                }`}
+              >
+                Status
+              </button>
+            )}
           </div>
 
           {/* Action buttons on the right */}
@@ -469,16 +466,20 @@ export default function RFIPage() {
           </div>
         )}
 
+        {activeTab === "status" && (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Vendor Responses</h2>
+              <RFIStatusTable projectId={projectId} />
+            </div>
+            <div>
+              <QuestionResponseSummary projectId={projectId} />
+            </div>
+          </div>
+        )}
+
         {activeTab === "questionnaire" && (
           <div>
-            {/* Status section - only show when published */}
-            {rfi?.isPublished && (
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-4">Status</h2>
-                <RFIStatusTable projectId={projectId} />
-              </div>
-            )}
-
             {/* Questionnaire section */}
             {rfi && rfi.id ? (
               <div>

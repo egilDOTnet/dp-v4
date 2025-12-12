@@ -245,7 +245,51 @@ schema: {
 - Data that will be serialized and sent to the client
 - Endpoints that return Prisma query results directly
 
+## Date Formatting Standards
+
+### Use ISO 8601 Format
+
+**Why**: Avoid locale-specific date formatting (like US-style MM/DD/YYYY) that can confuse international users. ISO format is unambiguous and universally understood.
+
+**✅ Good**:
+```typescript
+import { formatISODateTime, formatISODate } from "@/lib/utils";
+
+// For date-time: YYYY-MM-DD HH:mm:ss
+const formatted = formatISODateTime(dateString); // "2024-01-15 14:30:45"
+
+// For date only: YYYY-MM-DD
+const formatted = formatISODate(dateString); // "2024-01-15"
+```
+
+**❌ Bad**:
+```typescript
+// Avoid locale-specific formatting
+date.toLocaleString(); // "1/15/2024, 2:30:45 PM" (US format)
+date.toLocaleDateString(); // "1/15/2024" (US format)
+date.toLocaleDateString("en-US"); // US format
+```
+
+### Utility Functions
+
+Use the date formatting utilities in `/apps/web/src/lib/utils.ts`:
+- `formatISODateTime(date)`: Returns `YYYY-MM-DD HH:mm:ss` format
+- `formatISODate(date)`: Returns `YYYY-MM-DD` format
+
+Both functions handle:
+- String dates
+- Date objects
+- Null/undefined values (returns "-")
+
+### When to Use Each Format
+
+- **Date-Time** (`formatISODateTime`): For timestamps, sent dates, answered dates, created/updated times
+- **Date Only** (`formatISODate`): For deadlines, start/end dates, date-only fields
+
 ## References
 
 - [Prisma Select Documentation](https://www.prisma.io/docs/concepts/components/prisma-client/select-fields)
 - [Fastify Schema Documentation](https://www.fastify.io/docs/latest/Reference/Validation-and-Serialization/)
+- [ISO 8601 Date Format Standard](https://en.wikipedia.org/wiki/ISO_8601)
+
+

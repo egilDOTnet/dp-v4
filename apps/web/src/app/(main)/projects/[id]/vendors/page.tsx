@@ -10,7 +10,7 @@ import {
   SearchBar,
   Breadcrumbs,
   LoadingSpinner,
-  DismissibleBanner,
+  HeroBanner,
 } from "@/components/ui";
 
 export default function VendorsPage() {
@@ -210,59 +210,34 @@ export default function VendorsPage() {
       <PageHeader title="Vendors" />
 
       {/* Hero Banner */}
-      <DismissibleBanner
+      <HeroBanner
         storageKey="vendors-hero-banner"
-        className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 border border-primary-200 dark:border-primary-800"
-      >
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-full flex items-center justify-center">
-            <svg
-              className="w-6 h-6 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-text-primary mb-2">
-              Welcome to Vendor Management
-            </h3>
-            <p className="text-text-primary mb-3">
-              Building a comprehensive list of{" "}
-              <strong>potential vendors</strong> is crucial for a successful
-              procurement process.
-            </p>
-            <ul className="list-disc list-inside text-text-primary space-y-1 mb-4 ml-2 text-sm">
-              <li>
-                <strong>Add vendors:</strong> Create vendor profiles with
-                organization details
-              </li>
-              <li>
-                <strong>Manage contacts:</strong> Add multiple contact persons
-              </li>
-              <li>
-                <strong>Track status:</strong> Monitor vendor engagement
-              </li>
-            </ul>
-            <div className="bg-background-primary/60 border border-primary-300 dark:border-primary-700 rounded-md p-3">
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">💡</div>
-                <div className="text-sm text-text-primary italic">
-                  <strong className="not-italic">Tip:</strong> Add contact
-                  persons early to streamline RFI and RFP distribution.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DismissibleBanner>
+        title="Welcome to Vendor Management"
+        description={
+          <>
+            Building a comprehensive list of <strong>potential vendors</strong> is crucial for a successful procurement process.
+          </>
+        }
+        features={[
+          {
+            label: "Add vendors",
+            description: "Create vendor profiles with organization details",
+          },
+          {
+            label: "Manage contacts",
+            description: "Add multiple contact persons",
+          },
+          {
+            label: "Track status",
+            description: "Monitor vendor engagement",
+          },
+        ]}
+        tip={
+          <>
+            <strong className="not-italic">Tip:</strong> Add contact persons early to streamline RFI and RFP distribution.
+          </>
+        }
+      />
 
       {/* Search Bar and Add Button */}
       <div className="flex items-center gap-4">

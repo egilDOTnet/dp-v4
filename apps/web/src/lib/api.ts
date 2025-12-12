@@ -617,6 +617,10 @@ export const api = {
         apiRequest<RFIVendorResponse[]>(
           `/api/projects/${projectId}/rfi/vendor-responses`
         ),
+      get: (projectId: string, vendorResponseId: string) =>
+        apiRequest<RFIVendorResponseWithAnswers>(
+          `/api/projects/${projectId}/rfi/vendor-responses/${vendorResponseId}`
+        ),
     },
     send: (projectId: string) =>
       apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfi/send`, {
@@ -906,7 +910,7 @@ export type RFIQuestionType =
   | "SingleText"
   | "MultilineText";
 
-export type RFIVendorResponseStatus = "Sent" | "Received" | "Answered" | "Rejected";
+export type RFIVendorResponseStatus = "Sent" | "Received" | "Answered" | "Rejected" | null;
 
 export interface RFIQuestionOption {
   id: string;
@@ -950,8 +954,26 @@ export interface RFI {
   questions?: RFIQuestion[];
 }
 
-export interface RFIVendorResponse {
+export interface RFIResponse {
   id: string;
+  questionId: string;
+  answer: any; // JSON answer - can be string, number, array, object depending on question type
+  question: {
+    id: string;
+    title: string;
+    description: string | null;
+    type: RFIQuestionType;
+    order: number;
+    required: boolean;
+    scaleLabels: Record<string, string> | null;
+    options?: RFIQuestionOption[];
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RFIVendorResponse {
+  id: string | null;
   vendorId: string;
   vendorName: string;
   contactPerson: {
@@ -964,7 +986,11 @@ export interface RFIVendorResponse {
   status: RFIVendorResponseStatus;
   sentAt: string | null;
   answeredAt: string | null;
-  createdAt: string;
+  createdAt: string | null;
+}
+
+export interface RFIVendorResponseWithAnswers extends RFIVendorResponse {
+  responses: RFIResponse[];
 }
 
 export interface DashboardStats {

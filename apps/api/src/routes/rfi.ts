@@ -591,8 +591,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Get RFI
-      const RFI = getRFIModel("RFI");
-      const rfi = await RFI.findUnique({
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -608,14 +607,14 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Publish RFI
-      await RFI.update({
+      await db.rFI.update({
         where: { projectId },
         data: {
           isPublished: true,
           publishedAt: new Date(),
           unpublishedAt: null,
         },
-        });
+      });
 
         return reply.send({ success: true });
       } catch (error: any) {
@@ -705,8 +704,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Unpublish RFI
-      const RFI = getRFIModel("RFI");
-      await RFI.update({
+      await db.rFI.update({
         where: { projectId },
         data: {
           isPublished: false,
@@ -2140,12 +2138,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "array",
-            items: {
-              type: "object",
-              description: "Vendor response with answers",
-            },
-            description: "Array of vendor responses",
+            description: "Array of vendor responses with vendor and contact details",
+            // No schema validation - return data as-is to avoid serialization issues
           },
           401: {
             type: "object",
@@ -2191,9 +2185,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Get RFI
-      const RFI = getRFIModel("RFI");
-      const RFIVendorResponse = getRFIModel("RFIVendorResponse");
-      const rfi = await RFI.findUnique({
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -2201,36 +2193,56 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.send([]);
       }
 
-      // Get vendor responses
+      // Get all project vendors with vendor and contact info
+      const projectVendors = await db.projectVendor.findMany({
+        where: { projectId },
+        select: {
+          id: true,
+          vendorId: true,
+        },
+      });
+
+      // Get all vendor IDs
+      const vendorIds = projectVendors.map(pv => pv.vendorId);
+
+      // Fetch all vendors with their contact persons in one query
       // Use select instead of include to ensure proper JSON serialization
-      const vendorResponses = await RFIVendorResponse.findMany({
+      const vendors = await db.vendor.findMany({
+        where: { id: { in: vendorIds } },
+        select: {
+          id: true,
+          name: true,
+          VendorContactPerson: {
+            where: { isMainContact: true },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              isMainContact: true,
+            },
+          },
+        },
+      });
+
+      // Create a map of vendorId -> vendor for quick lookup
+      const vendorMap = new Map();
+      vendors.forEach((v: any) => {
+        vendorMap.set(v.id, v);
+      });
+
+      // Get all vendor responses for this RFI
+      const dbAny = db as any;
+      const vendorResponses = await dbAny.rFIVendorResponse.findMany({
         where: { rfiId: rfi.id },
         select: {
           id: true,
+          projectVendorId: true,
           status: true,
           sentAt: true,
           answeredAt: true,
           createdAt: true,
-          projectVendor: {
-            select: {
-              vendorId: true,
-              vendor: {
-                select: {
-                  id: true,
-                  name: true,
-                  VendorContactPerson: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                      phone: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
           contactPerson: {
             select: {
               id: true,
@@ -2241,30 +2253,252 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
       });
 
-      // Format response to match expected structure
-      return reply.send(
-        vendorResponses.map((vr: any) => ({
-          id: vr.id,
-          vendorId: vr.projectVendor.vendorId,
-          vendorName: vr.projectVendor.vendor.name,
-          contactPerson: {
-            id: vr.contactPerson.id,
-            firstName: vr.contactPerson.firstName,
-            lastName: vr.contactPerson.lastName,
-            email: vr.contactPerson.email,
-            phone: vr.contactPerson.phone,
+      // Create a map of projectVendorId -> vendorResponse for quick lookup
+      const responseMap = new Map();
+      vendorResponses.forEach((vr: any) => {
+        responseMap.set(vr.projectVendorId, vr);
+      });
+
+      // Format response: all vendors with their RFI response status if they have one
+      const result = projectVendors.map((pv: any) => {
+        const vendor = vendorMap.get(pv.vendorId);
+        const vendorResponse = responseMap.get(pv.id);
+        // Find main contact - from vendor or from response
+        const mainContact = vendor?.VendorContactPerson?.[0] || vendorResponse?.contactPerson;
+
+        const vendorName = vendor?.name || `Vendor ${pv.vendorId}`;
+
+        return {
+          id: vendorResponse?.id || null,
+          vendorId: pv.vendorId,
+          vendorName: vendorName,
+          contactPerson: mainContact ? {
+            id: mainContact.id,
+            firstName: mainContact.firstName || "",
+            lastName: mainContact.lastName || "",
+            email: mainContact.email || "",
+            phone: mainContact.phone || null,
+          } : {
+            id: "",
+            firstName: "Unknown",
+            lastName: "",
+            email: "",
+            phone: null,
           },
-          status: vr.status,
-          sentAt: vr.sentAt,
-          answeredAt: vr.answeredAt,
-          createdAt: vr.createdAt,
-        }))
-      );
+          status: vendorResponse?.status || null,
+          sentAt: vendorResponse?.sentAt || null,
+          answeredAt: vendorResponse?.answeredAt || null,
+          createdAt: vendorResponse?.createdAt || null,
+        };
+      });
+
+      return reply.send(result);
       } catch (error: any) {
         request.log.error({ err: error }, "Error in GET /:id/rfi/vendor-responses");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Get individual vendor response with answers
+   * User must be a project member or company admin
+   * Returns vendor response with all question answers
+   */
+  fastify.get<{
+    Params: { id: string; vendorResponseId: string };
+  }>(
+    "/:id/rfi/vendor-responses/:vendorResponseId",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get individual vendor response with all answers. User must be a project member or company administrator. Returns vendor response with nested responses array containing all question answers.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "vendorResponseId"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+            vendorResponseId: {
+              type: "string",
+              description: "Vendor Response ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            description: "Vendor response with answers",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project, RFI, or vendor response not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        const vendorResponseId = request.params.vendorResponseId;
+        if (!request.user) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Get RFI
+        const rfi = await db.rFI.findUnique({
+          where: { projectId },
+        });
+
+        if (!rfi) {
+          return reply.status(404).send({ error: "RFI not found" });
+        }
+
+        // Get vendor response with project vendor info
+        const dbAny = db as any;
+        const vendorResponse = await dbAny.rFIVendorResponse.findUnique({
+          where: { id: vendorResponseId },
+          select: {
+            id: true,
+            rfiId: true,
+            status: true,
+            sentAt: true,
+            answeredAt: true,
+            createdAt: true,
+            projectVendor: {
+              select: {
+                id: true,
+                projectId: true,
+                vendorId: true,
+                vendor: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            contactPerson: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        });
+
+        if (!vendorResponse) {
+          return reply.status(404).send({ error: "Vendor response not found" });
+        }
+
+        // Verify vendor response belongs to this RFI and project
+        if (vendorResponse.rfiId !== rfi.id) {
+          return reply.status(404).send({ error: "Vendor response not found for this RFI" });
+        }
+
+        if (vendorResponse.projectVendor.projectId !== projectId) {
+          return reply.status(404).send({ error: "Vendor response not found for this project" });
+        }
+
+        // Get all responses (answers) for this vendor response
+        const responses = await dbAny.rFIResponse.findMany({
+          where: { vendorResponseId },
+          select: {
+            id: true,
+            questionId: true,
+            answer: true,
+            createdAt: true,
+            updatedAt: true,
+            question: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                type: true,
+                order: true,
+                required: true,
+                scaleLabels: true,
+                options: {
+                  select: {
+                    id: true,
+                    label: true,
+                    value: true,
+                    order: true,
+                  },
+                  orderBy: { order: "asc" },
+                },
+              },
+            },
+          },
+          orderBy: {
+            question: {
+              order: "asc",
+            },
+          },
+        });
+
+        // Format response
+        return reply.send({
+          id: vendorResponse.id,
+          vendorId: vendorResponse.projectVendor.vendorId,
+          vendorName: vendorResponse.projectVendor.vendor.name,
+          contactPerson: vendorResponse.contactPerson,
+          status: vendorResponse.status,
+          sentAt: vendorResponse.sentAt,
+          answeredAt: vendorResponse.answeredAt,
+          createdAt: vendorResponse.createdAt,
+          responses: responses.map((r: any) => ({
+            id: r.id,
+            questionId: r.questionId,
+            answer: r.answer,
+            question: r.question,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt,
+          })),
+        });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in GET /:id/rfi/vendor-responses/:vendorResponseId");
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "An unexpected error occurred",

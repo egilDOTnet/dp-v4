@@ -10,7 +10,9 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "db:seed": "tsx src/seed.ts"
+    "db:seed": "tsx src/seed.ts",
+    "db:mock-rfi": "tsx src/mock-rfi-data.ts",
+    "db:publish-rfi": "tsx src/publish-rfi.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

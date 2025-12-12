@@ -191,7 +191,7 @@ interface DismissibleBannerProps {
   /** Additional class names */
   className?: string;
   /** Variant for styling */
-  variant?: "info" | "success" | "warning" | "neutral";
+  variant?: "info" | "success" | "warning" | "neutral" | "hero";
 }
 
 const bannerVariantClasses = {
@@ -199,6 +199,7 @@ const bannerVariantClasses = {
   success: "bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 border-primary-200 dark:border-primary-700",
   warning: "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-yellow-200 dark:border-yellow-700",
   neutral: "bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-gray-200 dark:border-gray-700",
+  hero: "bg-gradient-to-r from-accent-50 to-accent-100 dark:from-accent-900/20 dark:to-accent-800/20 border-accent-200 dark:border-accent-700",
 };
 
 export function DismissibleBanner({
@@ -247,7 +248,11 @@ export function DismissibleBanner({
         <div className="flex justify-end mt-4">
           <button
             onClick={handleDismiss}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
+            className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+              variant === "hero"
+                ? "bg-accent-600 hover:bg-accent-700 focus:ring-accent-500"
+                : "bg-primary-600 hover:bg-primary-700 focus:ring-primary-500"
+            }`}
           >
             {dismissText}
           </button>
