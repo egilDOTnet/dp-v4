@@ -142,10 +142,6 @@ export function Header() {
     return user?.email?.[0]?.toUpperCase() || "?";
   };
 
-  const isAdmin =
-    user?.role === "CompanyAdministrator" ||
-    user?.role === "GlobalAdministrator";
-
   // Toggle theme between light and dark
   const toggleTheme = () => {
     if (resolvedTheme === "light") {
@@ -161,14 +157,6 @@ export function Header() {
         <Logo href="/dashboard" height={36} />
         {user && (
           <div className="flex items-center gap-4">
-            {isAdmin && (
-              <Link
-                href="/projects/new"
-                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 hidden sm:block transition-colors"
-              >
-                Create Project
-              </Link>
-            )}
             {/* Notifications bell */}
             <div className="relative" ref={notificationsRef}>
               <button
@@ -336,31 +324,6 @@ export function Header() {
                       </svg>
                       Dashboard
                     </button>
-
-                    {isAdmin && (
-                      <button
-                        onClick={() => {
-                          setShowMenu(false);
-                          router.push("/projects/new");
-                        }}
-                        className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-secondary transition-colors sm:hidden"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 4v16m8-8H4"
-                          />
-                        </svg>
-                        Create Project
-                      </button>
-                    )}
 
                     <button
                       onClick={() => {
