@@ -226,7 +226,7 @@ export default function RFPChangelog({ projectId, rfp }: RFPChangelogProps) {
                     data-entry-id={entry.id}
                   >
                     {/* Left side: Green background with number */}
-                    <div className="bg-primary-500 text-white flex items-center justify-center min-w-[5rem] px-3 py-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg">
+                    <div className="bg-primary-500 text-white flex items-start justify-center min-w-[5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg">
                       <div className="text-xl font-semibold text-center">
                         {reverseNumber}
                       </div>
@@ -277,7 +277,7 @@ export default function RFPChangelog({ projectId, rfp }: RFPChangelogProps) {
 
                         {/* User info (hidden during edit mode) */}
                         {!isEditing && (
-                          <div className="text-sm text-text-secondary">
+                          <div className="text-sm text-text-secondary mt-2">
                             by {getUserName(entry)}
                           </div>
                         )}
