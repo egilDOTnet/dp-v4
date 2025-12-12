@@ -284,6 +284,10 @@ When filtering is needed in addition to search, use a filter component with drop
 - **Default State**: Gray background (`bg-background-secondary`) with border
 - **Active State**: Blue background (`bg-accent-600`) when any filter is selected
 - **Structure**: Filter icon, "Filter by" text, and dropdown selects
+- **Sizing**: 
+  - Container padding: `px-3 py-1` (compact to match button height)
+  - Select dropdowns: `h-7` (28px height) with `px-1.5 py-0.5` padding
+  - This ensures the filter bar matches the height of adjacent buttons
 - **Behavior**: 
   - Filters combine with search (both apply simultaneously)
   - Filtered results expand hierarchies to show matching items
@@ -292,12 +296,16 @@ When filtering is needed in addition to search, use a filter component with drop
 
 **Implementation Example**:
 ```tsx
-<div className={`flex items-center gap-2 px-4 py-2 rounded-md border border-border-primary ${
+<div className={`flex items-center gap-2 px-3 py-1 rounded-md border border-border-primary ${
   isFiltering ? 'bg-accent-600' : 'bg-background-secondary'
 }`}>
-  <FilterIcon />
-  <span>Filter by</span>
-  <select value={filterStatus || ""} onChange={...}>
+  <FilterIcon className="h-4 w-4" />
+  <span className="text-sm">Filter by</span>
+  <select 
+    value={filterStatus || ""} 
+    onChange={...}
+    className="text-sm rounded px-1.5 py-0.5 border border-border-primary h-7 bg-background-tertiary text-text-primary"
+  >
     <option value="">Status</option>
     {/* options */}
   </select>

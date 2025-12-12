@@ -368,7 +368,7 @@ export default function RequirementsPage() {
         <div className="flex items-center gap-2 ml-auto">
           {/* Filter Component - hidden when requirements are selected */}
           {selectedRequirementIds.size === 0 && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-md border border-border-primary transition-colors ${
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-md border border-border-primary transition-colors ${
               isFiltering ? 'bg-accent-600' : 'bg-background-secondary'
             }`}>
               <svg
@@ -390,7 +390,7 @@ export default function RequirementsPage() {
               <select
                 value={filterType || ""}
                 onChange={(e) => setFilterType(e.target.value as typeof filterType || null)}
-                className={`text-sm rounded px-2 py-1 border border-border-primary h-8 ${
+                className={`text-sm rounded px-1.5 py-0.5 border border-border-primary h-7 ${
                   isFiltering ? 'bg-white text-text-primary' : 'bg-background-tertiary text-text-primary'
                 }`}
               >
@@ -403,7 +403,7 @@ export default function RequirementsPage() {
               <select
                 value={filterStatus || ""}
                 onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus || null)}
-                className={`text-sm rounded px-2 py-1 border border-border-primary h-8 ${
+                className={`text-sm rounded px-1.5 py-0.5 border border-border-primary h-7 ${
                   isFiltering ? 'bg-white text-text-primary' : 'bg-background-tertiary text-text-primary'
                 }`}
               >
