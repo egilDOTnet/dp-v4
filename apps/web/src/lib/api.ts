@@ -666,6 +666,232 @@ export const api = {
     preview: (projectId: string) =>
       apiRequest<RFI>(`/api/projects/${projectId}/rfi/preview`),
   },
+  rfp: {
+    get: (projectId: string) =>
+      apiRequest<RFP>(`/api/projects/${projectId}/rfp`),
+    update: (
+      projectId: string,
+      data: {
+        status?: "Draft" | "Published" | "Closed";
+        contactPersonId?: string | null;
+        alternativeContactPersonId?: string | null;
+        publishDate?: string | null;
+        deliveryDate?: string | null;
+      }
+    ) =>
+      apiRequest<RFP>(`/api/projects/${projectId}/rfp`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    publish: (projectId: string) =>
+      apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfp/publish`, {
+        method: "POST",
+      }),
+    send: (projectId: string) =>
+      apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfp/send`, {
+        method: "POST",
+      }),
+    schedule: {
+      list: (projectId: string) =>
+        apiRequest<RFPScheduleItem[]>(`/api/projects/${projectId}/rfp/schedule`),
+      create: (
+        projectId: string,
+        data: {
+          type: "StartDate" | "AcceptanceDate" | "QuestionsDate" | "DeliveryDate" | "CustomDate" | "CustomDateRange";
+          description: string;
+          date?: string;
+          fromDate?: string;
+          toDate?: string;
+          isRequired?: boolean;
+        }
+      ) =>
+        apiRequest<RFPScheduleItem>(`/api/projects/${projectId}/rfp/schedule`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (
+        projectId: string,
+        itemId: string,
+        data: {
+          description?: string;
+          date?: string | null;
+          fromDate?: string | null;
+          toDate?: string | null;
+        }
+      ) =>
+        apiRequest<RFPScheduleItem>(
+          `/api/projects/${projectId}/rfp/schedule/${itemId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, itemId: string) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfp/schedule/${itemId}`,
+          {
+            method: "DELETE",
+          }
+        ),
+    },
+    documents: {
+      list: (projectId: string) =>
+        apiRequest<RFPDocument[]>(`/api/projects/${projectId}/rfp/documents`),
+      create: (
+        projectId: string,
+        data: {
+          type: "Document" | "Link";
+          description: string;
+          url?: string;
+          fileName?: string;
+          fileType?: string;
+          fileData?: string;
+          fileSize?: number;
+        }
+      ) =>
+        apiRequest<RFPDocument>(`/api/projects/${projectId}/rfp/documents`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (
+        projectId: string,
+        docId: string,
+        data: {
+          description?: string;
+          url?: string | null;
+        }
+      ) =>
+        apiRequest<RFPDocument>(
+          `/api/projects/${projectId}/rfp/documents/${docId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, docId: string) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfp/documents/${docId}`,
+          {
+            method: "DELETE",
+          }
+        ),
+      reorder: (
+        projectId: string,
+        data: {
+          documentIds: string[];
+        }
+      ) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfp/documents/reorder`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+    },
+    changelog: {
+      list: (projectId: string) =>
+        apiRequest<RFPChangelogEntry[]>(`/api/projects/${projectId}/rfp/changelog`),
+      update: (
+        projectId: string,
+        entryId: string,
+        data: {
+          description: string;
+        }
+      ) =>
+        apiRequest<RFPChangelogEntry>(
+          `/api/projects/${projectId}/rfp/changelog/${entryId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, entryId: string) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfp/changelog/${entryId}`,
+          {
+            method: "DELETE",
+          }
+        ),
+    },
+    questions: {
+      list: (projectId: string, filter?: "answered" | "unanswered") =>
+        apiRequest<RFPQuestion[]>(
+          `/api/projects/${projectId}/rfp/questions${filter ? `?filter=${filter}` : ""}`
+        ),
+      create: (
+        projectId: string,
+        data: {
+          question: string;
+          vendorId: string;
+          contactPersonId: string;
+          createdAt?: string;
+        }
+      ) =>
+        apiRequest<RFPQuestion>(`/api/projects/${projectId}/rfp/questions`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      split: (
+        projectId: string,
+        questionId: string,
+        data: {
+          questions: string[];
+        }
+      ) =>
+        apiRequest<RFPQuestion[]>(
+          `/api/projects/${projectId}/rfp/questions/${questionId}/split`,
+          {
+            method: "POST",
+            body: JSON.stringify(data),
+          }
+        ),
+      answer: (
+        projectId: string,
+        questionId: string,
+        data: {
+          cleanedQuestion: string;
+          answer: string;
+        }
+      ) =>
+        apiRequest<RFPQuestion>(
+          `/api/projects/${projectId}/rfp/questions/${questionId}/answer`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, questionId: string) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfp/questions/${questionId}`,
+          {
+            method: "DELETE",
+          }
+        ),
+    },
+    announcements: {
+      list: (projectId: string) =>
+        apiRequest<RFPAnnouncement[]>(`/api/projects/${projectId}/rfp/announcements`),
+      create: (
+        projectId: string,
+        data: {
+          title: string;
+          description: string;
+        }
+      ) =>
+        apiRequest<RFPAnnouncement>(`/api/projects/${projectId}/rfp/announcements`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      send: (projectId: string, announcementId: string) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfp/announcements/${announcementId}/send`,
+          {
+            method: "POST",
+          }
+        ),
+    },
+  },
   notifications: {
     list: () => apiRequest<Notification[]>("/api/notifications"),
     getUnreadCount: () => apiRequest<{ count: number }>("/api/notifications/unread-count"),
@@ -1038,6 +1264,138 @@ export interface DashboardStats {
     byStatus: Record<string, number>;
     byType: Record<string, number>;
     unresolvedComments: number;
+  };
+}
+
+export type RFPStatus = "Draft" | "Published" | "Closed";
+
+export type RFPScheduleItemType =
+  | "StartDate"
+  | "AcceptanceDate"
+  | "QuestionsDate"
+  | "DeliveryDate"
+  | "CustomDate"
+  | "CustomDateRange";
+
+export type RFPDocumentType = "Document" | "Link";
+
+export interface RFP {
+  id: string;
+  projectId: string;
+  status: RFPStatus;
+  contactPersonId: string | null;
+  alternativeContactPersonId: string | null;
+  publishDate: string | null;
+  deliveryDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  contactPerson?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  } | null;
+  alternativeContactPerson?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  } | null;
+}
+
+export interface RFPScheduleItem {
+  id: string;
+  rfpId: string;
+  type: RFPScheduleItemType;
+  description: string;
+  date: string | null;
+  fromDate: string | null;
+  toDate: string | null;
+  order: number;
+  isRequired: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RFPDocument {
+  id: string;
+  rfpId: string;
+  type: RFPDocumentType;
+  description: string;
+  fileName: string | null;
+  fileType: string | null;
+  fileData: string | null;
+  fileSize: number | null;
+  url: string | null;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RFPChangelogEntry {
+  id: string;
+  rfpId: string;
+  description: string;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  };
+}
+
+export interface RFPQuestion {
+  id: string;
+  rfpId: string;
+  question: string;
+  cleanedQuestion: string | null;
+  answer: string | null;
+  answeredAt: string | null;
+  answeredById: string | null;
+  vendorId: string;
+  contactPersonId: string;
+  createdAt: string;
+  updatedAt: string;
+  vendor?: {
+    id: string;
+    name: string;
+  };
+  contactPerson?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  answeredBy?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  } | null;
+}
+
+export interface RFPAnnouncement {
+  id: string;
+  rfpId: string;
+  title: string;
+  description: string;
+  sentAt: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
   };
 }
 

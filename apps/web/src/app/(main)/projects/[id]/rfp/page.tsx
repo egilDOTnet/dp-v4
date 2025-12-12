@@ -3,21 +3,81 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, Project } from "@/lib/api";
-import { HeroBanner } from "@/components/ui";
+import { api, Project, RFP } from "@/lib/api";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
+import RFPOverview from "@/components/rfp/RFPOverview";
+import RFPSchedule from "@/components/rfp/RFPSchedule";
+import RFPDocuments from "@/components/rfp/RFPDocuments";
+import RFPChangelog from "@/components/rfp/RFPChangelog";
+import RFPQuestions from "@/components/rfp/RFPQuestions";
+import RFPAnnouncements from "@/components/rfp/RFPAnnouncements";
+
+type TabType = "overview" | "schedule" | "documents" | "changelog" | "qa" | "announcements";
 
 export default function RFPPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
+  const [rfp, setRfp] = useState<RFP | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
 
   useEffect(() => {
     if (projectId) {
-      api.projects.get(projectId)
-        .then(setProject)
-        .catch((err) => console.error("Failed to load project:", err));
+      loadProject();
+      loadRFP();
     }
   }, [projectId]);
+
+  const loadProject = async () => {
+    try {
+      const projectData = await api.projects.get(projectId);
+      setProject(projectData);
+    } catch (err: any) {
+      setError(err.message || "Failed to load project");
+    }
+  };
+
+  const loadRFP = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const rfpData = await api.rfp.get(projectId);
+      setRfp(rfpData);
+    } catch (err: any) {
+      console.error("Error loading RFP:", err);
+      setError(err.message || err.error?.message || "Failed to load RFP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div>
+        <nav className="mb-4 text-sm text-text-secondary">
+          <Link href="/dashboard" className="hover:text-primary-600">
+            Dashboard
+          </Link>
+          <span className="mx-2">/</span>
+          <Link href="/projects" className="hover:text-primary-600">
+            Projects
+          </Link>
+          <span className="mx-2">/</span>
+          <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
+            {project?.name || "Project"}
+          </Link>
+          <span className="mx-2">/</span>
+          <span className="text-text-primary">RFP</span>
+        </nav>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-text-secondary">Loading RFP...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -37,54 +97,53 @@ export default function RFPPage() {
         <span className="text-text-primary">RFP</span>
       </nav>
 
-      {/* Hero Banner */}
-      <HeroBanner
-        storageKey="rfp-hero-banner"
-        title="Welcome to the RFP Module (Coming Soon)"
-        description={
-          <>
-            A <strong>Request for Proposal (RFP)</strong> is the formal step after your RFI where you request detailed proposals from qualified vendors. This is where vendors provide comprehensive responses to your specific requirements.
-          </>
-        }
-        features={[
-          {
-            label: "RFP content management",
-            description: "Create and organize detailed proposal requests",
-          },
-          {
-            label: "Set deadlines",
-            description: "Manage submission timelines and auto-publish dates",
-          },
-          {
-            label: "Q&A functionality",
-            description: "Handle vendor questions during the RFP period",
-          },
-          {
-            label: "Document links",
-            description: "Attach relevant specifications, requirements, and supporting materials",
-          },
-        ]}
-        tip={
-          <>
-            <div className="font-bold not-italic mb-1">Tip:</div>
-            <div>This feature will help you collect detailed, comparable proposals from qualified vendors.</div>
-            <div>Use your RFI insights to create a focused and effective RFP!</div>
-          </>
-        }
-      />
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-4">Request for Proposal (RFP)</h1>
 
-      <div className="bg-background-secondary rounded-lg shadow-md p-12 text-center border border-border-primary">
-        <h1 className="text-3xl font-bold mb-4 text-text-primary">Request for Proposal (RFP)</h1>
-        <p className="text-text-secondary mb-2">
-          Manage RFP contents, dates, Q&A with vendors, and links to necessary content
-        </p>
-        <p className="text-text-tertiary text-sm italic">Coming soon</p>
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm font-medium text-red-800 mb-1">Error</p>
+            <p className="text-sm text-red-700 whitespace-pre-wrap">{error}</p>
+          </div>
+        )}
       </div>
+
+      {rfp && (
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)}>
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="documents">Documents/Links</TabsTrigger>
+            <TabsTrigger value="changelog">Changelog</TabsTrigger>
+            <TabsTrigger value="qa">Q&A</TabsTrigger>
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <RFPOverview projectId={projectId} rfp={rfp} />
+          </TabsContent>
+
+          <TabsContent value="schedule">
+            <RFPSchedule projectId={projectId} rfp={rfp} />
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <RFPDocuments projectId={projectId} rfp={rfp} />
+          </TabsContent>
+
+          <TabsContent value="changelog">
+            <RFPChangelog projectId={projectId} rfp={rfp} />
+          </TabsContent>
+
+          <TabsContent value="qa">
+            <RFPQuestions projectId={projectId} rfp={rfp} />
+          </TabsContent>
+
+          <TabsContent value="announcements">
+            <RFPAnnouncements projectId={projectId} rfp={rfp} />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }
-
-
-
-
-

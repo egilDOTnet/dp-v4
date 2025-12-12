@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Format a date string or Date object to ISO 8601 format (YYYY-MM-DD HH:mm:ss)
+ * Format a date string or Date object to ISO 8601 format (YYYY-MM-DD HH:MM)
  * Use this instead of toLocaleString() to avoid US-style date formatting
  * 
  * @param date - Date string, Date object, or null/undefined
@@ -22,9 +22,8 @@ export function formatISODateTime(date: string | Date | null | undefined): strin
   const day = String(dateObj.getDate()).padStart(2, "0");
   const hours = String(dateObj.getHours()).padStart(2, "0");
   const minutes = String(dateObj.getMinutes()).padStart(2, "0");
-  const seconds = String(dateObj.getSeconds()).padStart(2, "0");
   
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
 /**

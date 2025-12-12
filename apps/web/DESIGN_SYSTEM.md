@@ -146,6 +146,31 @@ import { Card, CardBody, CardHeader, CardFooter } from '@/components/ui';
   <CardFooter>Actions</CardFooter>
 </Card>
 ```
+**Important**: CardHeader and CardBody should always be within the same Card component, not in separate Cards. This creates a unified section with proper visual hierarchy:
+- **CardHeader**: Contains the section title and action buttons
+- **CardBody**: Contains the section content (list items, empty states, etc.)
+
+**Correct Pattern**:
+```tsx
+<Card>
+  <CardHeader>
+    <h2>Section Title</h2>
+  </CardHeader>
+  <CardBody>
+    {/* Content or EmptyState */}
+  </CardBody>
+</Card>
+```
+
+**Incorrect Pattern** (separate Cards):
+```tsx
+<Card>
+  <CardHeader>Title</CardHeader>
+</Card>
+<Card>
+  <CardBody>Content</CardBody>
+</Card>
+```
 
 #### SearchBar
 ```tsx
@@ -216,6 +241,121 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
 - **Textarea**: Auto-growing text areas
 - **FormField**: Wrapper for form inputs with labels and errors
 
+#### File Input (Drag-and-Drop)
+For file uploads, use a drag-and-drop container instead of a standard file input:
+
+```tsx
+<div
+  className="relative border-2 border-dashed border-border-primary rounded-lg p-6 text-center hover:border-primary-500 transition-colors cursor-pointer"
+  onMouseDown={(e) => {
+    // Prevent blur on other inputs when clicking file container
+    // This is important when used in inline forms that auto-save on blur
+    e.preventDefault();
+  }}
+  onDragOver={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }}
+  onDragLeave={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }}
+  onDrop={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      // Handle file
+    }
+  }}
+  onClick={() => {
+    fileInputRef.current?.click();
+  }}
+>
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept=".pdf,.zip"
+    onChange={(e) => {
+      const file = e.target.files?.[0] || null;
+      // Handle file
+    }}
+    className="hidden"
+  />
+  {file ? (
+    <div className="space-y-2">
+      {/* Show file info */}
+      <div className="text-sm text-text-primary">
+        <span className="font-medium">{file.name}</span>
+      </div>
+      <p className="text-xs text-text-secondary">
+        {formatFileSize(file.size)}
+      </p>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          // Remove file
+        }}
+        className="text-xs text-text-tertiary hover:text-text-primary mt-2"
+      >
+        Remove file
+      </button>
+    </div>
+  ) : (
+    <div className="space-y-2">
+      <svg
+        className="mx-auto h-12 w-12 text-text-tertiary"
+        stroke="currentColor"
+        fill="none"
+        viewBox="0 0 48 48"
+        aria-hidden="true"
+      >
+        <path
+          d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div className="text-sm text-text-primary">
+        <span className="font-medium">Drag and drop a file here, or click to choose a file</span>
+      </div>
+      <p className="text-xs text-text-secondary">
+        PDF or ZIP files only
+      </p>
+    </div>
+  )}
+</div>
+```
+
+**Features**:
+- Drag-and-drop support with visual feedback
+- Click to browse files
+- Shows file info when selected (name, size)
+- "Remove file" option to clear selection
+- Consistent placeholder text: "Drag and drop a file here, or click to choose a file"
+- File type restrictions shown below placeholder
+- Hidden file input with ref for programmatic access
+
+**Important for Inline Forms**: When using the drag-and-drop file input in inline forms that auto-save on blur (like new item forms), add `onMouseDown={(e) => e.preventDefault()}` to the container div. This prevents the blur event from firing on other inputs when clicking the file container, which would otherwise cancel or save the form prematurely.
+
+**Blur Handler Pattern**: In your blur handler for inline forms, check if focus is still within the form container before canceling:
+```tsx
+const handleBlur = () => {
+  setTimeout(() => {
+    const activeElement = document.activeElement;
+    // Check if focus moved to another element within the form
+    if (formRef.current && activeElement && formRef.current.contains(activeElement)) {
+      return; // Focus is still within the form, don't cancel
+    }
+    // ... rest of blur logic (save or cancel)
+  }, 150);
+};
+```
+
+This pattern ensures that clicking on interactive elements within the form (like file inputs, toggles, buttons) doesn't trigger unwanted form cancellation or saving.
+
 ## Hooks
 
 ### useSearch
@@ -268,6 +408,56 @@ All forms use a consistent inline editing pattern:
 5. Show loading states during save
 
 **Title Click to Edit Mode**: Clicking on a title/heading puts all related fields into edit mode simultaneously. This allows users to quickly edit multiple fields at once (e.g., title, description, owner, dates for tasks).
+
+**Click-to-Edit Pattern**: For simpler list items (like documents, links, changelog entries), clicking directly on the field content (e.g., description, URL) puts that field into edit mode. The field becomes an input that auto-saves on blur.
+
+### Inline New Item Forms
+When adding new items to a list, use an inline form pattern instead of modals:
+
+**Pattern**:
+1. **Add Button**: Located in the CardHeader, next to the section title
+2. **Inline Form**: When "Add" is clicked, show a form inline at the top of the list (before existing items)
+3. **Form Structure**: The new item form should match the structure of existing items, using the same Card component
+4. **Visual Distinction**: Use `border-2 border-primary-600` to highlight the new item form
+5. **Keyboard Support**: 
+   - Enter to submit (when form is valid)
+   - Escape to cancel
+   - Auto-focus first input field
+6. **State Management**: 
+   - Use `isCreatingNew` state to control form visibility
+   - Hide the "Add" button when form is visible
+   - Reset form state on cancel or successful creation
+
+**Implementation Example**:
+```tsx
+const [isCreatingNew, setIsCreatingNew] = useState(false);
+const [newItemData, setNewItemData] = useState({ /* form fields */ });
+
+// In render:
+{isCreatingNew && (
+  <Card className="border-2 border-primary-600">
+    <CardBody>
+      {/* Form fields */}
+      <div className="flex gap-2 justify-end">
+        <Button onClick={handleCancel} variant="secondary">Cancel</Button>
+        <Button onClick={handleCreate} variant="primary">Add</Button>
+      </div>
+    </CardBody>
+  </Card>
+)}
+
+{documents.map((doc) => (
+  <Card key={doc.id}>
+    {/* Existing item content */}
+  </Card>
+))}
+```
+
+**Benefits**:
+- Keeps context visible (user can see existing items)
+- Faster workflow (no modal to open/close)
+- Consistent with inline editing pattern
+- Better for keyboard navigation
 
 ### Search Everywhere
 All list views include instant search:
