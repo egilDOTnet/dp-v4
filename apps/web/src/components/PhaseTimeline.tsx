@@ -76,14 +76,14 @@ export default function PhaseTimeline({
                   <div className="font-semibold mb-1">
                     Phase {phase.order}: {phase.name}
                   </div>
-                  <div className="text-gray-300 text-xs">
+                  <div className="text-text-secondary text-xs">
                     Status: {statusLabels[phase.status]}
                   </div>
-                  <div className="text-gray-300 text-xs">
+                  <div className="text-text-secondary text-xs">
                     Tasks: {phase.completedTaskCount} of {phase.taskCount} completed
                   </div>
                   {/* Arrow pointing up */}
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-transparent border-b-gray-900"></div>
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-transparent border-b-background-primary"></div>
                 </div>
               )}
             </div>
