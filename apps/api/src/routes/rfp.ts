@@ -2123,6 +2123,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
             title: true,
             description: true,
             sentAt: true,
+            scheduledSendAt: true,
             createdById: true,
             createdAt: true,
             updatedAt: true,
@@ -2154,6 +2155,8 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
     Body: {
       title: string;
       description: string; // HTML from WYSIWYG
+      sendImmediately?: boolean;
+      scheduledSendAt?: string; // ISO datetime string
     };
   }>(
     "/:id/rfp/announcements",
@@ -2176,6 +2179,8 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           properties: {
             title: { type: "string" },
             description: { type: "string" },
+            sendImmediately: { type: "boolean" },
+            scheduledSendAt: { type: "string" },
           },
         },
         response: {
@@ -2201,12 +2206,20 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: "RFP not found" });
         }
 
+        const sendImmediately = request.body.sendImmediately !== false; // Default to true
+        const now = new Date();
+        const scheduledSendAt = request.body.scheduledSendAt
+          ? new Date(request.body.scheduledSendAt)
+          : null;
+
         const announcement = await db.rFPAnnouncement.create({
           data: {
             rfpId: rfp.id,
             title: request.body.title,
             description: request.body.description,
             createdById: user.userId,
+            sentAt: sendImmediately ? now : null,
+            scheduledSendAt: !sendImmediately && scheduledSendAt ? scheduledSendAt : null,
           },
           select: {
             id: true,
@@ -2214,6 +2227,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
             title: true,
             description: true,
             sentAt: true,
+            scheduledSendAt: true,
             createdById: true,
             createdAt: true,
             updatedAt: true,
@@ -2302,6 +2316,187 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         return reply.send({ success: true });
       } catch (error: any) {
         request.log.error({ err: error }, "Error in POST /:id/rfp/announcements/:announcementId/send");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  fastify.put<{
+    Params: { id: string; announcementId: string };
+    Body: {
+      title: string;
+      description: string; // HTML from WYSIWYG
+      sendImmediately?: boolean;
+      scheduledSendAt?: string; // ISO datetime string
+    };
+  }>(
+    "/:id/rfp/announcements/:announcementId",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Update announcement",
+        tags: ["rfp"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "announcementId"],
+          properties: {
+            id: { type: "string", description: "Project ID" },
+            announcementId: { type: "string", description: "Announcement ID" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["title", "description"],
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            sendImmediately: { type: "boolean" },
+            scheduledSendAt: { type: "string" },
+          },
+        },
+        response: {
+          200: { description: "Updated announcement" },
+          401: { type: "object", properties: { error: { type: "string" } } },
+          403: { type: "object", properties: { error: { type: "string" } } },
+          404: { type: "object", properties: { error: { type: "string" } } },
+          500: { type: "object", properties: { error: { type: "string" }, message: { type: "string" } } },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        const announcementId = request.params.announcementId;
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        const rfp = await db.rFP.findUnique({
+          where: { projectId },
+        });
+
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        const announcement = await db.rFPAnnouncement.findUnique({
+          where: { id: announcementId },
+        });
+
+        if (!announcement || announcement.rfpId !== rfp.id) {
+          return reply.status(404).send({ error: "Announcement not found" });
+        }
+
+        // Don't allow updating sent announcements
+        if (announcement.sentAt) {
+          return reply.status(400).send({ error: "Cannot update sent announcement" });
+        }
+
+        const sendImmediately = request.body.sendImmediately !== false; // Default to true
+        const scheduledSendAt = request.body.scheduledSendAt
+          ? new Date(request.body.scheduledSendAt)
+          : null;
+
+        const updated = await db.rFPAnnouncement.update({
+          where: { id: announcementId },
+          data: {
+            title: request.body.title,
+            description: request.body.description,
+            scheduledSendAt: !sendImmediately && scheduledSendAt ? scheduledSendAt : null,
+          },
+          select: {
+            id: true,
+            rfpId: true,
+            title: true,
+            description: true,
+            sentAt: true,
+            scheduledSendAt: true,
+            createdById: true,
+            createdAt: true,
+            updatedAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                name: true,
+              },
+            },
+          },
+        });
+
+        return reply.send(updated);
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in PUT /:id/rfp/announcements/:announcementId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  fastify.delete<{
+    Params: { id: string; announcementId: string };
+  }>(
+    "/:id/rfp/announcements/:announcementId",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Delete announcement",
+        tags: ["rfp"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "announcementId"],
+          properties: {
+            id: { type: "string", description: "Project ID" },
+            announcementId: { type: "string", description: "Announcement ID" },
+          },
+        },
+        response: {
+          200: { type: "object", properties: { success: { type: "boolean" } } },
+          401: { type: "object", properties: { error: { type: "string" } } },
+          403: { type: "object", properties: { error: { type: "string" } } },
+          404: { type: "object", properties: { error: { type: "string" } } },
+          500: { type: "object", properties: { error: { type: "string" }, message: { type: "string" } } },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        const announcementId = request.params.announcementId;
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        const rfp = await db.rFP.findUnique({
+          where: { projectId },
+        });
+
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        const announcement = await db.rFPAnnouncement.findUnique({
+          where: { id: announcementId },
+        });
+
+        if (!announcement || announcement.rfpId !== rfp.id) {
+          return reply.status(404).send({ error: "Announcement not found" });
+        }
+
+        await db.rFPAnnouncement.delete({
+          where: { id: announcementId },
+        });
+
+        return reply.send({ success: true });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in DELETE /:id/rfp/announcements/:announcementId");
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "An unexpected error occurred",

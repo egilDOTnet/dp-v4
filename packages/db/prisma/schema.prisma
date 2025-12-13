@@ -570,14 +570,15 @@ model RFPQuestion {
 }
 
 model RFPAnnouncement {
-  id          String    @id @default(cuid())
-  rfpId       String
-  title       String
-  description String // HTML from WYSIWYG editor
-  sentAt      DateTime?
-  createdById String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  rfpId           String
+  title           String
+  description     String // HTML from WYSIWYG editor
+  sentAt          DateTime?
+  scheduledSendAt DateTime?
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   rfp       RFP  @relation(fields: [rfpId], references: [id], onDelete: Cascade)
   createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)

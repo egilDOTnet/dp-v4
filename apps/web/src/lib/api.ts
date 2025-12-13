@@ -877,12 +877,38 @@ export const api = {
         data: {
           title: string;
           description: string;
+          sendImmediately?: boolean;
+          scheduledSendAt?: string;
         }
       ) =>
         apiRequest<RFPAnnouncement>(`/api/projects/${projectId}/rfp/announcements`, {
           method: "POST",
           body: JSON.stringify(data),
         }),
+      update: (
+        projectId: string,
+        announcementId: string,
+        data: {
+          title: string;
+          description: string;
+          sendImmediately?: boolean;
+          scheduledSendAt?: string;
+        }
+      ) =>
+        apiRequest<RFPAnnouncement>(
+          `/api/projects/${projectId}/rfp/announcements/${announcementId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, announcementId: string) =>
+        apiRequest<{ success: boolean }>(
+          `/api/projects/${projectId}/rfp/announcements/${announcementId}`,
+          {
+            method: "DELETE",
+          }
+        ),
       send: (projectId: string, announcementId: string) =>
         apiRequest<{ success: boolean }>(
           `/api/projects/${projectId}/rfp/announcements/${announcementId}/send`,
@@ -1387,6 +1413,7 @@ export interface RFPAnnouncement {
   title: string;
   description: string;
   sentAt: string | null;
+  scheduledSendAt: string | null;
   createdById: string;
   createdAt: string;
   updatedAt: string;
