@@ -67,6 +67,7 @@ export default function ProjectLayout({
 
   // Determine current section from pathname
   const currentSection = pathname?.split("/").pop() || "tasks";
+  const isManagePage = pathname?.endsWith("/manage");
 
   return (
     <div className="flex gap-6">
@@ -113,7 +114,11 @@ export default function ProjectLayout({
             {isAdmin && (
               <Link
                 href={`/projects/${projectId}/manage`}
-                className="block px-3 py-2 rounded-md text-sm font-medium text-text-primary hover:bg-background-primary"
+                className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isManagePage
+                    ? "bg-primary-50 text-primary-700 border-l-4 border-primary-600"
+                    : "text-text-primary hover:bg-background-primary"
+                }`}
               >
                 Manage Project
               </Link>

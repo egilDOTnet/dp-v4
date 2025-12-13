@@ -151,6 +151,29 @@ export const api = {
       apiRequest<void>(`/api/projects/${id}`, {
         method: "DELETE",
       }),
+    updateGraphics: (
+      id: string,
+      data: {
+        logoData?: string | null;
+        logoFileName?: string | null;
+        logoFileType?: string | null;
+        bannerData?: string | null;
+        bannerFileName?: string | null;
+        bannerFileType?: string | null;
+      }
+    ) =>
+      apiRequest<Project>(`/api/projects/${id}/graphics`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    deleteLogo: (id: string) =>
+      apiRequest<Project>(`/api/projects/${id}/graphics/logo`, {
+        method: "DELETE",
+      }),
+    deleteBanner: (id: string) =>
+      apiRequest<Project>(`/api/projects/${id}/graphics/banner`, {
+        method: "DELETE",
+      }),
     addMembers: (id: string, memberIds: string[]) =>
       apiRequest<Project>(`/api/projects/${id}/members`, {
         method: "POST",
@@ -949,6 +972,12 @@ export interface Project {
   type: string | null;
   startDate: string | null;
   endDate: string | null;
+  logoData: string | null;
+  logoFileName: string | null;
+  logoFileType: string | null;
+  bannerData: string | null;
+  bannerFileName: string | null;
+  bannerFileType: string | null;
   tenantId: string;
   createdAt: string;
   updatedAt: string;

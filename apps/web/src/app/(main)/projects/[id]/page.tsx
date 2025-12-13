@@ -117,6 +117,18 @@ export default function ProjectDashboardPage() {
         }
       />
 
+      {/* Banner Image */}
+      {project.bannerData && (
+        <div className="mb-6 rounded-lg overflow-hidden">
+          <img
+            src={`data:${project.bannerFileType || "image/png"};base64,${project.bannerData}`}
+            alt="Project banner"
+            className="w-full h-auto object-cover"
+            style={{ maxHeight: "300px" }}
+          />
+        </div>
+      )}
+
       {/* Project Information */}
       <div className="bg-background-secondary rounded-lg shadow-md mb-6 p-6 border border-border-primary">
         <div className="grid grid-cols-3 gap-6">

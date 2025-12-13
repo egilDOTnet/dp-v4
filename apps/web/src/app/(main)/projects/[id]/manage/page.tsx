@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, User } from "@/lib/api";
 import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, LoadingSpinner, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button } from "@/components/ui";
 import { ImportWizard } from "@/components/ImportWizard";
+import { GraphicsUpload } from "@/components/GraphicsUpload";
 import { useSearch } from "@/hooks/useSearch";
 
 export default function ManageProjectPage() {
@@ -218,8 +219,9 @@ export default function ManageProjectPage() {
       <Tabs defaultValue="details" className="mt-6">
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="graphics">Graphics</TabsTrigger>
           <TabsTrigger value="import-export">Import/Export</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details">
@@ -614,6 +616,116 @@ export default function ManageProjectPage() {
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="graphics">
+          <div className="space-y-6">
+            {/* Logo Section */}
+            <div className="bg-background-secondary rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4">Logo</h2>
+              <p className="text-text-secondary mb-4">
+                Upload a logo image for your project. Accepted formats: JPG, GIF, SVG, PNG (PNG recommended).
+                Maximum size: 500×500 pixels. For bitmap formats, you can select the portion of the image to use.
+              </p>
+              <GraphicsUpload
+                type="logo"
+                currentImage={project.logoData ? `data:${project.logoFileType || "image/png"};base64,${project.logoData}` : null}
+                currentFileName={project.logoFileName || null}
+                onUpload={async (data, fileName, fileType) => {
+                  try {
+                    // Extract base64 data (remove data URL prefix if present)
+                    // data URL format: "data:image/png;base64,<base64string>"
+                    let base64Data = data;
+                    if (data.startsWith("data:")) {
+                      const commaIndex = data.indexOf(",");
+                      if (commaIndex !== -1) {
+                        base64Data = data.substring(commaIndex + 1);
+                      }
+                    }
+                    
+                    // Validate base64 data is not empty
+                    if (!base64Data || base64Data.trim().length === 0) {
+                      throw new Error("Invalid image data");
+                    }
+                    
+                    const updateResponse = await api.projects.updateGraphics(projectId, {
+                      logoData: base64Data.trim(),
+                      logoFileName: fileName,
+                      logoFileType: fileType,
+                    });
+                    
+                    // The update response should contain the logo data
+                    // Merge with existing project data to preserve members and other fields
+                    setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                  } catch (err: any) {
+                    const errorMessage = err.message || "Failed to upload logo";
+                    setFormError(errorMessage);
+                    console.error("Logo upload error:", err);
+                    throw err;
+                  }
+                }}
+                onDelete={async () => {
+                  await api.projects.deleteLogo(projectId);
+                  const updatedProject = await api.projects.get(projectId);
+                  setProject(updatedProject);
+                }}
+                projectId={projectId}
+              />
+            </div>
+
+            {/* Banner Section */}
+            <div className="bg-background-secondary rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-semibold mb-4">Banner</h2>
+              <p className="text-text-secondary mb-4">
+                Upload a banner image for your project. Accepted formats: JPG, PNG.
+                Maximum size: 2000×2000 pixels. The selected portion will be resized to 1200×300 pixels.
+              </p>
+              <GraphicsUpload
+                type="banner"
+                currentImage={project.bannerData ? `data:${project.bannerFileType || "image/png"};base64,${project.bannerData}` : null}
+                currentFileName={project.bannerFileName || null}
+                onUpload={async (data, fileName, fileType) => {
+                  try {
+                    // Extract base64 data (remove data URL prefix if present)
+                    // data URL format: "data:image/png;base64,<base64string>"
+                    let base64Data = data;
+                    if (data.startsWith("data:")) {
+                      const commaIndex = data.indexOf(",");
+                      if (commaIndex !== -1) {
+                        base64Data = data.substring(commaIndex + 1);
+                      }
+                    }
+                    
+                    // Validate base64 data is not empty
+                    if (!base64Data || base64Data.trim().length === 0) {
+                      throw new Error("Invalid image data");
+                    }
+                    
+                    const updateResponse = await api.projects.updateGraphics(projectId, {
+                      bannerData: base64Data.trim(),
+                      bannerFileName: fileName,
+                      bannerFileType: fileType,
+                    });
+                    
+                    // The update response should contain the banner data
+                    // Merge with existing project data to preserve members and other fields
+                    setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                  } catch (err: any) {
+                    const errorMessage = err.message || "Failed to upload banner";
+                    setFormError(errorMessage);
+                    console.error("Banner upload error:", err);
+                    throw err;
+                  }
+                }}
+                onDelete={async () => {
+                  await api.projects.deleteBanner(projectId);
+                  const updatedProject = await api.projects.get(projectId);
+                  setProject(updatedProject);
+                }}
+                projectId={projectId}
+              />
             </div>
           </div>
         </TabsContent>

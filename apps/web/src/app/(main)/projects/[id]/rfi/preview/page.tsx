@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, RFI, RFIQuestion } from "@/lib/api";
+import { api, RFI, RFIQuestion, Project } from "@/lib/api";
 
 export default function RFIPreviewPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [rfi, setRfi] = useState<RFI | null>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -21,8 +22,12 @@ export default function RFIPreviewPage() {
   const loadPreview = async () => {
     try {
       setLoading(true);
-      const data = await api.rfi.preview(projectId);
-      setRfi(data);
+      const [rfiData, projectData] = await Promise.all([
+        api.rfi.preview(projectId),
+        api.projects.get(projectId),
+      ]);
+      setRfi(rfiData);
+      setProject(projectData);
       setError("");
     } catch (err: any) {
       setError(err.message || "Failed to load preview");
@@ -245,6 +250,18 @@ export default function RFIPreviewPage() {
       </nav>
 
       <div className="bg-background-secondary rounded-lg shadow-md p-8">
+        {/* Banner Image */}
+        {project?.bannerData && (
+          <div className="mb-8 rounded-lg overflow-hidden">
+            <img
+              src={`data:${project.bannerFileType || "image/png"};base64,${project.bannerData}`}
+              alt="Project banner"
+              className="w-full h-auto object-cover"
+              style={{ maxHeight: "300px" }}
+            />
+          </div>
+        )}
+
         {/* RFI Information */}
         {rfi.rfiInformation && (
           <div className="mb-8">

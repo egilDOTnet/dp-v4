@@ -508,6 +508,12 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               type: { type: "string", nullable: true },
               startDate: { type: "string", format: "date-time", nullable: true },
               endDate: { type: "string", format: "date-time", nullable: true },
+              logoData: { type: "string", nullable: true },
+              logoFileName: { type: "string", nullable: true },
+              logoFileType: { type: "string", nullable: true },
+              bannerData: { type: "string", nullable: true },
+              bannerFileName: { type: "string", nullable: true },
+              bannerFileType: { type: "string", nullable: true },
               tenantId: { type: "string", nullable: true },
               createdAt: { type: "string", format: "date-time" },
               updatedAt: { type: "string", format: "date-time" },
@@ -591,6 +597,12 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         type: project.type,
         startDate: project.startDate,
         endDate: project.endDate,
+        logoData: project.logoData,
+        logoFileName: project.logoFileName,
+        logoFileType: project.logoFileType,
+        bannerData: project.bannerData,
+        bannerFileName: project.bannerFileName,
+        bannerFileType: project.bannerFileType,
         tenantId: project.tenantId,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
@@ -2852,6 +2864,12 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         type: updatedProject.type,
         startDate: updatedProject.startDate,
         endDate: updatedProject.endDate,
+        logoData: updatedProject.logoData,
+        logoFileName: updatedProject.logoFileName,
+        logoFileType: updatedProject.logoFileType,
+        bannerData: updatedProject.bannerData,
+        bannerFileName: updatedProject.bannerFileName,
+        bannerFileType: updatedProject.bannerFileType,
         tenantId: updatedProject.tenantId,
         createdAt: updatedProject.createdAt,
         updatedAt: updatedProject.updatedAt,
@@ -2953,6 +2971,434 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       });
 
       return reply.status(204).send();
+    }
+  );
+
+  /**
+   * Update project graphics (logo and/or banner)
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * All fields are optional - only provided fields are updated
+   */
+  fastify.put<{
+    Params: { id: string };
+    Body: {
+      logoData?: string | null;
+      logoFileName?: string | null;
+      logoFileType?: string | null;
+      bannerData?: string | null;
+      bannerFileName?: string | null;
+      bannerFileType?: string | null;
+    };
+  }>(
+    "/:id/graphics",
+    {
+      preHandler: [
+        authenticate,
+        requireTenant,
+        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+      ],
+      schema: {
+        description: "Update project graphics (logo and/or banner). Requires CompanyAdministrator or GlobalAdministrator role. All fields are optional - only provided fields are updated.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            logoData: {
+              type: "string",
+              nullable: true,
+              description: "Base64 encoded logo image data",
+            },
+            logoFileName: {
+              type: "string",
+              nullable: true,
+              description: "Original logo filename",
+            },
+            logoFileType: {
+              type: "string",
+              nullable: true,
+              description: "Logo MIME type (e.g., image/png)",
+            },
+            bannerData: {
+              type: "string",
+              nullable: true,
+              description: "Base64 encoded banner image data",
+            },
+            bannerFileName: {
+              type: "string",
+              nullable: true,
+              description: "Original banner filename",
+            },
+            bannerFileType: {
+              type: "string",
+              nullable: true,
+              description: "Banner MIME type (e.g., image/png)",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string", nullable: true },
+              startDate: { type: "string", format: "date-time", nullable: true },
+              endDate: { type: "string", format: "date-time", nullable: true },
+              logoData: { type: "string", nullable: true },
+              logoFileName: { type: "string", nullable: true },
+              logoFileType: { type: "string", nullable: true },
+              bannerData: { type: "string", nullable: true },
+              bannerFileName: { type: "string", nullable: true },
+              bannerFileType: { type: "string", nullable: true },
+              tenantId: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+            description: "Updated project with graphics",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: {
+          logoData?: string | null;
+          logoFileName?: string | null;
+          logoFileType?: string | null;
+          bannerData?: string | null;
+          bannerFileName?: string | null;
+          bannerFileType?: string | null;
+        };
+      }>,
+      reply: FastifyReply
+    ) => {
+      const projectId = request.params.id;
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and belongs to same tenant
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Build update data object with only provided fields
+      const updateData: any = {};
+      if (request.body.logoData !== undefined) {
+        updateData.logoData = request.body.logoData === null ? null : request.body.logoData;
+      }
+      if (request.body.logoFileName !== undefined) {
+        updateData.logoFileName = request.body.logoFileName === null ? null : request.body.logoFileName;
+      }
+      if (request.body.logoFileType !== undefined) {
+        updateData.logoFileType = request.body.logoFileType === null ? null : request.body.logoFileType;
+      }
+      if (request.body.bannerData !== undefined) {
+        updateData.bannerData = request.body.bannerData === null ? null : request.body.bannerData;
+      }
+      if (request.body.bannerFileName !== undefined) {
+        updateData.bannerFileName = request.body.bannerFileName === null ? null : request.body.bannerFileName;
+      }
+      if (request.body.bannerFileType !== undefined) {
+        updateData.bannerFileType = request.body.bannerFileType === null ? null : request.body.bannerFileType;
+      }
+
+      let updatedProject;
+      try {
+        // Update project graphics
+        updatedProject = await db.project.update({
+          where: { id: projectId },
+          data: updateData,
+        });
+      } catch (error: any) {
+        request.log.error({ error, projectId, updateData: { ...updateData, logoData: updateData.logoData ? `${updateData.logoData?.substring(0, 50)}...` : null, bannerData: updateData.bannerData ? `${updateData.bannerData?.substring(0, 50)}...` : null } }, "Error updating project graphics");
+        return reply.status(500).send({ error: "Failed to update project graphics", message: error.message });
+      }
+
+      if (!updatedProject) {
+        return reply.status(404).send({ error: "Project not found after update" });
+      }
+
+      // Verify graphics data was saved (log lengths for debugging)
+      if (request.body.logoData !== undefined && updatedProject.logoData) {
+        request.log.info({ 
+          projectId, 
+          logoDataLength: updatedProject.logoData.length,
+          logoFileName: updatedProject.logoFileName,
+          logoFileType: updatedProject.logoFileType
+        }, "Logo graphics saved successfully");
+      }
+      if (request.body.bannerData !== undefined && updatedProject.bannerData) {
+        request.log.info({ 
+          projectId, 
+          bannerDataLength: updatedProject.bannerData.length,
+          bannerFileName: updatedProject.bannerFileName,
+          bannerFileType: updatedProject.bannerFileType
+        }, "Banner graphics saved successfully");
+      }
+
+      return reply.send({
+        id: updatedProject.id,
+        name: updatedProject.name,
+        type: updatedProject.type,
+        startDate: updatedProject.startDate,
+        endDate: updatedProject.endDate,
+        logoData: updatedProject.logoData,
+        logoFileName: updatedProject.logoFileName,
+        logoFileType: updatedProject.logoFileType,
+        bannerData: updatedProject.bannerData,
+        bannerFileName: updatedProject.bannerFileName,
+        bannerFileType: updatedProject.bannerFileType,
+        tenantId: updatedProject.tenantId,
+        createdAt: updatedProject.createdAt,
+        updatedAt: updatedProject.updatedAt,
+      });
+    }
+  );
+
+  /**
+   * Delete project logo
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   */
+  fastify.delete<{ Params: { id: string } }>(
+    "/:id/graphics/logo",
+    {
+      preHandler: [
+        authenticate,
+        requireTenant,
+        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+      ],
+      schema: {
+        description: "Delete project logo. Requires CompanyAdministrator or GlobalAdministrator role.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              logoData: { type: "string", nullable: true },
+              logoFileName: { type: "string", nullable: true },
+              logoFileType: { type: "string", nullable: true },
+            },
+            description: "Project with logo deleted",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const projectId = request.params.id;
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and belongs to same tenant
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Delete logo
+      const updatedProject = await db.project.update({
+        where: { id: projectId },
+        data: {
+          logoData: null,
+          logoFileName: null,
+          logoFileType: null,
+        },
+      });
+
+      return reply.send({
+        id: updatedProject.id,
+        name: updatedProject.name,
+        logoData: updatedProject.logoData,
+        logoFileName: updatedProject.logoFileName,
+        logoFileType: updatedProject.logoFileType,
+      });
+    }
+  );
+
+  /**
+   * Delete project banner
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   */
+  fastify.delete<{ Params: { id: string } }>(
+    "/:id/graphics/banner",
+    {
+      preHandler: [
+        authenticate,
+        requireTenant,
+        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+      ],
+      schema: {
+        description: "Delete project banner. Requires CompanyAdministrator or GlobalAdministrator role.",
+        tags: ["projects"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              bannerData: { type: "string", nullable: true },
+              bannerFileName: { type: "string", nullable: true },
+              bannerFileType: { type: "string", nullable: true },
+            },
+            description: "Project with banner deleted",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role or tenant",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const projectId = request.params.id;
+      const currentUser = getUser(request);
+      if (!currentUser.tenantId) {
+        return reply.status(403).send({ error: "Tenant required" });
+      }
+
+      // Verify project exists and belongs to same tenant
+      const project = await db.project.findUnique({
+        where: { id: projectId },
+      });
+
+      if (!project) {
+        return reply.status(404).send({ error: "Project not found" });
+      }
+
+      if (project.tenantId !== currentUser.tenantId) {
+        return reply.status(403).send({ error: "Access denied" });
+      }
+
+      // Delete banner
+      const updatedProject = await db.project.update({
+        where: { id: projectId },
+        data: {
+          bannerData: null,
+          bannerFileName: null,
+          bannerFileType: null,
+        },
+      });
+
+      return reply.send({
+        id: updatedProject.id,
+        name: updatedProject.name,
+        bannerData: updatedProject.bannerData,
+        bannerFileName: updatedProject.bannerFileName,
+        bannerFileType: updatedProject.bannerFileType,
+      });
     }
   );
 
