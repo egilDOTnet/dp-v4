@@ -12,7 +12,7 @@ interface VendorWidgetProps {
 const statusColors: Record<string, string> = {
   Pending: "bg-gray-100 text-gray-700 border-gray-300",
   RFI_Received: "bg-blue-100 text-blue-700 border-blue-300",
-  RFI_Rejected: "bg-red-100 text-red-700 border-red-300",
+  RFI_Started: "bg-purple-100 text-purple-700 border-purple-300",
   RFI_Answered: "bg-primary-100 text-primary-700 border-primary-300",
   RFP_Received: "bg-purple-100 text-purple-700 border-purple-300",
   RFP_Answered: "bg-indigo-100 text-indigo-700 border-indigo-300",
@@ -25,7 +25,7 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   Pending: "Pending",
   RFI_Received: "RFI Received",
-  RFI_Rejected: "RFI Rejected",
+  RFI_Started: "RFI Started",
   RFI_Answered: "RFI Answered",
   RFP_Received: "RFP Received",
   RFP_Answered: "RFP Answered",

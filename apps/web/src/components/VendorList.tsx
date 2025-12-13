@@ -54,7 +54,7 @@ interface VendorListProps {
 const STATUS_OPTIONS: { value: VendorStatus; label: string }[] = [
   { value: "Pending", label: "Pending" },
   { value: "RFI_Received", label: "RFI Received" },
-  { value: "RFI_Rejected", label: "RFI Rejected" },
+  { value: "RFI_Started", label: "RFI Started" },
   { value: "RFI_Answered", label: "RFI Answered" },
   { value: "RFP_Received", label: "RFP Received" },
   { value: "RFP_Answered", label: "RFP Answered" },

@@ -334,20 +334,22 @@ export default function RFIPage() {
 
           {/* Action buttons on the right */}
           <div className="flex items-end gap-3 pb-2">
-            <div className="flex flex-col">
-              <label htmlFor="autoPublishDate" className="text-xs text-gray-600 mb-1">
-                Auto-publish date
-              </label>
-              <input
-                id="autoPublishDate"
-                type="date"
-                value={autoPublishDate}
-                onChange={(e) => handleUpdateAutoPublishDate(e.target.value)}
-                disabled={!deadline}
-                max={deadline ? deadline : undefined}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              />
-            </div>
+            {!rfi?.isPublished && (
+              <div className="flex flex-col">
+                <label htmlFor="autoPublishDate" className="text-xs text-gray-600 mb-1">
+                  Auto-publish date
+                </label>
+                <input
+                  id="autoPublishDate"
+                  type="date"
+                  value={autoPublishDate}
+                  onChange={(e) => handleUpdateAutoPublishDate(e.target.value)}
+                  disabled={!deadline}
+                  max={deadline ? deadline : undefined}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+            )}
             <div className="flex flex-col">
               <label htmlFor="deadline" className="text-xs text-gray-600 mb-1">
                 Deadline

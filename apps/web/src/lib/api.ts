@@ -953,6 +953,136 @@ export const api = {
         method: "PUT",
       }),
   },
+  vendor: {
+    rfi: {
+      getByToken: (token: string) =>
+        apiRequest<{
+          project: {
+            id: string;
+            name: string;
+            type: string | null;
+            logoData: string | null;
+            logoFileName: string | null;
+            logoFileType: string | null;
+            bannerData: string | null;
+            bannerFileName: string | null;
+            bannerFileType: string | null;
+          };
+          rfi: {
+            id: string;
+            projectId: string;
+            emailSubject: string | null;
+            emailText: string | null;
+            rfiInformation: string | null;
+            deadline: string | null;
+            isPublished: boolean;
+            publishedAt: string | null;
+            unpublishedAt: string | null;
+            questions: Array<{
+              id: string;
+              rfiId: string;
+              title: string;
+              description: string | null;
+              type: string;
+              order: number;
+              required: boolean;
+              scaleLabels: Record<string, string> | null;
+              options: Array<{
+                id: string;
+                questionId: string;
+                label: string;
+                value: string | null;
+                xAxis: boolean;
+                yAxis: boolean;
+                order: number;
+              }>;
+            }>;
+          };
+          vendor: {
+            id: string;
+            name: string;
+          };
+          vendorResponse: {
+            id: string;
+            status: string;
+            answeredAt: string | null;
+            sentAt: string | null;
+          };
+          contactPerson: {
+            id: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone: string | null;
+          } | null;
+          existingResponses: Record<string, any>;
+          deadlinePassed?: boolean;
+        }>(`/api/vendor/rfi/${encodeURIComponent(token)}`),
+      getResponse: (token: string) =>
+        apiRequest<{
+          answers: Record<string, any>;
+          contactPerson: {
+            id: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone: string | null;
+          };
+        }>(`/api/vendor/rfi/${encodeURIComponent(token)}/response`),
+      submitResponse: (
+        token: string,
+        data: {
+          answers: Record<string, any>;
+          contactPerson: {
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone?: string | null;
+          };
+        }
+      ) =>
+        apiRequest<{ success: boolean }>(`/api/vendor/rfi/${encodeURIComponent(token)}/response`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      saveAnswers: (token: string, answers: Record<string, any>) =>
+        apiRequest<{ success: boolean }>(`/api/vendor/rfi/${encodeURIComponent(token)}/answers`, {
+          method: "PUT",
+          body: JSON.stringify({ answers }),
+        }),
+      getContacts: (token: string) =>
+        apiRequest<
+          Array<{
+            id: string;
+            firstName: string;
+            lastName: string;
+            email: string;
+            phone: string | null;
+            isMainContact: boolean;
+          }>
+        >(`/api/vendor/rfi/${encodeURIComponent(token)}/contacts`),
+      createContact: (
+        token: string,
+        data: {
+          firstName: string;
+          lastName: string;
+          email: string;
+          phone?: string | null;
+        }
+      ) =>
+        apiRequest<{
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+          phone: string | null;
+          isMainContact: boolean;
+        }>(`/api/vendor/rfi/${encodeURIComponent(token)}/contacts`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+  },
 };
 
 export interface User {
@@ -1139,7 +1269,7 @@ export interface RequirementHistory {
 export type VendorStatus =
   | "Pending"
   | "RFI_Received"
-  | "RFI_Rejected"
+  | "RFI_Started"
   | "RFI_Answered"
   | "RFP_Received"
   | "RFP_Answered"
@@ -1221,7 +1351,7 @@ export type RFIQuestionType =
   | "SingleText"
   | "MultilineText";
 
-export type RFIVendorResponseStatus = "Sent" | "Received" | "Answered" | "Rejected" | null;
+export type RFIVendorResponseStatus = "Sent" | "Started" | "Received" | "Answered" | "Rejected" | null;
 
 export interface RFIQuestionOption {
   id: string;
@@ -1298,6 +1428,7 @@ export interface RFIVendorResponse {
   sentAt: string | null;
   answeredAt: string | null;
   createdAt: string | null;
+  magicLinkToken: string | null;
 }
 
 export interface RFIVendorResponseWithAnswers extends RFIVendorResponse {

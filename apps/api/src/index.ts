@@ -10,6 +10,7 @@ import templateRoutes from "./routes/templates";
 import requirementRoutes from "./routes/requirements";
 import vendorRoutes from "./routes/vendors";
 import rfiRoutes from "./routes/rfi";
+import vendorRFIRoutes from "./routes/vendor-rfi";
 import rfpRoutes from "./routes/rfp";
 import notificationRoutes from "./routes/notifications";
 import { errorHandler } from "./middleware/error-handler";
@@ -57,6 +58,7 @@ const start = async () => {
     await fastify.register(requirementRoutes, { prefix: "/api/projects" });
     await fastify.register(vendorRoutes, { prefix: "/api/vendors" });
     await fastify.register(rfiRoutes, { prefix: "/api/projects" });
+    await fastify.register(vendorRFIRoutes, { prefix: "/api" });
     await fastify.register(rfpRoutes, { prefix: "/api/projects" });
     await fastify.register(notificationRoutes, { prefix: "/api/notifications" });
 

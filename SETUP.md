@@ -193,6 +193,36 @@ docker-compose logs web
 docker-compose logs -f api
 ```
 
+### Next.js Routing Errors (Turbopack)
+
+#### Web server stuck in restart loop with "Invalid segment" error
+
+If the web container keeps restarting with an error like:
+```
+Invalid segment Static("contact"), catch all segment must be the last segment modifying the path
+```
+
+**Cause:** This happens when you have a catch-all route (`[...token]`) with nested static segments (like `contact`, `questions`, etc.) after it. In Next.js, catch-all routes must be the last segment in the path.
+
+**Solution:**
+1. Check for duplicate route directories:
+   ```bash
+   # Look for both [token] and [...token] directories
+   find apps/web/src/app -type d -name "*token*"
+   ```
+
+2. Remove the catch-all route directory if you have both:
+   ```bash
+   # Remove the catch-all route (keep the dynamic route [token] instead)
+   rm -rf apps/web/src/app/(vendor)/rfi/\[...token\]
+   ```
+
+3. Use dynamic routes (`[token]`) instead of catch-all routes (`[...token]`) when you need nested routes:
+   - ✅ **Correct:** `app/rfi/[token]/contact/page.tsx`
+   - ❌ **Incorrect:** `app/rfi/[...token]/contact/page.tsx`
+
+**Best Practice:** Use dynamic routes `[param]` for single parameters, and only use catch-all routes `[...param]` when you need to capture multiple path segments and don't have any nested static routes after it.
+
 ## Test User (if seeded)
 
 - Email: `admin@example.com`
@@ -200,6 +230,24 @@ docker-compose logs -f api
 - Role: Global Administrator
 
 ## Development Notes
+
+### Next.js Routing Best Practices
+
+When creating routes in `apps/web/src/app`, follow these rules:
+
+1. **Dynamic routes vs Catch-all routes:**
+   - Use `[param]` for single dynamic segments: `app/rfi/[token]/page.tsx`
+   - Use `[...param]` only when you need to capture multiple segments AND it's the last segment
+   - ❌ **Never** use catch-all routes with nested static segments:
+     - ❌ `app/rfi/[...token]/contact/page.tsx` (invalid - static segment after catch-all)
+   - ✅ **Always** use dynamic routes when you have nested routes:
+     - ✅ `app/rfi/[token]/contact/page.tsx` (correct)
+
+2. **Route groups:** Use `(groupName)` for organization without affecting the URL path
+
+3. **Before creating new routes:** Check for existing similar routes to avoid conflicts
+
+### General Development Notes
 
 - Magic links are displayed in the UI during development (not sent via email)
 - First user of a company is automatically assigned CompanyAdministrator role

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { api, RFIVendorResponse, RFIVendorResponseStatus } from "@/lib/api";
 import { formatISODateTime } from "@/lib/utils";
 import VendorResponseView from "./VendorResponseView";
+import { Button } from "@/components/ui/button";
 
 interface RFIStatusTableProps {
   projectId: string;
@@ -16,6 +17,7 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   useEffect(() => {
     loadResponses();
@@ -59,6 +61,7 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
     }
     const styles = {
       Sent: "bg-blue-100 text-blue-800",
+      Started: "bg-purple-100 text-purple-800",
       Received: "bg-yellow-100 text-yellow-800",
       Answered: "bg-primary-100 text-primary-800",
       Rejected: "bg-red-100 text-red-800",
@@ -74,6 +77,40 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
 
   const formatDateTime = (dateString: string | null) => {
     return formatISODateTime(dateString);
+  };
+
+  const getMagicLinkUrl = (token: string | null) => {
+    if (!token) return null;
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    return `${baseUrl}/rfi/${token}`;
+  };
+
+  const handleCopyLink = async (token: string | null) => {
+    const url = getMagicLinkUrl(token);
+    if (!url) return;
+    
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedToken(token);
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setCopiedToken(null);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = url;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopiedToken(token);
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setCopiedToken(null);
+      }, 2000);
+    }
   };
 
   if (loading) {
@@ -108,9 +145,6 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
                 Vendor
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Main Contact
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -118,6 +152,9 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Answered At
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Magic Link
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -128,33 +165,18 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
             {responses.map((response, index) => (
               <tr 
                 key={response.id || `vendor-${response.vendorId}-${index}`}
-                className={`hover:bg-gray-50 ${response.status === "Answered" ? "cursor-pointer" : ""}`}
+                className={`hover:bg-gray-50 ${(response.status === "Answered" || response.status === "Started") ? "cursor-pointer" : ""}`}
                 onClick={() => {
-                  if (response.status === "Answered" && response.id) {
+                  if ((response.status === "Answered" || response.status === "Started") && response.id) {
                     setSelectedResponseId(response.id);
                     setIsDialogOpen(true);
                   }
                 }}
               >
                 <td className="px-4 py-4 whitespace-nowrap">
-                  <div className={`text-sm font-medium ${response.status === "Answered" ? "text-primary-600 hover:text-primary-700" : "text-gray-900"}`}>
+                  <div className={`text-sm font-medium ${(response.status === "Answered" || response.status === "Started") ? "text-primary-600 hover:text-primary-700" : "text-gray-900"}`}>
                     {response.vendorName || "Unknown Vendor"}
                   </div>
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap">
-                  {response.contactPerson ? (
-                    <>
-                      <div className="text-sm text-gray-900">
-                        {response.contactPerson.firstName}{" "}
-                        {response.contactPerson.lastName}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {response.contactPerson.email}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-sm text-gray-400 italic">No contact person</div>
-                  )}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   {getStatusBadge(response.status)}
@@ -165,18 +187,36 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                   {formatDateTime(response.answeredAt)}
                 </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm">
+                  {response.magicLinkToken ? (
+                    <Button
+                      variant={copiedToken === response.magicLinkToken ? "default" : "secondary"}
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopyLink(response.magicLinkToken);
+                      }}
+                      title="Copy magic link"
+                    >
+                      {copiedToken === response.magicLinkToken ? "Copied" : "Copy"}
+                    </Button>
+                  ) : (
+                    <span className="text-gray-400 text-xs italic">Not generated</span>
+                  )}
+                </td>
                 <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                   {response.status ? (
-                    <button
+                    <Button
+                      variant="default"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleResend(response.vendorId);
                       }}
                       disabled={resendingId === response.vendorId}
-                      className="text-primary-600 hover:text-primary-700 disabled:opacity-50"
                     >
                       {resendingId === response.vendorId ? "Resending..." : "Resend"}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="text-gray-400 text-xs">Not sent</span>
                   )}

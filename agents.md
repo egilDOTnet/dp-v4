@@ -8,6 +8,11 @@
 - When doing design/layout work, be sure to reference `.skills/design.md`.
 - For frontend web work, always reference the `DESIGN_SYSTEM.md` file
 
+## Routing instructions
+- When creating or modifying Next.js routes in `apps/web`, reference `apps/web/ROUTING_GUIDE.md`
+- **Critical:** Never use catch-all routes (`[...param]`) with nested static segments - use dynamic routes (`[param]`) instead
+- If the web server gets stuck in a restart loop, check for duplicate `[param]` and `[...param]` route directories
+
 ## Testing instructions
 - CI pipeline configuration lives in `.github/workflows/`.
 - Run `pnpm turbo run test --filter <project_name>` to run tests for a specific package.

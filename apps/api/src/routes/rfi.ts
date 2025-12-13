@@ -38,6 +38,47 @@ function getRFIModel(modelName: string) {
   return model;
 }
 
+// Helper to sync vendor status from RFI vendor response status
+// This ensures one-way sync: RFI status changes update Vendor status
+async function syncVendorStatusFromRFIStatus(
+  rfiVendorResponseStatus: string,
+  projectVendorId: string
+): Promise<void> {
+  // Map RFI status to Vendor status
+  // Only sync certain statuses - Rejected doesn't update vendor status
+  let vendorStatus: string | null = null;
+  
+  switch (rfiVendorResponseStatus) {
+    case "Started":
+      vendorStatus = "RFI_Started";
+      break;
+    case "Received":
+      vendorStatus = "RFI_Received";
+      break;
+    case "Answered":
+      vendorStatus = "RFI_Answered";
+      break;
+    case "Sent":
+      // When RFI is sent, status should be RFI_Received
+      vendorStatus = "RFI_Received";
+      break;
+    case "Rejected":
+      // Don't sync rejected status - vendor status remains as is
+      return;
+    default:
+      // Unknown status, don't sync
+      return;
+  }
+
+  // Update vendor status
+  if (vendorStatus) {
+    await db.projectVendor.update({
+      where: { id: projectVendorId },
+      data: { status: vendorStatus as any },
+    });
+  }
+}
+
 export default async function rfiRoutes(fastify: FastifyInstance) {
   /**
    * Get RFI for a project
@@ -305,15 +346,13 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
             },
             deadline: {
               type: "string",
-              format: "date-time",
               nullable: true,
-              description: "RFI deadline (ISO 8601 datetime)",
+              description: "RFI deadline (ISO 8601 date or datetime string, e.g., '2025-12-15' or '2025-12-15T23:59:59Z')",
             },
             autoPublishDate: {
               type: "string",
-              format: "date-time",
               nullable: true,
-              description: "Auto-publish date (must be before deadline if both set)",
+              description: "Auto-publish date (ISO 8601 date or datetime string, must be before deadline if both set)",
             },
           },
         },
@@ -362,8 +401,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const projectId = request.params.id;
+      let updateData: any = {};
+      let createData: any = {};
+      
       try {
-        const projectId = request.params.id;
         if (!request.user) {
           return reply.status(401).send({ error: "Unauthorized" });
         }
@@ -373,11 +415,45 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
       const project = (request as any).project;
 
+      // Helper function to safely parse date strings
+      // Handles empty strings, null, and date-only strings (YYYY-MM-DD)
+      const parseDate = (dateValue: string | null | undefined): Date | null => {
+        if (!dateValue || (typeof dateValue === "string" && dateValue.trim() === "")) {
+          return null;
+        }
+        try {
+          // If it's a date-only string (YYYY-MM-DD), convert to end of day in UTC
+          if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+            // Use UTC to avoid timezone issues - set to end of day (23:59:59.999)
+            const date = new Date(dateValue + "T23:59:59.999Z");
+            if (isNaN(date.getTime())) {
+              return null;
+            }
+            return date;
+          }
+          // Otherwise, try to parse as full datetime
+          const date = new Date(dateValue);
+          if (isNaN(date.getTime())) {
+            return null;
+          }
+          return date;
+        } catch (error) {
+          request.log.warn({ err: error, dateValue }, "Error parsing date");
+          return null;
+        }
+      };
+
+      // Parse dates for validation
+      const parsedDeadline = request.body.deadline !== undefined 
+        ? parseDate(request.body.deadline) 
+        : null;
+      const parsedAutoPublish = request.body.autoPublishDate !== undefined 
+        ? parseDate(request.body.autoPublishDate) 
+        : null;
+
       // Validate dates
-      if (request.body.deadline && request.body.autoPublishDate) {
-        const deadline = new Date(request.body.deadline);
-        const autoPublish = new Date(request.body.autoPublishDate);
-        if (autoPublish >= deadline) {
+      if (parsedDeadline && parsedAutoPublish) {
+        if (parsedAutoPublish >= parsedDeadline) {
           return reply.status(400).send({
             error: "Auto publish date must be before deadline",
           });
@@ -386,7 +462,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
 
       // Update or create RFI
       // Use direct model access like requirements endpoint
-      const updateData: any = {};
+      updateData = {};
       if (request.body.emailSubject !== undefined) {
         updateData.emailSubject = request.body.emailSubject;
       }
@@ -397,24 +473,26 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         updateData.rfiInformation = request.body.rfiInformation;
       }
       if (request.body.deadline !== undefined) {
-        updateData.deadline = request.body.deadline ? new Date(request.body.deadline) : null;
+        updateData.deadline = parsedDeadline;
       }
       if (request.body.autoPublishDate !== undefined) {
-        updateData.autoPublishDate = request.body.autoPublishDate
-          ? new Date(request.body.autoPublishDate)
-          : null;
+        updateData.autoPublishDate = parsedAutoPublish;
       }
 
       // For create, get templates and apply defaults
-      const createData: any = {
+      createData = {
         projectId,
         emailText: request.body.emailText || "",
         rfiInformation: request.body.rfiInformation || "",
-        deadline: request.body.deadline ? new Date(request.body.deadline) : null,
-        autoPublishDate: request.body.autoPublishDate
-          ? new Date(request.body.autoPublishDate)
-          : null,
       };
+      
+      // Only set deadline/autoPublishDate if they were provided in the request
+      if (request.body.deadline !== undefined) {
+        createData.deadline = parsedDeadline;
+      }
+      if (request.body.autoPublishDate !== undefined) {
+        createData.autoPublishDate = parsedAutoPublish;
+      }
 
       // Only fetch templates if creating new RFI and fields not explicitly provided
       const existingRfi = await db.rFI.findUnique({ where: { projectId } });
@@ -498,7 +576,13 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         // Fastify's serializer handles Date objects automatically
         return reply.send(rfi);
       } catch (error: any) {
-        request.log.error({ err: error }, "Error in PUT /:id/rfi");
+        request.log.error({ 
+          err: error, 
+          projectId,
+          body: request.body,
+          updateData,
+          stack: error.stack 
+        }, "Error in PUT /:id/rfi");
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "An unexpected error occurred",
@@ -2243,6 +2327,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           sentAt: true,
           answeredAt: true,
           createdAt: true,
+          magicLinkToken: true,
           contactPerson: {
             select: {
               id: true,
@@ -2291,6 +2376,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           sentAt: vendorResponse?.sentAt || null,
           answeredAt: vendorResponse?.answeredAt || null,
           createdAt: vendorResponse?.createdAt || null,
+          magicLinkToken: vendorResponse?.magicLinkToken || null,
         };
       });
 
@@ -2336,8 +2422,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "Vendor response with answers",
+            // No schema validation - return data as-is to avoid serialization issues
           },
           401: {
             type: "object",
@@ -2393,8 +2479,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         }
 
         // Get vendor response with project vendor info
-        const dbAny = db as any;
-        const vendorResponse = await dbAny.rFIVendorResponse.findUnique({
+        const RFIVendorResponse = getRFIModel("RFIVendorResponse");
+        const vendorResponse = await RFIVendorResponse.findUnique({
           where: { id: vendorResponseId },
           select: {
             id: true,
@@ -2429,20 +2515,33 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         });
 
         if (!vendorResponse) {
+          request.log.warn({ projectId, vendorResponseId }, "Vendor response not found");
           return reply.status(404).send({ error: "Vendor response not found" });
         }
 
         // Verify vendor response belongs to this RFI and project
         if (vendorResponse.rfiId !== rfi.id) {
+          request.log.warn({ 
+            projectId, 
+            vendorResponseId, 
+            vendorResponseRfiId: vendorResponse.rfiId, 
+            expectedRfiId: rfi.id 
+          }, "Vendor response RFI mismatch");
           return reply.status(404).send({ error: "Vendor response not found for this RFI" });
         }
 
         if (vendorResponse.projectVendor.projectId !== projectId) {
+          request.log.warn({ 
+            projectId, 
+            vendorResponseId, 
+            vendorResponseProjectId: vendorResponse.projectVendor.projectId 
+          }, "Vendor response project mismatch");
           return reply.status(404).send({ error: "Vendor response not found for this project" });
         }
 
         // Get all responses (answers) for this vendor response
-        const responses = await dbAny.rFIResponse.findMany({
+        const RFIResponse = getRFIModel("RFIResponse");
+        const responses = await RFIResponse.findMany({
           where: { vendorResponseId },
           select: {
             id: true,
@@ -2478,8 +2577,15 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           },
         });
 
+        request.log.info({ 
+          projectId, 
+          vendorResponseId, 
+          responseCount: responses.length,
+          vendorName: vendorResponse.projectVendor.vendor.name 
+        }, "Fetched vendor response with answers");
+
         // Format response
-        return reply.send({
+        const responseData = {
           id: vendorResponse.id,
           vendorId: vendorResponse.projectVendor.vendorId,
           vendorName: vendorResponse.projectVendor.vendor.name,
@@ -2496,7 +2602,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
             createdAt: r.createdAt,
             updatedAt: r.updatedAt,
           })),
-        });
+        };
+
+        return reply.send(responseData);
       } catch (error: any) {
         request.log.error({ err: error }, "Error in GET /:id/rfi/vendor-responses/:vendorResponseId");
         return reply.status(500).send({
@@ -2643,15 +2751,34 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         });
 
         if (!existingResponse) {
-          // Create vendor response
-          await RFIVendorResponse.create({
+          // Generate magic link token
+          const tokenExpiresAt = new Date();
+          tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30 days from now
+          
+          const vendorResponse = await RFIVendorResponse.create({
             data: {
               rfiId: rfi.id,
               projectVendorId: pv.id,
               contactPersonId: mainContact.id,
               status: "Sent",
               sentAt: now,
+              tokenExpiresAt,
             },
+          });
+
+          // Generate JWT token
+          const magicLinkToken = fastify.jwt.sign(
+            {
+              vendorResponseId: vendorResponse.id,
+              type: "rfi-vendor",
+            } as any,
+            { expiresIn: "30d" }
+          );
+
+          // Update with token
+          await RFIVendorResponse.update({
+            where: { id: vendorResponse.id },
+            data: { magicLinkToken },
           });
 
           // Update vendor status
@@ -2662,7 +2789,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
             });
           }
 
-          // TODO: Send email in production
+          // TODO: Send email in production with magic link
+          // Magic link URL: ${baseUrl}/rfi/${magicLinkToken}
         }
       }
 
@@ -2803,9 +2931,11 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       const now = new Date();
+      const tokenExpiresAt = new Date();
+      tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30 days from now
 
       // Update or create vendor response
-      await RFIVendorResponse.upsert({
+      const vendorResponse = await RFIVendorResponse.upsert({
         where: {
           rfiId_projectVendorId: {
             rfiId: rfi.id,
@@ -2815,6 +2945,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         update: {
           sentAt: now,
           status: "Sent",
+          tokenExpiresAt,
         },
         create: {
           rfiId: rfi.id,
@@ -2822,10 +2953,30 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           contactPersonId: mainContact.id,
           status: "Sent",
           sentAt: now,
+          tokenExpiresAt,
         },
       });
 
-      // TODO: Send email in production (with CC to logged in user)
+      // Generate or regenerate magic link token
+      const magicLinkToken = fastify.jwt.sign(
+        {
+          vendorResponseId: vendorResponse.id,
+          type: "rfi-vendor",
+        } as any,
+        { expiresIn: "30d" }
+      );
+
+      // Update with token
+      await RFIVendorResponse.update({
+        where: { id: vendorResponse.id },
+        data: { magicLinkToken },
+      });
+
+      // Sync vendor status from RFI status (RFI resent = vendor receives it again)
+      await syncVendorStatusFromRFIStatus("Sent", projectVendor.id);
+
+      // TODO: Send email in production (with CC to logged in user) with magic link
+      // Magic link URL: ${baseUrl}/rfi/${magicLinkToken}
 
         return reply.send({ success: true });
       } catch (error: any) {

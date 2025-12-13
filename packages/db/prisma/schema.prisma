@@ -227,7 +227,7 @@ enum Role {
 enum VendorStatus {
   Pending
   RFI_Received
-  RFI_Rejected
+  RFI_Started
   RFI_Answered
   RFP_Received
   RFP_Answered
@@ -304,6 +304,7 @@ enum RFIQuestionType {
 
 enum RFIVendorResponseStatus {
   Sent
+  Started
   Received
   Answered
   Rejected
@@ -406,6 +407,8 @@ model RFIVendorResponse {
   status          RFIVendorResponseStatus @default(Sent)
   sentAt          DateTime?
   answeredAt      DateTime?
+  magicLinkToken  String?                 @unique
+  tokenExpiresAt  DateTime?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
 
@@ -418,6 +421,7 @@ model RFIVendorResponse {
   @@index([rfiId])
   @@index([projectVendorId])
   @@index([contactPersonId])
+  @@index([magicLinkToken])
 }
 
 model RFIResponse {
