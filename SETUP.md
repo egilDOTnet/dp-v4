@@ -147,6 +147,21 @@ If you see errors about workspace packages not being found (`@dp/config`, etc.):
 
 If you see OpenSSL-related errors with Prisma, the Docker images include OpenSSL. If issues persist, ensure the Prisma schema includes the correct binary targets for Alpine Linux (already configured in `packages/db/prisma/schema.prisma`).
 
+### Migration Shadow Database Error (P3006 / P1014)
+
+If you encounter a shadow database error when creating migrations (e.g., "The underlying table for model `User` does not exist"), see the detailed troubleshooting guide:
+
+📖 **[Migration Troubleshooting Guide](./packages/db/MIGRATION_TROUBLESHOOTING.md)**
+
+**Quick fix:** Use the `--create-only` flag when creating migrations:
+
+```bash
+cd packages/db
+pnpm db:migrate:create-only --name your_migration_name
+```
+
+This creates the migration file without applying it, avoiding shadow database validation issues.
+
 ### Port Already in Use
 
 If you get an error that port 3001 (or 3000) is already in use:
