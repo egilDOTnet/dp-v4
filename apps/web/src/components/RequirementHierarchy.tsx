@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { api, RequirementHierarchy as RequirementHierarchyType, Requirement } from "@/lib/api";
 import RequirementList from "@/components/RequirementList";
 import {
@@ -187,12 +187,18 @@ export default function RequirementHierarchyComponent({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingParentId, setCreatingParentId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ title: "", description: "" });
+  const formDataRef = useRef(formData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const hierarchyRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -333,6 +339,7 @@ export default function RequirementHierarchyComponent({
     setError("");
 
     try {
+      console.log("[RequirementHierarchy] Updating hierarchy:", { projectId, hierarchyId: id, title: formData.title.trim() });
       await api.requirements.hierarchies.update(projectId, id, {
         title: formData.title.trim(),
         description: formData.description.trim() || null,
@@ -341,6 +348,7 @@ export default function RequirementHierarchyComponent({
       setFormData({ title: "", description: "" });
       onHierarchyUpdate();
     } catch (err: any) {
+      console.error("[RequirementHierarchy] Error updating hierarchy:", { projectId, hierarchyId: id, error: err });
       setError(err.message || "Failed to update hierarchy");
     } finally {
       setLoading(false);
@@ -395,8 +403,11 @@ export default function RequirementHierarchyComponent({
       if (editingId) {
         const hierarchyElement = hierarchyRefs.current[editingId];
         if (hierarchyElement && !hierarchyElement.contains(target)) {
+          // Use ref to get latest formData without causing re-renders
+          const currentFormData = formDataRef.current;
           // Save and exit edit mode
-          if (formData.title.trim()) {
+          if (currentFormData.title.trim()) {
+            console.log("[RequirementHierarchy] Click outside detected, saving hierarchy:", { editingId, projectId, title: currentFormData.title });
             handleUpdate(editingId);
           } else {
             // If title is empty, just cancel
@@ -412,7 +423,7 @@ export default function RequirementHierarchyComponent({
         document.removeEventListener("mousedown", handleClickOutside);
       };
     }
-  }, [editingId, formData]);
+  }, [editingId, projectId]); // Removed formData from dependencies, using ref instead
 
   // Auto-focus title input when creating new hierarchy
   useEffect(() => {

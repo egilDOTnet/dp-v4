@@ -597,6 +597,12 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         description?: string | null;
       };
 
+      request.log?.info({ projectId, hierarchyId: id, params: request.params }, "Updating hierarchy");
+
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+
       const hierarchy = await db.requirementHierarchy.findUnique({
         where: { id },
       });
@@ -604,10 +610,6 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       if (!hierarchy || hierarchy.projectId !== projectId) {
         return reply.status(404).send({ error: "Hierarchy not found" });
       }
-
-      // Verify project access using middleware
-      await verifyProjectAccess(request, reply);
-      if (reply.sent) return;
 
       const updated = await db.requirementHierarchy.update({
         where: { id },
@@ -691,6 +693,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
 
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+
       const hierarchy = await db.requirementHierarchy.findUnique({
         where: { id },
         include: {
@@ -702,10 +708,6 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       if (!hierarchy || hierarchy.projectId !== projectId) {
         return reply.status(404).send({ error: "Hierarchy not found" });
       }
-
-      // Verify project access using middleware
-      await verifyProjectAccess(request, reply);
-      if (reply.sent) return;
 
       // Check if hierarchy has requirements or children
       if (hierarchy.requirements.length > 0 || hierarchy.children.length > 0) {
@@ -1294,6 +1296,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       };
       const currentUser = getUser(request);
 
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+
       const requirement = await db.requirement.findUnique({
         where: { id },
         include: {
@@ -1304,10 +1310,6 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       if (!requirement || requirement.hierarchy.projectId !== projectId) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
-
-      // Verify project access using middleware
-      await verifyProjectAccess(request, reply);
-      if (reply.sent) return;
 
       // Normalize empty string to null for status
       const normalizedStatus = body.status !== undefined 
@@ -1453,6 +1455,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
 
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+
       const requirement = await db.requirement.findUnique({
         where: { id },
         include: {
@@ -1463,10 +1469,6 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       if (!requirement || requirement.hierarchy.projectId !== projectId) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
-
-      // Verify project access using middleware
-      await verifyProjectAccess(request, reply);
-      if (reply.sent) return;
 
       const hierarchyId = requirement.hierarchyId;
 
@@ -1567,6 +1569,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       };
       const currentUser = getUser(request);
 
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+
       const requirement = await db.requirement.findUnique({
         where: { id },
         include: {
@@ -1577,10 +1583,6 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       if (!requirement || requirement.hierarchy.projectId !== projectId) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
-
-      // Verify project access using middleware
-      await verifyProjectAccess(request, reply);
-      if (reply.sent) return;
 
       // Verify new hierarchy belongs to project
       const newHierarchy = await db.requirementHierarchy.findUnique({
@@ -1833,6 +1835,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { projectId, id } = request.params as { projectId: string; id: string };
 
+      // Verify project access using middleware
+      await verifyProjectAccess(request, reply);
+      if (reply.sent) return;
+
       const requirement = await db.requirement.findUnique({
         where: { id },
         include: {
@@ -1843,10 +1849,6 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       if (!requirement || requirement.hierarchy.projectId !== projectId) {
         return reply.status(404).send({ error: "Requirement not found" });
       }
-
-      // Verify project access using middleware
-      await verifyProjectAccess(request, reply);
-      if (reply.sent) return;
 
       const history = await db.requirementHistory.findMany({
         where: { requirementId: id },

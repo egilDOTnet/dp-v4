@@ -25,9 +25,23 @@ export async function verifyProjectAccess(
 
   const user = getUser(request);
   const params = request.params as { id?: string; projectId?: string };
-  const projectId = params.id || params.projectId;
+  // Prefer projectId over id, since id might be a resource ID (e.g., hierarchy ID, requirement ID)
+  const projectId = params.projectId || params.id;
+
+  // Log for debugging
+  if (request.log) {
+    request.log.debug({ 
+      params: request.params, 
+      extractedProjectId: projectId,
+      hasId: !!params.id,
+      hasProjectId: !!params.projectId,
+      url: request.url,
+      method: request.method
+    }, "verifyProjectAccess: extracting projectId");
+  }
 
   if (!projectId) {
+    request.log?.warn({ params: request.params, url: request.url }, "Project ID not found in request params");
     reply.status(400).send({ error: "Project ID required" });
     return;
   }
@@ -39,6 +53,7 @@ export async function verifyProjectAccess(
   });
 
   if (!project) {
+    request.log?.warn({ projectId, params: request.params, url: request.url }, "Project not found in database");
     reply.status(404).send({ error: "Project not found" });
     return;
   }
