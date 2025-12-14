@@ -606,7 +606,7 @@ export default function ManageProjectPage() {
                           </div>
                           <button
                             onClick={() => handleRemoveMember(member.id)}
-                            className="text-red-600 hover:text-red-800 text-sm underline"
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                           >
                             Remove
                           </button>

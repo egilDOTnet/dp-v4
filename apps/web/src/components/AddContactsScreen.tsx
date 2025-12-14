@@ -247,7 +247,7 @@ export default function AddContactsScreen({
                 </button>
                 <button
                   onClick={() => handleDeleteContact(index)}
-                  className="text-red-600 hover:text-red-900 text-sm"
+                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                 >
                   Delete
                 </button>

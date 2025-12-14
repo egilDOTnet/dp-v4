@@ -921,7 +921,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                         <button
                           onClick={() => handleDelete(item.id)}
                           disabled={savingFields.has(item.id)}
-                          className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm"
+                          className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                         >
                           Delete
                         </button>
@@ -1051,7 +1051,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                         <button
                           onClick={() => handleDelete(item.id)}
                           disabled={savingFields.has(item.id)}
-                          className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm"
+                          className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                         >
                           Delete
                         </button>

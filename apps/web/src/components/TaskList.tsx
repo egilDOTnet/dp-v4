@@ -1828,7 +1828,7 @@ export default function TaskList({
                                 <button
                                   onClick={() => handleDelete(task.id)}
                                   disabled={loading || deletingTaskIds.has(task.id)}
-                                  className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm mb-1 flex-shrink-0"
+                                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
                                 >
                                   Delete
                                 </button>
@@ -2226,7 +2226,7 @@ export default function TaskList({
                                 <button
                                   onClick={() => handleDelete(task.id)}
                                   disabled={loading || deletingTaskIds.has(task.id)}
-                                  className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm mb-1 flex-shrink-0"
+                                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
                                 >
                                   Delete
                                 </button>

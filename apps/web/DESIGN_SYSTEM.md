@@ -868,35 +868,38 @@ The WYSIWYG editor supports @-mentions of project team members:
 
 Delete buttons in list items (tasks, requirements, etc.) follow a consistent pattern:
 
-- **Placement**: Appears in the lower left corner during edit mode
+- **Placement**: Appears in the lower right corner during edit mode (or appropriate position based on context)
 - **Visibility**: Only shown when the item is in edit mode
 - **Styling**: 
-  - Red text color: `text-red-600`
-  - Hover state: `hover:text-red-800`
-  - Underline: `underline`
-  - Small text: `text-sm`
+  - Red background: `bg-red-600`
+  - White text: `text-white`
+  - Hover state: `hover:bg-red-700`
+  - Small padding: `px-2 py-1`
+  - Small text: `text-xs`
+  - Rounded corners: `rounded`
   - Disabled state: `disabled:opacity-50`
+  - Flex shrink: `flex-shrink-0` (for inline contexts)
 - **Behavior**:
-  - Shows confirmation dialog before deleting
+  - Shows confirmation dialog before deleting (where appropriate)
   - Fade-out animation (300ms) before actual deletion
   - Uses opacity and scale transforms for smooth animation
 - **Implementation**: 
-  - Positioned below the main edit field (description, etc.)
-  - Uses `mt-2` for spacing from the field above
-  - Left-aligned within the edit container
+  - Positioned below the main edit field (description, etc.) or in appropriate location
+  - Uses appropriate spacing from the field above
+  - Right-aligned or positioned based on context
 
 ```tsx
-{/* Delete button in lower left corner during edit mode */}
-<div className="mt-2 flex items-center">
-  <button
-    onClick={() => handleDelete(item.id)}
-    disabled={loading || deletingItemIds.has(item.id)}
-    className="text-red-600 hover:text-red-800 disabled:opacity-50 underline text-sm"
-  >
-    Delete
-  </button>
-</div>
+{/* Delete button in lower right corner during edit mode */}
+<button
+  onClick={() => handleDelete(item.id)}
+  disabled={loading || deletingItemIds.has(item.id)}
+  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
+>
+  Delete
+</button>
 ```
+
+**Note**: For form contexts and dialogs, use the `Button` component from `@/components/ui/FormField` with `variant="danger"` for consistency.
 
 ## Hero Banners
 
