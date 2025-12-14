@@ -27,11 +27,26 @@ fastify.setErrorHandler(errorHandler);
 const start = async () => {
   try {
     // Register plugins
+    // In development, allow local network access (for testing on mobile devices)
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    const allowedOrigins = isDevelopment
+      ? [
+          "http://localhost:3000",
+          "http://127.0.0.1:3000",
+          // Allow any .local domain (e.g., egilDOTstudio.local:3000)
+          /^http:\/\/.*\.local:\d+$/,
+          // Allow local IP addresses (e.g., 192.168.x.x:3000)
+          /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+          /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+          /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/,
+        ]
+      : [
+          "http://localhost:3000",
+          "http://127.0.0.1:3000",
+        ];
+
     await fastify.register(cors, {
-      origin: [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-      ],
+      origin: allowedOrigins,
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
       allowedHeaders: ["Content-Type", "Authorization"],

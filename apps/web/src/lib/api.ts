@@ -1,4 +1,22 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// Dynamically determine API URL based on current hostname
+// This allows the app to work when accessed via local network (e.g., egilDOTstudio.local:3000)
+function getApiUrl(): string {
+  // In browser, always use current hostname with port 3001
+  // This ensures it works when accessed from other devices on the network
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    return `${protocol}//${hostname}:3001`;
+  }
+
+  // For server-side rendering, use environment variable or fallback to localhost
+  // Note: NEXT_PUBLIC_API_URL in docker-compose is for SSR only
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+}
+
+// Compute API URL at runtime to ensure it always uses the current hostname
+// This is important when accessing from different devices on the network
+const getApiUrlRuntime = () => getApiUrl();
 
 export interface ApiError {
   error: string;
@@ -22,7 +40,8 @@ export async function apiRequest<T>(
   }
 
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const apiUrl = getApiUrlRuntime();
+    const response = await fetch(`${apiUrl}${endpoint}`, {
       ...options,
       headers,
     });
@@ -50,8 +69,9 @@ export async function apiRequest<T>(
   } catch (error: any) {
     // Handle network errors (CORS, connection refused, etc.)
     if (error instanceof TypeError && error.message.includes("fetch")) {
+      const apiUrl = getApiUrlRuntime();
       throw new Error(
-        `Network error: Could not connect to server at ${API_URL}. Please check if the API server is running.`
+        `Network error: Could not connect to server at ${apiUrl}. Please check if the API server is running.`
       );
     }
     // Re-throw other errors as-is

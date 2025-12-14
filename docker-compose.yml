@@ -62,6 +62,7 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # NEXT_PUBLIC_API_URL is only used for SSR - client-side uses dynamic hostname
       NEXT_PUBLIC_API_URL: http://localhost:3001
     networks:
       - appnet
