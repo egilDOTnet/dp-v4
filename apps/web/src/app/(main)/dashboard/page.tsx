@@ -59,7 +59,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dashboard"
+        title="Company Dashboard"
         description={`Welcome back${user?.firstName ? `, ${user.firstName}` : ""}!`}
         actions={
           isAdmin ? (

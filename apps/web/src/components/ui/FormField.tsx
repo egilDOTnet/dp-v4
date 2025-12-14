@@ -109,11 +109,22 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className = "", hasError = false, ...props }, ref) => {
+  ({ className = "", hasError = false, onKeyDown, ...props }, ref) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Handle Ctrl-A/Command-A to select all text
+      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+        e.preventDefault();
+        const input = e.currentTarget;
+        input.select();
+      }
+      onKeyDown?.(e);
+    };
+
     return (
       <input
         ref={ref}
         className={`${baseInputClasses} ${hasError ? errorInputClasses : ""} ${className}`}
+        onKeyDown={handleKeyDown}
         {...props}
       />
     );
@@ -133,13 +144,23 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className = "", hasError = false, autoResize = false, onChange, ...props }, ref) => {
+  ({ className = "", hasError = false, autoResize = false, onChange, onKeyDown, ...props }, ref) => {
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       if (autoResize) {
         e.target.style.height = "auto";
         e.target.style.height = `${e.target.scrollHeight}px`;
       }
       onChange?.(e);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Handle Ctrl-A/Command-A to select all text
+      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+        e.preventDefault();
+        const textarea = e.currentTarget;
+        textarea.select();
+      }
+      onKeyDown?.(e);
     };
 
     return (
@@ -149,6 +170,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           autoResize ? "resize-none overflow-hidden" : ""
         } ${className}`}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         {...props}
       />
     );

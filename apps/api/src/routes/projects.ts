@@ -5,6 +5,7 @@ import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
 import { computeDisplayName } from "../utils/user-utils";
+import { createId } from "@paralleldrive/cuid2";
 
 // Helper functions for requirement hierarchy (duplicated from requirements.ts for import functionality)
 async function generateHierarchyNumber(
@@ -304,9 +305,11 @@ async function initializeProjectPhases(projectId: string) {
   for (let i = 0; i < PHASE_NAMES.length; i++) {
     const phase = await db.phase.create({
       data: {
+        id: createId(),
         projectId,
         name: PHASE_NAMES[i],
         order: i + 1,
+        updatedAt: new Date(),
         Task: {
           create: DEFAULT_TASKS[i + 1].map((taskName, taskIndex) => ({
             name: taskName,
@@ -745,13 +748,16 @@ export default async function projectRoutes(fastify: FastifyInstance) {
 
       const project = await db.project.create({
         data: {
+          id: createId(),
           name: body.name,
           type: body.type,
           startDate: body.startDate ? new Date(body.startDate) : null,
           endDate: body.endDate ? new Date(body.endDate) : null,
           tenantId: currentUser.tenantId,
+          updatedAt: new Date(),
           ProjectMember: {
             create: (body.memberIds?.map((userId) => ({
+              id: createId(),
               userId,
             })) || []) as any,
           },
@@ -938,6 +944,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       if (newMemberIds.length > 0) {
         await db.projectMember.createMany({
           data: newMemberIds.map((userId) => ({
+            id: createId(),
             projectId,
             userId,
           })) as any,
