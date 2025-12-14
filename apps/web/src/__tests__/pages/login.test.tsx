@@ -6,11 +6,15 @@ import {
   hasSemanticBackgroundColors,
 } from '../utils/color-utils';
 
-// Mock AuthContext
+// Mock AuthContext to provide useAuth hook
 vi.mock('@/contexts/AuthContext', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useAuth: () => ({
     login: vi.fn(),
+    logout: vi.fn(),
     user: null,
+    loading: false,
+    refreshUser: vi.fn(),
   }),
 }));
 

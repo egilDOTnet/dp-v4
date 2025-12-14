@@ -358,8 +358,10 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "Created or updated RFI",
+            // No schema validation - return data as-is to avoid serialization issues
+            // Fastify's schema validation can strip properties from Prisma objects
+            // even when using select. Using only description allows proper serialization.
           },
           400: {
             type: "object",
@@ -787,6 +789,15 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       await verifyProjectAccess(request, reply);
       if (reply.sent) return;
 
+      // Check if RFI exists
+      const rfi = await db.rFI.findUnique({
+        where: { projectId },
+      });
+
+      if (!rfi) {
+        return reply.status(404).send({ error: "RFI not found" });
+      }
+
       // Unpublish RFI
       await db.rFI.update({
         where: { projectId },
@@ -1005,8 +1016,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           201: {
-            type: "object",
             description: "Created question with auto-generated order",
+            // No schema validation - return data as-is to avoid serialization issues
           },
           401: {
             type: "object",
@@ -1213,8 +1224,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "Updated question",
+            // No schema validation - return data as-is to avoid serialization issues
           },
           401: {
             type: "object",
@@ -1461,7 +1472,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         where: { id: questionId },
       });
 
-        return reply.send({ success: true });
+        return reply.status(204).send();
       } catch (error: any) {
         request.log.error({ err: error }, "Error in DELETE /:id/rfi/questions/:questionId");
         return reply.status(500).send({
@@ -1576,6 +1587,18 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
+      // Validate all question IDs belong to this RFI
+      const questions = await RFIQuestion.findMany({
+        where: {
+          id: { in: request.body.questionIds },
+          rfiId: rfi.id,
+        },
+      });
+
+      if (questions.length !== request.body.questionIds.length) {
+        return reply.status(400).send({ error: "Invalid question IDs" });
+      }
+
       // Update order for each question
       const updatePromises = request.body.questionIds.map((questionId, index) =>
         RFIQuestion.update({
@@ -1586,7 +1609,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
 
         await Promise.all(updatePromises);
 
-        return reply.send({ success: true });
+        return reply.status(204).send();
       } catch (error: any) {
         request.log.error({ err: error }, "Error in PUT /:id/rfi/questions/reorder");
         return reply.status(500).send({
@@ -1659,8 +1682,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           201: {
-            type: "object",
             description: "Created option with auto-generated order",
+            // No schema validation - return data as-is to avoid serialization issues
           },
           401: {
             type: "object",
@@ -1823,8 +1846,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "Updated option",
+            // No schema validation - return data as-is to avoid serialization issues
           },
           401: {
             type: "object",
@@ -2045,7 +2068,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         where: { id: optionId },
       });
 
-        return reply.send({ success: true });
+        return reply.status(204).send();
       } catch (error: any) {
         request.log.error({ err: error }, "Error in DELETE /:id/rfi/questions/:questionId/options/:optionId");
         return reply.status(500).send({
@@ -2174,6 +2197,18 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Question not found" });
       }
 
+      // Validate all option IDs belong to this question
+      const options = await RFIQuestionOption.findMany({
+        where: {
+          id: { in: request.body.optionIds },
+          questionId: question.id,
+        },
+      });
+
+      if (options.length !== request.body.optionIds.length) {
+        return reply.status(400).send({ error: "Invalid option IDs" });
+      }
+
       // Update order for each option
       const updatePromises = request.body.optionIds.map((optionId, index) =>
         RFIQuestionOption.update({
@@ -2184,7 +2219,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
 
         await Promise.all(updatePromises);
 
-        return reply.send({ success: true });
+        return reply.status(204).send();
       } catch (error: any) {
         request.log.error({ err: error }, "Error in PUT /:id/rfi/questions/:questionId/options/reorder");
         return reply.status(500).send({
@@ -2731,6 +2766,17 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
       });
 
+      // Check if there are any vendors with main contacts
+      const vendorsWithContacts = projectVendors.filter(
+        (pv) => pv.vendor.VendorContactPerson.length > 0
+      );
+
+      if (vendorsWithContacts.length === 0) {
+        return reply.status(400).send({
+          error: "No vendors with main contacts found in project",
+        });
+      }
+
       const now = new Date();
 
       // Create vendor responses for each vendor with a main contact
@@ -2904,6 +2950,12 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
+      if (!rfi.isPublished) {
+        return reply.status(400).send({
+          error: "RFI must be published before resending to vendors",
+        });
+      }
+
       // Get project vendor
       const projectVendor = await db.projectVendor.findFirst({
         where: {
@@ -3016,8 +3068,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "RFI with questions and options for preview",
+            // No schema validation - return data as-is to avoid serialization issues
           },
           401: {
             type: "object",

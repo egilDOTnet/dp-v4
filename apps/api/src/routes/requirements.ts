@@ -358,8 +358,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
         response: {
           201: {
-            type: "object",
             description: "Created hierarchy with auto-generated number",
+            // No type/properties to avoid Fastify schema validation stripping Prisma object properties
           },
           400: {
             type: "object",
@@ -393,16 +393,17 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       },
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { projectId } = request.params as { projectId: string };
-      const body = request.body as {
-        title: string;
-        description?: string;
-        parentId?: string | null;
-      };
+      try {
+        const { projectId } = request.params as { projectId: string };
+        const body = request.body as {
+          title: string;
+          description?: string;
+          parentId?: string | null;
+        };
 
-      // Verify project access using middleware
-      await verifyProjectAccess(request, reply);
-      if (reply.sent) return;
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
 
       // Validate parent if provided
       if (body.parentId) {
@@ -482,7 +483,62 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
             children: true,
           },
         });
-        return reply.status(201).send(updatedHierarchy || hierarchy);
+        const result = updatedHierarchy || hierarchy;
+        if (!result || !result.id || !result.title) {
+          request.log.error({ hierarchyId: hierarchy.id, result: result ? Object.keys(result) : 'null' }, "Failed to reload hierarchy after creation or missing required fields");
+          return reply.status(500).send({ error: "Failed to create hierarchy" });
+        }
+        // Return plain object to avoid serialization issues
+        // Construct response with explicit property access and defensive checks
+        const response: Record<string, any> = {
+          id: String(result.id || ''),
+          projectId: String(result.projectId || ''),
+          parentId: result.parentId ? String(result.parentId) : null,
+          number: String(result.number || ''),
+          title: String(result.title || ''),
+          description: result.description ? String(result.description) : null,
+          order: Number(result.order || 0),
+          createdAt: result.createdAt instanceof Date ? result.createdAt.toISOString() : (result.createdAt ? String(result.createdAt) : new Date().toISOString()),
+          updatedAt: result.updatedAt instanceof Date ? result.updatedAt.toISOString() : (result.updatedAt ? String(result.updatedAt) : new Date().toISOString()),
+        };
+        
+        // Add parent if it exists
+        if (result.parent) {
+          response.parent = {
+            id: String(result.parent.id || ''),
+            projectId: String(result.parent.projectId || ''),
+            parentId: result.parent.parentId ? String(result.parent.parentId) : null,
+            number: String(result.parent.number || ''),
+            title: String(result.parent.title || ''),
+            description: result.parent.description ? String(result.parent.description) : null,
+            order: Number(result.parent.order || 0),
+            createdAt: result.parent.createdAt instanceof Date ? result.parent.createdAt.toISOString() : (result.parent.createdAt ? String(result.parent.createdAt) : new Date().toISOString()),
+            updatedAt: result.parent.updatedAt instanceof Date ? result.parent.updatedAt.toISOString() : (result.parent.updatedAt ? String(result.parent.updatedAt) : new Date().toISOString()),
+          };
+        } else {
+          response.parent = null;
+        }
+        
+        // Add children array
+        if (Array.isArray(result.children)) {
+          response.children = result.children.map((child: any) => ({
+            id: String(child.id || ''),
+            projectId: String(child.projectId || ''),
+            parentId: child.parentId ? String(child.parentId) : null,
+            number: String(child.number || ''),
+            title: String(child.title || ''),
+            description: child.description ? String(child.description) : null,
+            order: Number(child.order || 0),
+            createdAt: child.createdAt instanceof Date ? child.createdAt.toISOString() : (child.createdAt ? String(child.createdAt) : new Date().toISOString()),
+            updatedAt: child.updatedAt instanceof Date ? child.updatedAt.toISOString() : (child.updatedAt ? String(child.updatedAt) : new Date().toISOString()),
+          }));
+        } else {
+          response.children = [];
+        }
+        
+        // Ensure response is a plain object by serializing and parsing
+        const serializedResponse = JSON.parse(JSON.stringify(response));
+        return reply.status(201).send(serializedResponse);
       }
 
       // If this is a level 1 hierarchy, renumber all level 1 hierarchies based on order
@@ -515,7 +571,70 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
       });
 
-      return reply.status(201).send(updatedHierarchy || hierarchy);
+      const result = updatedHierarchy || hierarchy;
+      if (!result || !result.id || !result.title) {
+        request.log.error({ hierarchyId: hierarchy.id, result: result ? Object.keys(result) : 'null' }, "Failed to reload hierarchy after creation or missing required fields");
+        return reply.status(500).send({ error: "Failed to create hierarchy" });
+      }
+
+      // Return plain object to avoid serialization issues
+      // Construct response with explicit property access and defensive checks
+      const response: Record<string, any> = {
+        id: String(result.id || ''),
+        projectId: String(result.projectId || ''),
+        parentId: result.parentId ? String(result.parentId) : null,
+        number: String(result.number || ''),
+        title: String(result.title || ''),
+        description: result.description ? String(result.description) : null,
+        order: Number(result.order || 0),
+        createdAt: result.createdAt instanceof Date ? result.createdAt.toISOString() : (result.createdAt ? String(result.createdAt) : new Date().toISOString()),
+        updatedAt: result.updatedAt instanceof Date ? result.updatedAt.toISOString() : (result.updatedAt ? String(result.updatedAt) : new Date().toISOString()),
+      };
+      
+      // Add parent if it exists
+      if (result.parent) {
+        response.parent = {
+          id: String(result.parent.id || ''),
+          projectId: String(result.parent.projectId || ''),
+          parentId: result.parent.parentId ? String(result.parent.parentId) : null,
+          number: String(result.parent.number || ''),
+          title: String(result.parent.title || ''),
+          description: result.parent.description ? String(result.parent.description) : null,
+          order: Number(result.parent.order || 0),
+          createdAt: result.parent.createdAt instanceof Date ? result.parent.createdAt.toISOString() : (result.parent.createdAt ? String(result.parent.createdAt) : new Date().toISOString()),
+          updatedAt: result.parent.updatedAt instanceof Date ? result.parent.updatedAt.toISOString() : (result.parent.updatedAt ? String(result.parent.updatedAt) : new Date().toISOString()),
+        };
+      } else {
+        response.parent = null;
+      }
+      
+      // Add children array
+      if (Array.isArray(result.children)) {
+        response.children = result.children.map((child: any) => ({
+          id: String(child.id || ''),
+          projectId: String(child.projectId || ''),
+          parentId: child.parentId ? String(child.parentId) : null,
+          number: String(child.number || ''),
+          title: String(child.title || ''),
+          description: child.description ? String(child.description) : null,
+          order: Number(child.order || 0),
+          createdAt: child.createdAt instanceof Date ? child.createdAt.toISOString() : (child.createdAt ? String(child.createdAt) : new Date().toISOString()),
+          updatedAt: child.updatedAt instanceof Date ? child.updatedAt.toISOString() : (child.updatedAt ? String(child.updatedAt) : new Date().toISOString()),
+        }));
+      } else {
+        response.children = [];
+      }
+      
+      // Ensure response is a plain object by serializing and parsing
+      const serializedResponse = JSON.parse(JSON.stringify(response));
+      return reply.status(201).send(serializedResponse);
+      } catch (error: any) {
+        request.log.error({ err: error, projectId: request.params }, "Error creating hierarchy");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to create hierarchy",
+        });
+      }
     }
   );
 
@@ -563,8 +682,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "Updated hierarchy",
+            // No type/properties to avoid Fastify schema validation stripping Prisma object properties
           },
           401: {
             type: "object",
@@ -623,7 +742,40 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
       });
 
-      return reply.send(updated);
+      // Return plain object to avoid serialization issues
+      return reply.send({
+        id: updated.id,
+        projectId: updated.projectId,
+        parentId: updated.parentId,
+        number: updated.number,
+        title: updated.title,
+        description: updated.description,
+        order: updated.order,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        parent: updated.parent ? {
+          id: updated.parent.id,
+          projectId: updated.parent.projectId,
+          parentId: updated.parent.parentId,
+          number: updated.parent.number,
+          title: updated.parent.title,
+          description: updated.parent.description,
+          order: updated.parent.order,
+          createdAt: updated.parent.createdAt,
+          updatedAt: updated.parent.updatedAt,
+        } : null,
+        children: updated.children ? updated.children.map(child => ({
+          id: child.id,
+          projectId: child.projectId,
+          parentId: child.parentId,
+          number: child.number,
+          title: child.title,
+          description: child.description,
+          order: child.order,
+          createdAt: child.createdAt,
+          updatedAt: child.updatedAt,
+        })) : [],
+      });
     }
   );
 
@@ -1044,8 +1196,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
         response: {
           201: {
-            type: "object",
             description: "Created requirement with auto-generated number",
+            // No type/properties to avoid Fastify schema validation stripping Prisma object properties
           },
           400: {
             type: "object",
@@ -1200,7 +1352,62 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
       });
 
-      return reply.status(201).send(updatedRequirement || requirement);
+      const result = updatedRequirement || requirement;
+      if (!result) {
+        request.log.error({ requirementId: requirement.id }, "Failed to reload requirement after creation");
+        return reply.status(500).send({ error: "Failed to create requirement" });
+      }
+
+      // Return plain object to avoid serialization issues
+      return reply.status(201).send({
+        id: result.id,
+        hierarchyId: result.hierarchyId,
+        number: result.number,
+        description: result.description,
+        type: result.type,
+        status: result.status,
+        order: result.order,
+        createdById: result.createdById,
+        lastModifiedById: result.lastModifiedById,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+        hierarchy: result.hierarchy ? {
+          id: result.hierarchy.id,
+          projectId: result.hierarchy.projectId,
+          parentId: result.hierarchy.parentId,
+          number: result.hierarchy.number,
+          title: result.hierarchy.title,
+          description: result.hierarchy.description,
+          order: result.hierarchy.order,
+          createdAt: result.hierarchy.createdAt,
+          updatedAt: result.hierarchy.updatedAt,
+          parent: result.hierarchy.parent ? {
+            id: result.hierarchy.parent.id,
+            projectId: result.hierarchy.parent.projectId,
+            parentId: result.hierarchy.parent.parentId,
+            number: result.hierarchy.parent.number,
+            title: result.hierarchy.parent.title,
+            description: result.hierarchy.parent.description,
+            order: result.hierarchy.parent.order,
+            createdAt: result.hierarchy.parent.createdAt,
+            updatedAt: result.hierarchy.parent.updatedAt,
+          } : null,
+        } : null,
+        createdBy: result.createdBy ? {
+          id: result.createdBy.id,
+          email: result.createdBy.email,
+          firstName: result.createdBy.firstName,
+          lastName: result.createdBy.lastName,
+          name: result.createdBy.name,
+        } : null,
+        lastModifiedBy: result.lastModifiedBy ? {
+          id: result.lastModifiedBy.id,
+          email: result.lastModifiedBy.email,
+          firstName: result.lastModifiedBy.firstName,
+          lastName: result.lastModifiedBy.lastName,
+          name: result.lastModifiedBy.name,
+        } : null,
+      });
     }
   );
 
@@ -1253,8 +1460,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "Updated requirement",
+            // No type/properties to avoid Fastify schema validation stripping Prisma object properties
           },
           400: {
             type: "object",
@@ -1393,7 +1600,56 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         );
       }
 
-      return reply.send(updated);
+      // Return plain object to avoid serialization issues
+      return reply.send({
+        id: updated.id,
+        hierarchyId: updated.hierarchyId,
+        number: updated.number,
+        description: updated.description,
+        type: updated.type,
+        status: updated.status,
+        order: updated.order,
+        createdById: updated.createdById,
+        lastModifiedById: updated.lastModifiedById,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        hierarchy: updated.hierarchy ? {
+          id: updated.hierarchy.id,
+          projectId: updated.hierarchy.projectId,
+          parentId: updated.hierarchy.parentId,
+          number: updated.hierarchy.number,
+          title: updated.hierarchy.title,
+          description: updated.hierarchy.description,
+          order: updated.hierarchy.order,
+          createdAt: updated.hierarchy.createdAt,
+          updatedAt: updated.hierarchy.updatedAt,
+          parent: updated.hierarchy.parent ? {
+            id: updated.hierarchy.parent.id,
+            projectId: updated.hierarchy.parent.projectId,
+            parentId: updated.hierarchy.parent.parentId,
+            number: updated.hierarchy.parent.number,
+            title: updated.hierarchy.parent.title,
+            description: updated.hierarchy.parent.description,
+            order: updated.hierarchy.parent.order,
+            createdAt: updated.hierarchy.parent.createdAt,
+            updatedAt: updated.hierarchy.parent.updatedAt,
+          } : null,
+        } : null,
+        createdBy: updated.createdBy ? {
+          id: updated.createdBy.id,
+          email: updated.createdBy.email,
+          firstName: updated.createdBy.firstName,
+          lastName: updated.createdBy.lastName,
+          name: updated.createdBy.name,
+        } : null,
+        lastModifiedBy: updated.lastModifiedBy ? {
+          id: updated.lastModifiedBy.id,
+          email: updated.lastModifiedBy.email,
+          firstName: updated.lastModifiedBy.firstName,
+          lastName: updated.lastModifiedBy.lastName,
+          name: updated.lastModifiedBy.name,
+        } : null,
+      });
     }
   );
 
@@ -1527,8 +1783,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "object",
             description: "Moved requirement with updated number",
+            // No type/properties to avoid Fastify schema validation stripping Prisma object properties
           },
           400: {
             type: "object",
@@ -1654,7 +1910,92 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         currentUser.userId
       );
 
-      return reply.send(updated);
+      // Reload requirement with updated number after renumbering
+      const finalRequirement = await db.requirement.findUnique({
+        where: { id },
+        include: {
+          hierarchy: {
+            include: {
+              parent: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+          },
+          lastModifiedBy: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      const result = finalRequirement || updated;
+      if (!result) {
+        request.log.error({ requirementId: id }, "Failed to reload requirement after move");
+        return reply.status(500).send({ error: "Failed to move requirement" });
+      }
+
+      // Return plain object to avoid serialization issues
+      return reply.send({
+        id: result.id,
+        hierarchyId: result.hierarchyId,
+        number: result.number,
+        description: result.description,
+        type: result.type,
+        status: result.status,
+        order: result.order,
+        createdById: result.createdById,
+        lastModifiedById: result.lastModifiedById,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+        hierarchy: result.hierarchy ? {
+          id: result.hierarchy.id,
+          projectId: result.hierarchy.projectId,
+          parentId: result.hierarchy.parentId,
+          number: result.hierarchy.number,
+          title: result.hierarchy.title,
+          description: result.hierarchy.description,
+          order: result.hierarchy.order,
+          createdAt: result.hierarchy.createdAt,
+          updatedAt: result.hierarchy.updatedAt,
+          parent: result.hierarchy.parent ? {
+            id: result.hierarchy.parent.id,
+            projectId: result.hierarchy.parent.projectId,
+            parentId: result.hierarchy.parent.parentId,
+            number: result.hierarchy.parent.number,
+            title: result.hierarchy.parent.title,
+            description: result.hierarchy.parent.description,
+            order: result.hierarchy.parent.order,
+            createdAt: result.hierarchy.parent.createdAt,
+            updatedAt: result.hierarchy.parent.updatedAt,
+          } : null,
+        } : null,
+        createdBy: result.createdBy ? {
+          id: result.createdBy.id,
+          email: result.createdBy.email,
+          firstName: result.createdBy.firstName,
+          lastName: result.createdBy.lastName,
+          name: result.createdBy.name,
+        } : null,
+        lastModifiedBy: result.lastModifiedBy ? {
+          id: result.lastModifiedBy.id,
+          email: result.lastModifiedBy.email,
+          firstName: result.lastModifiedBy.firstName,
+          lastName: result.lastModifiedBy.lastName,
+          name: result.lastModifiedBy.name,
+        } : null,
+      });
     }
   );
 
@@ -1801,12 +2142,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "array",
-            items: {
-              type: "object",
-              description: "Requirement history entry with modifier information",
-            },
             description: "Array of requirement history entries",
+            // No type/items to avoid Fastify schema validation stripping Prisma object properties
           },
           401: {
             type: "object",
@@ -1866,7 +2203,24 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         orderBy: { createdAt: "desc" },
       });
 
-      return reply.send(history);
+      // Return plain objects to avoid serialization issues
+      return reply.send(history.map((entry) => ({
+        id: entry.id,
+        requirementId: entry.requirementId,
+        description: entry.description,
+        type: entry.type,
+        status: entry.status,
+        modifiedById: entry.modifiedById,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+        modifiedBy: entry.modifiedBy ? {
+          id: entry.modifiedBy.id,
+          email: entry.modifiedBy.email,
+          firstName: entry.modifiedBy.firstName,
+          lastName: entry.modifiedBy.lastName,
+          name: entry.modifiedBy.name,
+        } : null,
+      })));
     }
   );
 
@@ -1921,12 +2275,8 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: "array",
-            items: {
-              type: "object",
-              description: "Updated requirement with full relations",
-            },
             description: "Array of updated requirements",
+            // No type/items to avoid Fastify schema validation stripping Prisma object properties
           },
           400: {
             type: "object",
@@ -2140,7 +2490,56 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         },
       });
 
-      return reply.send(finalRequirements);
+      // Return plain objects to avoid serialization issues
+      return reply.send(finalRequirements.map((req) => ({
+        id: req.id,
+        hierarchyId: req.hierarchyId,
+        number: req.number,
+        description: req.description,
+        type: req.type,
+        status: req.status,
+        order: req.order,
+        createdById: req.createdById,
+        lastModifiedById: req.lastModifiedById,
+        createdAt: req.createdAt,
+        updatedAt: req.updatedAt,
+        hierarchy: req.hierarchy ? {
+          id: req.hierarchy.id,
+          projectId: req.hierarchy.projectId,
+          parentId: req.hierarchy.parentId,
+          number: req.hierarchy.number,
+          title: req.hierarchy.title,
+          description: req.hierarchy.description,
+          order: req.hierarchy.order,
+          createdAt: req.hierarchy.createdAt,
+          updatedAt: req.hierarchy.updatedAt,
+          parent: req.hierarchy.parent ? {
+            id: req.hierarchy.parent.id,
+            projectId: req.hierarchy.parent.projectId,
+            parentId: req.hierarchy.parent.parentId,
+            number: req.hierarchy.parent.number,
+            title: req.hierarchy.parent.title,
+            description: req.hierarchy.parent.description,
+            order: req.hierarchy.parent.order,
+            createdAt: req.hierarchy.parent.createdAt,
+            updatedAt: req.hierarchy.parent.updatedAt,
+          } : null,
+        } : null,
+        createdBy: req.createdBy ? {
+          id: req.createdBy.id,
+          email: req.createdBy.email,
+          firstName: req.createdBy.firstName,
+          lastName: req.createdBy.lastName,
+          name: req.createdBy.name,
+        } : null,
+        lastModifiedBy: req.lastModifiedBy ? {
+          id: req.lastModifiedBy.id,
+          email: req.lastModifiedBy.email,
+          firstName: req.lastModifiedBy.firstName,
+          lastName: req.lastModifiedBy.lastName,
+          name: req.lastModifiedBy.name,
+        } : null,
+      })));
     }
   );
 

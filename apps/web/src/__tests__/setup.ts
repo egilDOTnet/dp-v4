@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom';
 import { expect, afterEach, vi, beforeAll } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { resetRouterMocks } from './mocks/next-navigation';
+import { setupApiMocks, resetFetchMock } from './utils/api-mocks';
+import { resetIdCounter } from './utils/mock-data';
 
 // Mock localStorage
 const localStorageMock = {
@@ -25,10 +28,19 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
+// Mock document.queryCommandState for WysiwygEditor
+Object.defineProperty(document, 'queryCommandState', {
+  writable: true,
+  value: vi.fn().mockReturnValue(false),
+});
+
 beforeAll(() => {
   global.localStorage = localStorageMock as any;
   // Default return value for getItem
   localStorageMock.getItem.mockReturnValue(null);
+  
+  // Setup API mocks
+  setupApiMocks();
 });
 
 // Cleanup after each test
@@ -37,6 +49,16 @@ afterEach(() => {
   // Reset localStorage mocks
   vi.clearAllMocks();
   localStorageMock.getItem.mockReturnValue(null);
+  
+  // Reset router mocks
+  resetRouterMocks();
+  
+  // Reset API mocks
+  setupApiMocks();
+  resetFetchMock();
+  
+  // Reset ID counter for test data factories
+  resetIdCounter();
 });
 
 
