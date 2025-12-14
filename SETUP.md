@@ -223,6 +223,67 @@ Invalid segment Static("contact"), catch all segment must be the last segment mo
 
 **Best Practice:** Use dynamic routes `[param]` for single parameters, and only use catch-all routes `[...param]` when you need to capture multiple path segments and don't have any nested static routes after it.
 
+### Test Database Setup
+
+**IMPORTANT:** Tests require a separate test database to prevent accidental deletion of development/production data.
+
+#### Safety Checks
+
+The test suite includes safety checks that:
+- **Require** the database name to contain `test` or `_test`
+- **Prevent** running tests against development/production databases
+- **Fail fast** with clear error messages if safety checks fail
+
+#### Setting Up Test Database
+
+1. **Create a test database:**
+   ```bash
+   # Connect to PostgreSQL
+   psql -U postgres -h localhost
+   
+   # Create test database
+   CREATE DATABASE app_test;
+   ```
+
+2. **Run migrations on test database:**
+   ```bash
+   cd packages/db
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test" pnpm prisma migrate deploy
+   ```
+
+3. **Set TEST_DATABASE_URL environment variable:**
+   
+   Option A: In `apps/api/.env`:
+   ```
+   TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test"
+   ```
+   
+   Option B: Export in your shell:
+   ```bash
+   export TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test"
+   ```
+
+4. **Run tests:**
+   ```bash
+   cd apps/api
+   pnpm test
+   ```
+
+#### Default Behavior
+
+If `TEST_DATABASE_URL` is not set, tests will default to `app_test` database. The safety checks ensure that even with this default, tests will fail if the database name doesn't contain `test`.
+
+#### Troubleshooting
+
+**Error: "SAFETY CHECK FAILED: Test database name must contain 'test'"**
+- Ensure your `TEST_DATABASE_URL` points to a database with `test` in its name
+- The default is `app_test` - create this database if it doesn't exist
+
+**Error: "Cannot cleanup non-test database"**
+- This means `cleanupDatabase()` detected a non-test database
+- Check that `DATABASE_URL` (used by tests) points to a test database
+- Never set `DATABASE_URL` to your development database when running tests
+
 ## Test User (if seeded)
 
 - Email: `admin@example.com`

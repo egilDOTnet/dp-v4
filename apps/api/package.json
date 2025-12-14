@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests",
+    "test:safe": "./scripts/test-with-limits.sh",
     "clean": "rm -rf dist .turbo"
   },
   "dependencies": {

@@ -517,9 +517,11 @@ export default async function authRoutes(fastify: FastifyInstance) {
           // Create new user with a new tenant
           const tenant = await db.tenant.create({
             data: {
+              id: `tenant-${Date.now()}-${Math.random().toString(36).substring(7)}`,
               name: `${decoded.email.split("@")[0]} Company`,
+              updatedAt: new Date(),
             },
-          } as any);
+          });
 
           // Derive name from email
           const nameData = deriveNameFromEmail(decoded.email);
