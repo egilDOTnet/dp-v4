@@ -1426,6 +1426,104 @@ describe("Project Routes", () => {
 
       expect(response.statusCode).toBe(404);
     });
+
+    it("should return 400 for invalid date-time format (date-only string)", async () => {
+      const tenant = await createTestTenant();
+      const user = await createTestUser({
+        email: "user@example.com",
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const project = await createTestProject({
+        name: "Project",
+        tenantId: tenant.id,
+      });
+      await createTestProjectMember({ projectId: project.id, userId: user.id });
+
+      const phase = await createTestPhase({
+        projectId: project.id,
+        name: "Phase",
+        order: 0,
+      });
+
+      const task = await createTestTask({
+        phaseId: phase.id,
+        name: "Task",
+        order: 1,
+      });
+
+      const token = generateTestToken(app, {
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      // Try to update with date-only string (YYYY-MM-DD) instead of date-time
+      const response = await app.inject({
+        method: "PUT",
+        url: `/api/projects/${project.id}/phases/${phase.id}/tasks/${task.id}`,
+        headers: createAuthHeader(token),
+        payload: {
+          actualCompletionDate: "2024-01-15", // Invalid: date-only, not date-time
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.message).toContain("actualCompletionDate");
+      expect(body.message).toContain("date-time");
+    });
+
+    it("should accept valid ISO date-time format for actualCompletionDate", async () => {
+      const tenant = await createTestTenant();
+      const user = await createTestUser({
+        email: "user@example.com",
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const project = await createTestProject({
+        name: "Project",
+        tenantId: tenant.id,
+      });
+      await createTestProjectMember({ projectId: project.id, userId: user.id });
+
+      const phase = await createTestPhase({
+        projectId: project.id,
+        name: "Phase",
+        order: 0,
+      });
+
+      const task = await createTestTask({
+        phaseId: phase.id,
+        name: "Task",
+        order: 1,
+      });
+
+      const token = generateTestToken(app, {
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const completionDate = new Date().toISOString();
+      const response = await app.inject({
+        method: "PUT",
+        url: `/api/projects/${project.id}/phases/${phase.id}/tasks/${task.id}`,
+        headers: createAuthHeader(token),
+        payload: {
+          actualCompletionDate: completionDate,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.actualCompletionDate).toBeDefined();
+      expect(new Date(body.actualCompletionDate).toISOString()).toBe(completionDate);
+    });
   });
 
   describe("DELETE /api/projects/:id/phases/:phaseId/tasks/:taskId", () => {

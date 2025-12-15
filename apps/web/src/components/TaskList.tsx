@@ -561,7 +561,7 @@ export default function TaskList({
         if (value) {
           const date = new Date(value);
           if (!isNaN(date.getTime())) {
-            updatePayload.startDate = date.toISOString().split("T")[0];
+            updatePayload.startDate = date.toISOString();
           } else {
             updatePayload.startDate = value;
           }
@@ -572,7 +572,7 @@ export default function TaskList({
         if (value) {
           const date = new Date(value);
           if (!isNaN(date.getTime())) {
-            updatePayload.plannedCompletionDate = date.toISOString().split("T")[0];
+            updatePayload.plannedCompletionDate = date.toISOString();
           } else {
             updatePayload.plannedCompletionDate = value;
           }
@@ -786,7 +786,7 @@ export default function TaskList({
     setError("");
 
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toISOString();
       await api.projects.phases.updateTask(projectId, phaseId, taskId, {
         actualCompletionDate: today,
       });

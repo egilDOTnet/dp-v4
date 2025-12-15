@@ -312,6 +312,44 @@ describe('TaskList', () => {
         expect(apiModule.api.projects.phases.updateTask).toHaveBeenCalled();
       }, { timeout: 3000 });
     });
+
+    it('should send actualCompletionDate in ISO date-time format (not date-only)', async () => {
+      const user = userEvent.setup();
+      const task = createMockTask({ id: 'task-1', name: 'Task', actualCompletionDate: null, order: 1 });
+      (apiModule.api.projects.phases.updateTask as any).mockResolvedValue({
+        ...task,
+        actualCompletionDate: new Date().toISOString(),
+      });
+
+      render(
+        <TaskList
+          projectId={projectId}
+          phaseId={phaseId}
+          tasks={[task]}
+          projectMembers={mockProjectMembers}
+          onTaskUpdate={mockOnTaskUpdate}
+        />
+      );
+
+      const markAsDoneButton = screen.getByTitle(/mark as done/i);
+      await user.click(markAsDoneButton);
+
+      await waitFor(() => {
+        expect(apiModule.api.projects.phases.updateTask).toHaveBeenCalled();
+      }, { timeout: 3000 });
+
+      // Verify the date format is ISO date-time (YYYY-MM-DDTHH:mm:ss.sssZ), not date-only (YYYY-MM-DD)
+      const updateCall = (apiModule.api.projects.phases.updateTask as any).mock.calls[0];
+      const actualCompletionDate = updateCall[3]?.actualCompletionDate;
+      
+      expect(actualCompletionDate).toBeDefined();
+      // Should be ISO date-time format (contains 'T' and timezone info)
+      expect(actualCompletionDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      expect(actualCompletionDate).not.toMatch(/^\d{4}-\d{2}-\d{2}$/); // Should not be date-only
+      // Should be a valid ISO string
+      expect(() => new Date(actualCompletionDate).toISOString()).not.toThrow();
+      expect(new Date(actualCompletionDate).toISOString()).toBe(actualCompletionDate);
+    });
   });
 
   describe('Deleting Tasks', () => {
@@ -387,3 +425,4 @@ describe('TaskList', () => {
     });
   });
 });
+
