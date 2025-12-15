@@ -2,9 +2,41 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
+import { readdirSync, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Dynamically find Prisma client path in pnpm structure
+function findPrismaClientPath() {
+  const pnpmPath = resolve(__dirname, '../../node_modules/.pnpm');
+  if (!existsSync(pnpmPath)) {
+    return null;
+  }
+  
+  try {
+    const entries = readdirSync(pnpmPath);
+    const prismaEntry = entries.find(entry => entry.startsWith('@prisma+client@7.1.0'));
+    if (prismaEntry) {
+      const clientPath = resolve(pnpmPath, prismaEntry, 'node_modules/@prisma/client');
+      if (existsSync(clientPath)) {
+        return clientPath;
+      }
+    }
+  } catch {
+    // Fallback to default path structure
+  }
+  
+  // Fallback: try to resolve from node_modules directly
+  const fallbackPath = resolve(__dirname, '../../node_modules/@prisma/client');
+  if (existsSync(fallbackPath)) {
+    return fallbackPath;
+  }
+  
+  return null;
+}
+
+const prismaClientPath = findPrismaClientPath();
 
 export default defineConfig({
   plugins: [
@@ -14,18 +46,17 @@ export default defineConfig({
       name: 'resolve-prisma-client',
       enforce: 'pre',
       resolveId(id) {
-        if (id === '@prisma/client') {
-          // Return the actual path to Prisma client in the workspace
-          const prismaPath = resolve(__dirname, '../../node_modules/.pnpm/@prisma+client@6.19.0_prisma@6.19.0/node_modules/@prisma/client');
-          return prismaPath;
+        if (id === '@prisma/client' && prismaClientPath) {
+          return prismaClientPath;
         }
         return null;
       },
     },
+  ],
   test: {
-    // Use node environment for integration tests (they test API endpoints, not browser)
-    // Component tests can override this if needed
-    environment: 'node',
+    // Use jsdom environment for component tests (default)
+    // Integration tests can override this per-file using // @vitest-environment node
+    environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
     testTimeout: 30000, // Increase timeout for integration tests
@@ -47,8 +78,8 @@ export default defineConfig({
       '@dp/lib': resolve(__dirname, '../../packages/lib/src/index.ts'),
       '@dp/config': resolve(__dirname, '../../packages/config/src/index.ts'),
       // Resolve @prisma/client from workspace - use the generated client from packages/db
-      // In pnpm, we need to point to the actual location
-      '@prisma/client': resolve(__dirname, '../../node_modules/.pnpm/@prisma+client@6.19.0_prisma@6.19.0/node_modules/@prisma/client'),
+      // In pnpm, we dynamically find the actual location
+      ...(prismaClientPath ? { '@prisma/client': prismaClientPath } : {}),
     },
     // Preserve symlinks to help resolve workspace packages correctly
     preserveSymlinks: false,

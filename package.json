@@ -12,9 +12,17 @@
   "devDependencies": {
     "turbo": "^2.6.1"
   },
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@10.25.0",
   "engines": {
     "node": ">=20.9.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "@prisma/engines",
+      "esbuild",
+      "sharp"
+    ]
   }
 }

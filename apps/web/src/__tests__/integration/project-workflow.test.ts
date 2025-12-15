@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment node
+ */
 import { describe, it, expect } from 'vitest';
 import './setup'; // Import setup to ensure test server is running
 import { api } from '@/lib/api';

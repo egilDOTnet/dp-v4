@@ -109,8 +109,18 @@ beforeAll(async () => {
 
   // CRITICAL: Create a new PrismaClient instance with the test DATABASE_URL
   // and replace the global cache so all imports of db will use this instance
+  // Prisma 7 requires an adapter to be provided
   const { PrismaClient } = await import("@prisma/client");
+  const { PrismaPg } = await import("@prisma/adapter-pg");
+  const { Pool } = await import("pg");
+
+  const testPool = new Pool({
+    connectionString: testDbUrl,
+  });
+  const testAdapter = new PrismaPg(testPool);
+
   const testDb = new PrismaClient({
+    adapter: testAdapter,
     log: ["error"],
   });
   

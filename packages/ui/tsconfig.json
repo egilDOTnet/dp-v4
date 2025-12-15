@@ -1,5 +1,5 @@
 {
-  "extends": "@dp/config/typescript/base.json",
+  "extends": "../config/typescript/base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
     "lib": ["DOM", "DOM.Iterable", "ES2022"]
