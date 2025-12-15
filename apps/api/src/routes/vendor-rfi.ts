@@ -1,74 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
-
-// Helper to safely access RFI models
-function getRFIModel(modelName: string) {
-  const dbAny = db as any;
-  const camelCaseName = modelName.charAt(0).toLowerCase() + modelName.slice(1);
-  const model = dbAny[camelCaseName];
-
-  if (!model) {
-    const availableModels = Object.keys(dbAny)
-      .filter(
-        (key) =>
-          !key.startsWith("_") &&
-          !key.startsWith("$") &&
-          typeof dbAny[key] === "object" &&
-          dbAny[key] !== null &&
-          dbAny[key].findUnique !== undefined
-      )
-      .slice(0, 30);
-    
-    throw new Error(
-      `RFI model "${modelName}" (accessed as "${camelCaseName}") not found in Prisma client. ` +
-        `Available Prisma models: ${availableModels.join(", ")}`
-    );
-  }
-
-  return model;
-}
-
-// Helper to sync vendor status from RFI vendor response status
-// This ensures one-way sync: RFI status changes update Vendor status
-async function syncVendorStatusFromRFIStatus(
-  rfiVendorResponseStatus: string,
-  projectVendorId: string
-): Promise<void> {
-  // Map RFI status to Vendor status
-  // Only sync certain statuses - Rejected doesn't update vendor status
-  let vendorStatus: string | null = null;
-  
-  switch (rfiVendorResponseStatus) {
-    case "Started":
-      vendorStatus = "RFI_Started";
-      break;
-    case "Received":
-      vendorStatus = "RFI_Received";
-      break;
-    case "Answered":
-      vendorStatus = "RFI_Answered";
-      break;
-    case "Sent":
-      // When RFI is sent, status should be RFI_Received (handled in rfi.ts)
-      // But we can also handle it here as a fallback
-      vendorStatus = "RFI_Received";
-      break;
-    case "Rejected":
-      // Don't sync rejected status - vendor status remains as is
-      return;
-    default:
-      // Unknown status, don't sync
-      return;
-  }
-
-  // Update vendor status
-  if (vendorStatus) {
-    await db.projectVendor.update({
-      where: { id: projectVendorId },
-      data: { status: vendorStatus as any },
-    });
-  }
-}
+import { syncVendorStatusFromRFIStatus } from "../utils/rfi-utils";
 
 // Helper to validate magic link token
 async function validateMagicLinkToken(
@@ -88,10 +20,10 @@ async function validateMagicLinkToken(
       return null;
     }
 
-    const RFIVendorResponse = getRFIModel("RFIVendorResponse");
+    const dbAny = db as any;
     
     // Get vendor response with token check
-    const vendorResponse = await RFIVendorResponse.findUnique({
+    const vendorResponse = await dbAny.rFIVendorResponse.findUnique({
       where: { id: decoded.vendorResponseId },
       select: {
         id: true,
@@ -339,8 +271,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             });
           }
 
-          const RFIVendorResponse = getRFIModel("RFIVendorResponse");
-          const RFIResponse = getRFIModel("RFIResponse");
+          const dbAny = db as any;
 
           // Update status to "Started" if not already "Answered" or "Started"
           if (vendorResponse.status !== "Answered" && vendorResponse.status !== "Started") {
@@ -351,7 +282,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
                 newStatus: "Started"
               }, "Updating vendor response status to Started");
               
-              await RFIVendorResponse.update({
+              await dbAny.rFIVendorResponse.update({
                 where: { id: vendorResponse.id },
                 data: { status: "Started" },
               });
@@ -378,7 +309,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
 
           // Save or update answers
           for (const [questionId, answer] of Object.entries(answersData)) {
-            const existingResponse = await RFIResponse.findFirst({
+            const existingResponse = await dbAny.rFIResponse.findFirst({
               where: {
                 vendorResponseId: vendorResponse.id,
                 questionId,
@@ -386,14 +317,14 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             });
 
             if (existingResponse) {
-              await RFIResponse.update({
+              await dbAny.rFIResponse.update({
                 where: { id: existingResponse.id },
                 data: {
                   answer: answer as any,
                 },
               });
             } else {
-              await RFIResponse.create({
+              await dbAny.rFIResponse.create({
                 data: {
                   vendorResponseId: vendorResponse.id,
                   questionId,
@@ -435,8 +366,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             return reply.status(400).send({ error: "Invalid email format" });
           }
 
-          const RFIVendorResponse = getRFIModel("RFIVendorResponse");
-          const RFIResponse = getRFIModel("RFIResponse");
+          const dbAny = db as any;
 
           // Get project vendor to find vendor ID
           const projectVendor = await db.projectVendor.findUnique({
@@ -492,7 +422,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
           }
 
           // Update vendor response with new contact person
-          await RFIVendorResponse.update({
+          await dbAny.rFIVendorResponse.update({
             where: { id: vendorResponse.id },
             data: {
               contactPersonId: contactPersonRecord.id,
@@ -506,7 +436,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
 
           // Save or update answers
           for (const [questionId, answer] of Object.entries(answers)) {
-            const existingResponse = await RFIResponse.findFirst({
+            const existingResponse = await dbAny.rFIResponse.findFirst({
               where: {
                 vendorResponseId: vendorResponse.id,
                 questionId,
@@ -514,14 +444,14 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             });
 
             if (existingResponse) {
-              await RFIResponse.update({
+              await dbAny.rFIResponse.update({
                 where: { id: existingResponse.id },
                 data: {
                   answer: answer as any,
                 },
               });
             } else {
-              await RFIResponse.create({
+              await dbAny.rFIResponse.create({
                 data: {
                   vendorResponseId: vendorResponse.id,
                   questionId,

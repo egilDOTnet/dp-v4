@@ -2,82 +2,7 @@ import { FastifyInstance } from "fastify";
 import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
-
-// Helper to safely access RFI models with better error handling
-// Prisma generates model names in camelCase: Project -> db.project, RFI -> db.rFI
-function getRFIModel(modelName: string) {
-  const dbAny = db as any;
-  
-  // Prisma naming: first letter lowercase, rest stays
-  // RFI -> rFI, RFIQuestion -> rFIQuestion, etc.
-  const camelCaseName = modelName.charAt(0).toLowerCase() + modelName.slice(1);
-  const model = dbAny[camelCaseName];
-
-  if (!model) {
-    // Provide helpful error message with available models
-    const availableModels = Object.keys(dbAny)
-      .filter(
-        (key) =>
-          !key.startsWith("_") &&
-          !key.startsWith("$") &&
-          typeof dbAny[key] === "object" &&
-          dbAny[key] !== null &&
-          dbAny[key].findUnique !== undefined // Only Prisma models have findUnique
-      )
-      .slice(0, 30);
-    
-    throw new Error(
-      `RFI model "${modelName}" (accessed as "${camelCaseName}") not found in Prisma client. ` +
-        `Please ensure: 1) Migrations have been applied with 'pnpm prisma migrate deploy' in packages/db, ` +
-        `2) Prisma client has been regenerated with 'pnpm prisma generate' in packages/db, ` +
-        `3) API server has been restarted. ` +
-        (availableModels.length > 0 ? `Available Prisma models: ${availableModels.join(", ")}` : "")
-    );
-  }
-
-  return model;
-}
-
-// Helper to sync vendor status from RFI vendor response status
-// This ensures one-way sync: RFI status changes update Vendor status
-async function syncVendorStatusFromRFIStatus(
-  rfiVendorResponseStatus: string,
-  projectVendorId: string
-): Promise<void> {
-  // Map RFI status to Vendor status
-  // Only sync certain statuses - Rejected doesn't update vendor status
-  let vendorStatus: string | null = null;
-  
-  switch (rfiVendorResponseStatus) {
-    case "Started":
-      vendorStatus = "RFI_Started";
-      break;
-    case "Received":
-      vendorStatus = "RFI_Received";
-      break;
-    case "Answered":
-      vendorStatus = "RFI_Answered";
-      break;
-    case "Sent":
-      // When RFI is sent, status should be RFI_Received
-      vendorStatus = "RFI_Received";
-      break;
-    case "Rejected":
-      // Don't sync rejected status - vendor status remains as is
-      return;
-    default:
-      // Unknown status, don't sync
-      return;
-  }
-
-  // Update vendor status
-  if (vendorStatus) {
-    await db.projectVendor.update({
-      where: { id: projectVendorId },
-      data: { status: vendorStatus as any },
-    });
-  }
-}
+import { syncVendorStatusFromRFIStatus } from "../utils/rfi-utils";
 
 export default async function rfiRoutes(fastify: FastifyInstance) {
   /**
@@ -1076,9 +1001,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       const project = (request as any).project;
 
       // Get or create RFI
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      let rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      let rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -1096,7 +1020,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         const emailText = emailTemplate?.content?.replace(/{PROJECT_NAME}/g, project.name) || "";
         const rfiInformation = rfiInfoTemplate?.content?.replace(/{PROJECT_NAME}/g, project.name).replace(/{PROJECT_DESCRIPTION}/g, project.type || "No description available") || "";
 
-        rfi = await RFI.create({
+        rfi = await db.rFI.create({
           data: {
             projectId,
             emailSubject,
@@ -1109,7 +1033,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Get max order
-      const maxOrderQuestion = await RFIQuestion.findFirst({
+      const maxOrderQuestion = await dbAny.rFIQuestion.findFirst({
         where: { rfiId: rfi.id },
         orderBy: { order: "desc" },
       });
@@ -1118,7 +1042,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
 
       // Create question
       // Use select instead of include to ensure proper JSON serialization
-      const question = await RFIQuestion.create({
+      const question = await dbAny.rFIQuestion.create({
         data: {
           rfiId: rfi.id,
           title: request.body.title,
@@ -1304,9 +1228,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         }
 
         // Verify question belongs to RFI
-        const RFI = getRFIModel("RFI");
-        const RFIQuestion = getRFIModel("RFIQuestion");
-        const rfi = await RFI.findUnique({
+        const dbAny = db as any;
+        const rfi = await db.rFI.findUnique({
           where: { projectId },
         });
 
@@ -1314,7 +1237,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: "RFI not found" });
         }
 
-        const question = await RFIQuestion.findUnique({
+        const question = await dbAny.rFIQuestion.findUnique({
           where: { id: questionId },
         });
 
@@ -1341,7 +1264,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         }
 
         // Use select instead of include to ensure proper JSON serialization
-        const updatedQuestion = await RFIQuestion.update({
+        const updatedQuestion = await dbAny.rFIQuestion.update({
           where: { id: questionId },
           data: updateData,
           select: {
@@ -1461,9 +1384,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Verify question belongs to RFI
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      const rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -1471,7 +1393,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      const question = await RFIQuestion.findUnique({
+      const question = await dbAny.rFIQuestion.findUnique({
         where: { id: questionId },
       });
 
@@ -1480,7 +1402,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Delete question (cascade will delete options and responses)
-      await RFIQuestion.delete({
+      await dbAny.rFIQuestion.delete({
         where: { id: questionId },
       });
 
@@ -1589,9 +1511,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Verify RFI exists
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      const rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -1600,7 +1521,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Validate all question IDs belong to this RFI
-      const questions = await RFIQuestion.findMany({
+      const questions = await dbAny.rFIQuestion.findMany({
         where: {
           id: { in: request.body.questionIds },
           rfiId: rfi.id,
@@ -1613,7 +1534,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
 
       // Update order for each question
       const updatePromises = request.body.questionIds.map((questionId, index) =>
-        RFIQuestion.update({
+        dbAny.rFIQuestion.update({
           where: { id: questionId },
           data: { order: index + 1 },
         })
@@ -1742,10 +1663,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Verify question belongs to RFI
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      const RFIQuestionOption = getRFIModel("RFIQuestionOption");
-      const rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -1753,7 +1672,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      const question = await RFIQuestion.findUnique({
+      const question = await dbAny.rFIQuestion.findUnique({
         where: { id: questionId },
       });
 
@@ -1762,7 +1681,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Get max order
-      const maxOrderOption = await RFIQuestionOption.findFirst({
+      const maxOrderOption = await dbAny.rFIQuestionOption.findFirst({
         where: { questionId },
         orderBy: { order: "desc" },
       });
@@ -1770,7 +1689,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       const order = maxOrderOption ? maxOrderOption.order + 1 : 1;
 
       // Create option
-      const option = await RFIQuestionOption.create({
+      const option = await dbAny.rFIQuestionOption.create({
         data: {
           questionId,
           label: request.body.label,
@@ -1907,10 +1826,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Verify option belongs to question and question belongs to RFI
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      const RFIQuestionOption = getRFIModel("RFIQuestionOption");
-      const rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -1918,7 +1835,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      const question = await RFIQuestion.findUnique({
+      const question = await dbAny.rFIQuestion.findUnique({
         where: { id: questionId },
       });
 
@@ -1926,7 +1843,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Question not found" });
       }
 
-      const option = await RFIQuestionOption.findUnique({
+      const option = await dbAny.rFIQuestionOption.findUnique({
         where: { id: optionId },
       });
 
@@ -1949,7 +1866,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         updateData.yAxis = request.body.yAxis;
       }
 
-      const updatedOption = await RFIQuestionOption.update({
+      const updatedOption = await dbAny.rFIQuestionOption.update({
         where: { id: optionId },
         data: updateData,
       });
@@ -2048,10 +1965,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Verify option belongs to question and question belongs to RFI
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      const RFIQuestionOption = getRFIModel("RFIQuestionOption");
-      const rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -2059,7 +1974,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      const question = await RFIQuestion.findUnique({
+      const question = await dbAny.rFIQuestion.findUnique({
         where: { id: questionId },
       });
 
@@ -2067,7 +1982,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Question not found" });
       }
 
-      const option = await RFIQuestionOption.findUnique({
+      const option = await dbAny.rFIQuestionOption.findUnique({
         where: { id: optionId },
       });
 
@@ -2076,7 +1991,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Delete option
-      await RFIQuestionOption.delete({
+      await dbAny.rFIQuestionOption.delete({
         where: { id: optionId },
       });
 
@@ -2190,10 +2105,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Verify question belongs to RFI
-      const RFI = getRFIModel("RFI");
-      const RFIQuestion = getRFIModel("RFIQuestion");
-      const RFIQuestionOption = getRFIModel("RFIQuestionOption");
-      const rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -2201,7 +2114,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      const question = await RFIQuestion.findUnique({
+      const question = await dbAny.rFIQuestion.findUnique({
         where: { id: questionId },
       });
 
@@ -2210,7 +2123,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       }
 
       // Validate all option IDs belong to this question
-      const options = await RFIQuestionOption.findMany({
+      const options = await dbAny.rFIQuestionOption.findMany({
         where: {
           id: { in: request.body.optionIds },
           questionId: question.id,
@@ -2223,7 +2136,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
 
       // Update order for each option
       const updatePromises = request.body.optionIds.map((optionId, index) =>
-        RFIQuestionOption.update({
+        dbAny.rFIQuestionOption.update({
           where: { id: optionId },
           data: { order: index + 1 },
         })
@@ -2526,8 +2439,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         }
 
         // Get vendor response with project vendor info
-        const RFIVendorResponse = getRFIModel("RFIVendorResponse");
-        const vendorResponse = await RFIVendorResponse.findUnique({
+        const dbAny = db as any;
+        const vendorResponse = await dbAny.rFIVendorResponse.findUnique({
           where: { id: vendorResponseId },
           select: {
             id: true,
@@ -2587,8 +2500,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         }
 
         // Get all responses (answers) for this vendor response
-        const RFIResponse = getRFIModel("RFIResponse");
-        const responses = await RFIResponse.findMany({
+        const responses = await dbAny.rFIResponse.findMany({
           where: { vendorResponseId },
           select: {
             id: true,
@@ -2748,9 +2660,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Get RFI
-      const RFI = getRFIModel("RFI");
-      const RFIVendorResponse = getRFIModel("RFIVendorResponse");
-      const rfi = await RFI.findUnique({
+        const dbAny = db as any;
+        const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -2799,7 +2710,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         }
 
         // Check if response already exists
-        const existingResponse = await RFIVendorResponse.findUnique({
+        const existingResponse = await dbAny.rFIVendorResponse.findUnique({
           where: {
             rfiId_projectVendorId: {
               rfiId: rfi.id,
@@ -2813,7 +2724,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           const tokenExpiresAt = new Date();
           tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30 days from now
           
-          const vendorResponse = await RFIVendorResponse.create({
+          const vendorResponse = await dbAny.rFIVendorResponse.create({
             data: {
               rfiId: rfi.id,
               projectVendorId: pv.id,
@@ -2834,7 +2745,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           );
 
           // Update with token
-          await RFIVendorResponse.update({
+          await dbAny.rFIVendorResponse.update({
             where: { id: vendorResponse.id },
             data: { magicLinkToken },
           });
@@ -2952,9 +2863,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       if (reply.sent) return;
 
       // Get RFI
-      const RFI = getRFIModel("RFI");
-      const RFIVendorResponse = getRFIModel("RFIVendorResponse");
-      const rfi = await RFI.findUnique({
+      const dbAny = db as any;
+      const rfi = await db.rFI.findUnique({
         where: { projectId },
       });
 
@@ -2999,7 +2909,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30 days from now
 
       // Update or create vendor response
-      const vendorResponse = await RFIVendorResponse.upsert({
+      const vendorResponse = await dbAny.rFIVendorResponse.upsert({
         where: {
           rfiId_projectVendorId: {
             rfiId: rfi.id,
@@ -3031,7 +2941,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       );
 
       // Update with token
-      await RFIVendorResponse.update({
+      await dbAny.rFIVendorResponse.update({
         where: { id: vendorResponse.id },
         data: { magicLinkToken },
       });
@@ -3138,10 +3048,8 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         if (reply.sent) return;
 
         // Get RFI
-        const RFI = getRFIModel("RFI");
-        const RFIVendorResponse = getRFIModel("RFIVendorResponse");
         const dbAny = db as any;
-        const rfi = await RFI.findUnique({
+        const rfi = await db.rFI.findUnique({
           where: { projectId },
         });
 
@@ -3227,7 +3135,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         // Check if a preview vendor response already exists for this RFI
         // Use a special identifier or find by checking if it's a preview response
         // For now, we'll create a new one each time or reuse if exists
-        const existingPreviewResponse = await RFIVendorResponse.findFirst({
+        const existingPreviewResponse = await dbAny.rFIVendorResponse.findFirst({
           where: {
             rfiId: rfi.id,
             projectVendorId: projectVendor.id,
@@ -3242,7 +3150,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           const tokenExpiresAt = new Date();
           tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30 days from now
 
-          vendorResponse = await RFIVendorResponse.create({
+          vendorResponse = await dbAny.rFIVendorResponse.create({
             data: {
               rfiId: rfi.id,
               projectVendorId: projectVendor.id,
@@ -3264,7 +3172,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         );
 
         // Update with token
-        await RFIVendorResponse.update({
+        await dbAny.rFIVendorResponse.update({
           where: { id: vendorResponse.id },
           data: { magicLinkToken },
         });
