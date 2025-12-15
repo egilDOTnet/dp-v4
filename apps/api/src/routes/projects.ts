@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { db, RequirementStatus } from "@dp/db";
+import { db, RequirementStatus, VendorStatus } from "@dp/db";
 import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
@@ -4089,12 +4089,25 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "Vendor already linked to this project" });
       }
 
+      // Validate and set status
+      let status: VendorStatus = VendorStatus.Pending;
+      if (request.body.status) {
+        const statusValue = request.body.status as string;
+        if (Object.values(VendorStatus).includes(statusValue as VendorStatus)) {
+          status = statusValue as VendorStatus;
+        } else {
+          return reply.status(400).send({
+            error: `Invalid status value. Must be one of: ${Object.values(VendorStatus).join(", ")}`,
+          });
+        }
+      }
+
       // Create project-vendor link
       const projectVendor = await db.projectVendor.create({
         data: {
           projectId,
           vendorId: vendor.id,
-          status: (request.body.status as any) || "Pending",
+          status,
         },
         include: {
           vendor: {
@@ -4605,6 +4618,14 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       // Verify project access using middleware
       await verifyProjectAccess(request, reply);
 
+      // Validate status
+      const statusValue = request.body.status as string;
+      if (!Object.values(VendorStatus).includes(statusValue as VendorStatus)) {
+        return reply.status(400).send({
+          error: `Invalid status value. Must be one of: ${Object.values(VendorStatus).join(", ")}`,
+        });
+      }
+
       // Update the project-vendor relationship
       const projectVendor = await db.projectVendor.update({
         where: {
@@ -4614,7 +4635,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           },
         },
         data: {
-          status: request.body.status as any,
+          status: statusValue as VendorStatus,
         },
         include: {
           vendor: {

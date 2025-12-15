@@ -35,7 +35,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
         status: "Draft",
       });
@@ -1568,7 +1568,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
       });
       const vendor = await createTestVendor({ tenantId: tenant.id });
@@ -1619,7 +1619,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
       });
       const vendor = await createTestVendor({ tenantId: tenant.id });
@@ -1671,7 +1671,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
       });
       const vendor = await createTestVendor({ tenantId: tenant.id });
@@ -1911,7 +1911,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
       });
       const vendor = await createTestVendor({ tenantId: tenant.id });
@@ -1966,7 +1966,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
       });
       const vendor = await createTestVendor({ tenantId: tenant.id });
@@ -2039,7 +2039,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
       });
       const vendor = await createTestVendor({ tenantId: tenant.id });
@@ -2120,7 +2120,7 @@ describe("RFP Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      await createTestRFP({
+      const rfp = await createTestRFP({
         projectId: project.id,
       });
       const vendor = await createTestVendor({ tenantId: tenant.id });
@@ -2628,3 +2628,4 @@ describe("RFP Routes", () => {
     });
   });
 });
+

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import RequirementList from '@/components/RequirementList';
 import { createMockRequirement } from '../utils/mock-data';
-import { mockApi, setupApiMocks } from '../utils/api-mocks';
+import { setupApiMocks } from '../utils/api-mocks';
 import * as apiModule from '@/lib/api';
 
 // Mock the api module
@@ -155,8 +155,6 @@ describe('RequirementList', () => {
         />
       );
 
-      const descriptionInput = screen.getByPlaceholderText(/requirement description/i);
-      
       // Note: The component's Enter key handler only calls handleCreate if description.trim() is truthy
       // So pressing Enter with empty/whitespace-only input won't trigger handleCreate or show an error
       // The error is only shown if handleCreate is called with an empty description after trimming
@@ -446,26 +444,23 @@ describe('RequirementList', () => {
       await user.click(deleteButton);
 
       // Wait for the delete API to be called (after 300ms animation)
+      // The component uses setTimeout with 300ms delay before calling delete
       await waitFor(() => {
         expect(apiModule.api.requirements.delete).toHaveBeenCalledWith(projectId, 'req-1');
       }, { timeout: 2000 });
 
-      // The error should be set in the component's error state
-      // However, the error might not be immediately visible or might be cleared
-      // Let's verify that the delete was attempted and failed
-      // The component sets: setError(err.message || "Failed to delete requirement")
-      // The error is displayed in a div with classes "bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded"
-      // But it might not be visible if the component re-renders or the error is cleared
-      
-      // For this test, we verify that:
-      // 1. The delete API was called (verified above)
-      // 2. The delete failed (mock rejected)
-      // 3. The requirement is still present (delete didn't succeed)
+      // Wait for the error to be handled by the component
+      // The component catches the error and sets it in state, which happens after the setTimeout callback
+      // We need to wait long enough for the setTimeout callback to complete and handle the error
       await waitFor(() => {
         // Requirement should still be visible since delete failed
         const requirementText = screen.queryByText('To Delete');
         expect(requirementText).toBeInTheDocument();
       }, { timeout: 2000 });
+
+      // Ensure we wait a bit more to let any async error handling complete
+      // This prevents unhandled promise rejection warnings
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Note: The error message might not be visible in the DOM if the component
       // clears it or doesn't display it in certain states. The important thing is
@@ -577,3 +572,4 @@ describe('RequirementList', () => {
     });
   });
 });
+

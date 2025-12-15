@@ -134,7 +134,8 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
       setShowMentionDropdown(true);
 
       // Calculate dropdown position
-      const rect = range.getBoundingClientRect();
+      // getBoundingClientRect may not be available in test environments (jsdom)
+      const rect = range.getBoundingClientRect?.() || { bottom: 0, left: 0 };
       const editorRect = editor.getBoundingClientRect();
       setMentionPosition({
         top: rect.bottom - editorRect.top + 5,
@@ -489,6 +490,7 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
         <div
           ref={editorRef}
           contentEditable
+          role="textbox"
           onInput={handleInput}
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}

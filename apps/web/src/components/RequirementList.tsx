@@ -517,21 +517,21 @@ export default function RequirementList({
     setLoading(true);
     setError("");
 
-    try {
-      // Start fade-out animation
-      setCancelingRequirementId(id);
-      // Wait for animation to complete before deleting
-      setTimeout(async () => {
+    // Start fade-out animation
+    setCancelingRequirementId(id);
+    // Wait for animation to complete before deleting
+    setTimeout(async () => {
+      try {
         await api.requirements.delete(projectId, id);
         setCancelingRequirementId(null);
         onRequirementUpdate();
         setLoading(false);
-      }, 300);
-    } catch (err: any) {
-      setError(err.message || "Failed to delete requirement");
-      setCancelingRequirementId(null);
-      setLoading(false);
-    }
+      } catch (err: any) {
+        setError(err.message || "Failed to delete requirement");
+        setCancelingRequirementId(null);
+        setLoading(false);
+      }
+    }, 300);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '../../utils/test-utils';
+import { render, screen } from '../../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/Dialog';
 
 // Mock Radix UI Dialog primitives
 vi.mock('@radix-ui/react-dialog', () => ({
-  Root: ({ children, open, onOpenChange }: any) => (
+  Root: ({ children, open, onOpenChange: _onOpenChange }: any) => (
     <div data-testid="dialog-root" data-open={open}>
       {children}
     </div>
@@ -171,3 +171,4 @@ describe('Dialog', () => {
     });
   });
 });
+

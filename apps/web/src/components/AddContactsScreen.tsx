@@ -132,6 +132,18 @@ export default function AddContactsScreen({
         id: contact.id || `temp-${index}`,
         isNew: false,
       };
+      
+      // If we just added a new contact (not updating), add a new empty form
+      if (contact.isNew && !contact.id) {
+        updatedContacts.push({
+          firstName: "",
+          lastName: "",
+          email: "",
+          isMainContact: false,
+          isNew: true,
+        });
+      }
+      
       setContacts(updatedContacts);
       setEditingIndex(null);
     } catch (err) {
@@ -184,7 +196,7 @@ export default function AddContactsScreen({
 
       <div className="space-y-4">
         {contacts.map((contact, index) => {
-          const isEditing = editingIndex === index;
+          const isEditing = editingIndex === index || contact.isNew;
           const isFirstContact = index === 0;
 
           if (isEditing) {
@@ -207,11 +219,14 @@ export default function AddContactsScreen({
                         }
                       : undefined
                   }
-                  isFirstContact={isFirstContact && contacts.length === 1}
+                  isFirstContact={isFirstContact}
                   onSubmit={async (data) => {
                     await handleSaveContact(index, data);
                   }}
-                  onCancel={handleCancelEdit}
+                  onCancel={contact.isNew ? () => handleDeleteContact(index) : handleCancelEdit}
+                  onDelete={contact.id && !contact.isNew ? async () => {
+                    await handleDeleteContact(index);
+                  } : undefined}
                 />
               </div>
             );
@@ -284,7 +299,7 @@ export default function AddContactsScreen({
             disabled={!allContactsSaved || saving}
             className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Done"}
+            {saving ? "Saving..." : "Continue"}
           </button>
           <button
             onClick={onSkip}

@@ -246,6 +246,7 @@ export default function VendorForm({
 
   return (
     <form
+      data-testid="vendor-form"
       onSubmit={handleSubmit}
       className="space-y-4 bg-background-secondary p-4 rounded-lg border border-border-primary"
     >
@@ -399,6 +400,7 @@ export default function VendorForm({
       <div className="flex gap-2 pt-4">
         <button
           type="submit"
+          data-testid="vendor-submit"
           disabled={submitting}
           className="px-4 py-2 text-sm font-medium bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
         >
@@ -412,6 +414,7 @@ export default function VendorForm({
         </button>
         <button
           type="button"
+          data-testid="vendor-cancel"
           onClick={onCancel}
           className="px-4 py-2 text-sm font-medium border border-border-primary text-text-primary rounded-md hover:bg-background-primary"
         >

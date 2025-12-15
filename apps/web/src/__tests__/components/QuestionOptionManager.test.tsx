@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../utils/test-utils';
+import { render, screen, waitFor, fireEvent } from '../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import QuestionOptionManager from '@/components/QuestionOptionManager';
 import { createMockRFIQuestion, createMockRFIQuestionOption } from '../utils/mock-data';
-import { mockApi, setupApiMocks } from '../utils/api-mocks';
+import { setupApiMocks } from '../utils/api-mocks';
 import * as apiModule from '@/lib/api';
 
 // Mock the api module
@@ -122,12 +122,6 @@ describe('QuestionOptionManager', () => {
     });
 
     it('should display error message when error occurs', async () => {
-      const question = createMockRFIQuestion({
-        id: questionId,
-        type: 'MultipleChoice',
-        options: [],
-      });
-
       (apiModule.api.rfi.questions.list as any).mockRejectedValue(new Error('Failed to load'));
 
       render(
@@ -253,7 +247,6 @@ describe('QuestionOptionManager', () => {
         expect(screen.getByPlaceholderText('Row label')).toBeInTheDocument();
       });
 
-      const input = screen.getByPlaceholderText('Row label');
       await user.keyboard('{Enter}');
 
       await waitFor(() => {
@@ -417,9 +410,8 @@ describe('QuestionOptionManager', () => {
         expect(input).toBeInTheDocument();
       });
 
-      const input = screen.getByDisplayValue('Option 1');
-      await user.clear(input);
-      await user.type(input, 'Updated Option');
+      const input = screen.getByDisplayValue('Option 1') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: 'Updated Option' } });
       await user.keyboard('{Enter}');
 
       await waitFor(() => {
@@ -464,11 +456,9 @@ describe('QuestionOptionManager', () => {
       await user.click(optionLabel);
 
       await waitFor(() => {
-        const input = screen.getByDisplayValue('Option 1');
-        expect(input).toBeInTheDocument();
+        expect(screen.getByDisplayValue('Option 1')).toBeInTheDocument();
       });
 
-      const input = screen.getByDisplayValue('Option 1');
       await user.keyboard('{Escape}');
 
       await waitFor(() => {
@@ -596,3 +586,4 @@ describe('QuestionOptionManager', () => {
     });
   });
 });
+

@@ -386,10 +386,37 @@ describe('WysiwygEditor', () => {
       await user.click(editor);
       await user.type(editor, '@');
 
+      // Wait for dropdown to appear (shows full names)
       await waitFor(() => {
-        expect(screen.getByText('Alice')).toBeInTheDocument();
-        expect(screen.getByText('Bob')).toBeInTheDocument();
+        expect(screen.getByText('Alice Doe')).toBeInTheDocument();
+        expect(screen.getByText('Bob Smith')).toBeInTheDocument();
       });
+
+      // Use keyboard navigation to select and insert mention
+      // This preserves the editor selection better than clicking
+      // Alice is the first option (index 0), so we can just press Enter
+      // Or use ArrowDown to navigate if needed
+      await user.keyboard('{Enter}');
+
+      // Check that the inserted mention uses first name only (since it's unique)
+      // Check both the onChange call and the editor's actual content
+      await waitFor(() => {
+        // Check editor content directly
+        const editorContent = editor.innerHTML;
+        expect(editorContent).toContain('@Alice');
+        expect(editorContent).not.toContain('@Alice Doe');
+        
+        // Also verify onChange was called with the correct content
+        expect(mockOnChange).toHaveBeenCalled();
+        const calls = mockOnChange.mock.calls;
+        if (calls.length > 0) {
+          const lastCall = calls[calls.length - 1][0];
+          if (lastCall) {
+            expect(lastCall).toContain('@Alice');
+            expect(lastCall).not.toContain('@Alice Doe');
+          }
+        }
+      }, { timeout: 2000 });
     });
 
     it('should use full name for non-unique first names', async () => {
@@ -507,15 +534,12 @@ describe('WysiwygEditor', () => {
       const editor = screen.getByRole('textbox');
       await user.click(editor);
 
-      // Simulate paste
-      const pasteEvent = new ClipboardEvent('paste', {
-        clipboardData: new DataTransfer(),
-      });
-      pasteEvent.clipboardData.setData('text/plain', 'Pasted text');
-      
-      editor.dispatchEvent(pasteEvent);
+      // Simulate paste using userEvent.paste (which handles ClipboardEvent properly)
+      await user.paste('Pasted text');
 
-      expect(document.execCommand).toHaveBeenCalledWith('insertText', false, 'Pasted text');
+      await waitFor(() => {
+        expect(document.execCommand).toHaveBeenCalledWith('insertText', false, 'Pasted text');
+      });
     });
   });
 
@@ -586,3 +610,4 @@ describe('WysiwygEditor', () => {
     });
   });
 });
+

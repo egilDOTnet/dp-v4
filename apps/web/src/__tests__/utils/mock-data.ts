@@ -54,6 +54,30 @@ export function createMockUser(overrides?: Partial<User>): User {
   };
 }
 
+// ProjectMember factory (for WysiwygEditor and similar components)
+export interface ProjectMember {
+  id: string;
+  email: string;
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+export function createMockProjectMember(overrides?: Partial<ProjectMember>): ProjectMember {
+  const firstName = overrides?.firstName ?? `First${idCounter}`;
+  const lastName = overrides?.lastName ?? `Last${idCounter}`;
+  const name = overrides?.name ?? `${firstName} ${lastName}`;
+  
+  return {
+    id: overrides?.id ?? generateId(),
+    email: overrides?.email ?? `user${idCounter}@example.com`,
+    name,
+    firstName,
+    lastName,
+    ...overrides,
+  };
+}
+
 export function createMockAdmin(overrides?: Partial<User>): User {
   return createMockUser({
     role: 'CompanyAdministrator',
@@ -195,7 +219,25 @@ export function createMockVendor(overrides?: Partial<Vendor>): Vendor {
   };
 }
 
-export function createMockProjectVendor(overrides?: Partial<ProjectVendor>): ProjectVendor {
+export function createMockProjectVendor(
+  overrides?: Omit<Partial<ProjectVendor>, 'vendor'> & {
+    vendor?: Partial<Vendor & { contacts: VendorContactPerson[] }>;
+  }
+): ProjectVendor {
+  const baseVendor = createMockVendor();
+  const vendorOverrides = overrides?.vendor;
+  
+  // Extract vendor from overrides to avoid spreading it twice
+  const { vendor: _vendor, ...restOverrides } = overrides || {};
+  
+  // Merge vendor properties, ensuring all required fields are present
+  const mergedVendor: Vendor & { contacts: VendorContactPerson[] } = {
+    ...baseVendor,
+    ...vendorOverrides,
+    // Ensure contacts is always an array (required by ProjectVendor type)
+    contacts: vendorOverrides?.contacts ?? baseVendor.contacts ?? [],
+  } as Vendor & { contacts: VendorContactPerson[] };
+  
   return {
     id: generateId(),
     projectId: generateId(),
@@ -203,8 +245,8 @@ export function createMockProjectVendor(overrides?: Partial<ProjectVendor>): Pro
     status: 'Pending',
     createdAt: generateDate(-20),
     updatedAt: generateDate(-1),
-    vendor: createMockVendor(),
-    ...overrides,
+    vendor: mergedVendor,
+    ...restOverrides,
   };
 }
 
@@ -356,17 +398,21 @@ export function createMockRFPChangelogEntry(
 }
 
 export function createMockRFPQuestion(overrides?: Partial<RFPQuestion>): RFPQuestion {
+  const { cleanedQuestion, ...restOverrides } = overrides || {};
   return {
     id: generateId(),
     rfpId: generateId(),
     question: `RFP Question ${idCounter}`,
+    cleanedQuestion: cleanedQuestion ?? null,
     answer: null,
     answeredAt: null,
     answeredById: null,
+    vendorId: generateId(),
+    contactPersonId: generateId(),
     answeredBy: null,
     createdAt: generateDate(-10),
     updatedAt: generateDate(-1),
-    ...overrides,
+    ...restOverrides,
   };
 }
 
@@ -427,3 +473,4 @@ export function createMockNotification(overrides?: Partial<Notification>): Notif
 export function resetIdCounter(): void {
   idCounter = 1;
 }
+

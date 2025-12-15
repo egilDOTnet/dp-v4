@@ -453,7 +453,7 @@ export default function VendorList({
         </div>
       )}
 
-      {safeVendors.length > 0 && (
+      {(safeVendors.length > 0 || addingVendor) && (
         <div className="overflow-x-auto">
           <table className="w-full divide-y divide-border-primary">
             <thead className="bg-background-tertiary">

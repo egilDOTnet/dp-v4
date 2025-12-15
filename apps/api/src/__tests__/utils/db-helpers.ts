@@ -239,13 +239,16 @@ export async function createTestUser(overrides?: {
     // Create user in the same transaction - tenant is guaranteed to exist
     // Use crypto.randomUUID() to ensure unique emails even in parallel tests
     const uniqueId = randomUUID();
+    const firstName = overrides?.firstName !== undefined ? overrides.firstName : "Test";
+    const lastName = overrides?.lastName !== undefined ? overrides.lastName : "User";
+    const name = firstName && lastName ? `${firstName} ${lastName}` : null;
     return await tx.user.create({
       data: {
         id: overrides?.id || `test-user-${uniqueId}`,
         email: overrides?.email || `test-${uniqueId}@example.com`,
-        firstName: overrides?.firstName || "Test",
-        lastName: overrides?.lastName || "User",
-        name: `${overrides?.firstName || "Test"} ${overrides?.lastName || "User"}`,
+        firstName,
+        lastName,
+        name,
         role: (overrides?.role || "User") as Role,
         tenantId,
         passwordHash,

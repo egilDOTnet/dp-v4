@@ -352,7 +352,7 @@ export default function QuestionOptionManager({
                       }}
                       onKeyDown={(e) => {
                         e.stopPropagation();
-                        if (e.key === "Enter" && newOptionLabel.trim()) {
+                        if (e.key === "Enter") {
                           e.preventDefault();
                           handleAddRow();
                         } else if (e.key === "Escape") {

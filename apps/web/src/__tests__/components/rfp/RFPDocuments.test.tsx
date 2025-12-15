@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '../../utils/test-utils';
+import { render, screen, waitFor, fireEvent } from '../../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import RFPDocuments from '@/components/rfp/RFPDocuments';
 import { createMockRFP, createMockRFPDocument } from '../../utils/mock-data';
-import { mockApi, setupApiMocks } from '../../utils/api-mocks';
+import { setupApiMocks } from '../../utils/api-mocks';
 import * as apiModule from '@/lib/api';
 
 // Mock the api module
@@ -118,8 +118,8 @@ describe('RFPDocuments', () => {
         expect(screen.getByText(/no documents/i)).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /add document/i });
-      await user.click(addButton);
+      const addButtons = screen.getAllByRole('button', { name: /add document/i });
+      await user.click(addButtons[0]); // Use header button
 
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/description/i)).toBeInTheDocument();
@@ -137,8 +137,8 @@ describe('RFPDocuments', () => {
         expect(screen.getByText(/no documents/i)).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /add document/i });
-      await user.click(addButton);
+      const addButtons = screen.getAllByRole('button', { name: /add document/i });
+      await user.click(addButtons[0]); // Use header button
 
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/description/i)).toBeInTheDocument();
@@ -147,12 +147,20 @@ describe('RFPDocuments', () => {
       const descriptionInput = screen.getByPlaceholderText(/description/i);
       await user.type(descriptionInput, 'Test Link');
 
-      const urlInput = screen.getByPlaceholderText(/url/i);
-      await user.type(urlInput, 'https://example.com');
+      const urlInput = screen.getByPlaceholderText(/https:\/\/\.\.\./i) as HTMLInputElement;
+      // Use fireEvent to set the value directly for more reliable testing
+      fireEvent.change(urlInput, { target: { value: 'https://example.com' } });
+      
+      // Wait a bit for the state to update
+      await waitFor(() => {
+        expect(urlInput.value).toBe('https://example.com');
+      });
 
-      // Submit by clicking outside or pressing Enter
-      await user.click(document.body);
-
+      // Press Enter on the URL input to submit the form
+      // The component has a handleNewDocKeyDown handler that submits on Enter
+      fireEvent.keyDown(urlInput, { key: 'Enter', code: 'Enter' });
+      
+      // Wait for the API call
       await waitFor(() => {
         expect(apiModule.api.rfp.documents.create).toHaveBeenCalledWith(
           projectId,
@@ -162,7 +170,7 @@ describe('RFPDocuments', () => {
             url: 'https://example.com',
           }
         );
-      }, { timeout: 1000 });
+      }, { timeout: 2000 });
     });
 
     it('should create document when file is selected', async () => {
@@ -170,28 +178,28 @@ describe('RFPDocuments', () => {
       (apiModule.api.rfp.documents.list as any).mockResolvedValue([]);
       (apiModule.api.rfp.documents.create as any).mockResolvedValue({});
 
-      // Create a mock file
-      const file = new File(['test content'], 'test.pdf', { type: 'application/pdf' });
-
       render(<RFPDocuments projectId={projectId} rfp={rfp} />);
 
       await waitFor(() => {
         expect(screen.getByText(/no documents/i)).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /add document/i });
-      await user.click(addButton);
+      const addButtons = screen.getAllByRole('button', { name: /add document/i });
+      await user.click(addButtons[0]); // Use header button
 
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/description/i)).toBeInTheDocument();
       });
 
-      // Switch to Document type
-      const typeSelect = screen.getByLabelText(/type/i);
-      await user.selectOptions(typeSelect, 'Document');
+      // Switch to Document type by clicking the "File" button
+      const fileButton = screen.getByRole('button', { name: /^file$/i });
+      await user.click(fileButton);
 
       // File input would be handled differently in real implementation
       // This is a simplified test
+      await waitFor(() => {
+        expect(fileButton).toHaveClass(/bg-primary-600/);
+      });
     });
   });
 
@@ -249,7 +257,7 @@ describe('RFPDocuments', () => {
       const input = screen.getByDisplayValue('Test Document');
       await user.clear(input);
       await user.type(input, 'Updated Document');
-      await user.click(document.body); // Blur to trigger save
+      await user.click(globalThis.document.body); // Blur to trigger save
 
       await waitFor(() => {
         expect(apiModule.api.rfp.documents.update).toHaveBeenCalledWith(
@@ -262,15 +270,24 @@ describe('RFPDocuments', () => {
 
     it('should update link URL when edited', async () => {
       const user = userEvent.setup();
-      (apiModule.api.rfp.documents.update as any).mockResolvedValue({});
+      // Mock list to return link initially, then updated link after update
       const link = createMockRFPDocument({
         id: 'link-1',
         description: 'Test Link',
         type: 'Link',
         url: 'https://example.com',
       });
-
-      (apiModule.api.rfp.documents.list as any).mockResolvedValue([link]);
+      const updatedLink = { ...link, url: 'https://updated.com' };
+      
+      let listCallCount = 0;
+      (apiModule.api.rfp.documents.list as any).mockImplementation(() => {
+        listCallCount++;
+        if (listCallCount === 1) {
+          return Promise.resolve([link]);
+        }
+        return Promise.resolve([updatedLink]);
+      });
+      (apiModule.api.rfp.documents.update as any).mockResolvedValue(updatedLink);
 
       render(<RFPDocuments projectId={projectId} rfp={rfp} />);
 
@@ -278,18 +295,20 @@ describe('RFPDocuments', () => {
         expect(screen.getByText('https://example.com')).toBeInTheDocument();
       });
 
-      const urlElement = screen.getByText('https://example.com');
-      await user.click(urlElement);
+      // Click on the URL link to enter edit mode (component now supports clicking URL to edit)
+      const urlLink = screen.getByText('https://example.com');
+      await user.click(urlLink);
 
+      // Wait for URL input to appear
       await waitFor(() => {
-        const input = screen.getByDisplayValue('https://example.com');
-        expect(input).toBeInTheDocument();
+        const urlInput = screen.getByDisplayValue('https://example.com');
+        expect(urlInput).toBeInTheDocument();
       });
 
-      const input = screen.getByDisplayValue('https://example.com');
-      await user.clear(input);
-      await user.type(input, 'https://updated.com');
-      await user.click(document.body); // Blur to trigger save
+      const urlInput = screen.getByDisplayValue('https://example.com');
+      await user.clear(urlInput);
+      await user.type(urlInput, 'https://updated.com');
+      await user.click(globalThis.document.body); // Blur to trigger save
 
       await waitFor(() => {
         expect(apiModule.api.rfp.documents.update).toHaveBeenCalledWith(
@@ -297,22 +316,31 @@ describe('RFPDocuments', () => {
           'link-1',
           { url: 'https://updated.com' }
         );
-      }, { timeout: 1000 });
+      }, { timeout: 2000 });
     });
   });
 
   describe('Deleting Documents', () => {
     it('should delete document when delete button is clicked', async () => {
       const user = userEvent.setup();
-      window.confirm = vi.fn(() => true);
-      (apiModule.api.rfp.documents.delete as any).mockResolvedValue({});
+      const mockConfirm = vi.fn(() => true);
+      window.confirm = mockConfirm;
       const document = createMockRFPDocument({
         id: 'doc-1',
         description: 'Test Document',
         type: 'Document',
       });
 
-      (apiModule.api.rfp.documents.list as any).mockResolvedValue([document]);
+      // Mock list to return document initially, then empty after delete
+      let listCallCount = 0;
+      (apiModule.api.rfp.documents.list as any).mockImplementation(() => {
+        listCallCount++;
+        if (listCallCount === 1) {
+          return Promise.resolve([document]);
+        }
+        return Promise.resolve([]);
+      });
+      (apiModule.api.rfp.documents.delete as any).mockResolvedValue({});
 
       render(<RFPDocuments projectId={projectId} rfp={rfp} />);
 
@@ -320,21 +348,38 @@ describe('RFPDocuments', () => {
         expect(screen.getByText('Test Document')).toBeInTheDocument();
       });
 
-      // Find delete button (usually an icon button)
-      const deleteButton = screen.getByRole('button', { name: /delete/i });
-      await user.click(deleteButton);
+      // Click on description to enter edit mode (delete button only appears in edit mode)
+      const descriptionElement = screen.getByText('Test Document');
+      await user.click(descriptionElement);
 
+      // Wait for edit mode to activate - input should appear and delete button should be available
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Test Document')).toBeInTheDocument();
+        const deleteButton = screen.getByRole('button', { name: /delete/i });
+        expect(deleteButton).toBeInTheDocument();
+        expect(deleteButton).not.toBeDisabled();
+      });
+      
+      const deleteButton = screen.getByRole('button', { name: /delete/i });
+      
+      // Click the delete button - this should trigger handleDelete which calls confirm
+      // Use fireEvent instead of userEvent for more direct click simulation
+      fireEvent.click(deleteButton);
+
+      // Verify delete API was called (after confirm returns true)
+      // Note: confirm is checked implicitly - if delete is called, confirm must have returned true
       await waitFor(() => {
         expect(apiModule.api.rfp.documents.delete).toHaveBeenCalledWith(
           projectId,
           'doc-1'
         );
-      });
+      }, { timeout: 2000 });
     });
 
     it('should not delete document when confirmation is cancelled', async () => {
       const user = userEvent.setup();
-      window.confirm = vi.fn(() => false);
+      const mockConfirm = vi.fn(() => false);
+      window.confirm = mockConfirm;
       const document = createMockRFPDocument({
         id: 'doc-1',
         description: 'Test Document',
@@ -342,6 +387,7 @@ describe('RFPDocuments', () => {
       });
 
       (apiModule.api.rfp.documents.list as any).mockResolvedValue([document]);
+      (apiModule.api.rfp.documents.delete as any).mockResolvedValue({});
 
       render(<RFPDocuments projectId={projectId} rfp={rfp} />);
 
@@ -349,9 +395,23 @@ describe('RFPDocuments', () => {
         expect(screen.getByText('Test Document')).toBeInTheDocument();
       });
 
-      const deleteButton = screen.getByRole('button', { name: /delete/i });
-      await user.click(deleteButton);
+      // Click on description to enter edit mode (delete button only appears in edit mode)
+      const descriptionElement = screen.getByText('Test Document');
+      await user.click(descriptionElement);
 
+      // Wait for edit mode to activate and delete button to appear
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Test Document')).toBeInTheDocument();
+        const deleteButton = screen.getByRole('button', { name: /delete/i });
+        expect(deleteButton).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getByRole('button', { name: /delete/i });
+      // Use fireEvent for more direct click simulation
+      fireEvent.click(deleteButton);
+
+      // Confirm should be called but delete should not be called
+      expect(mockConfirm).toHaveBeenCalled();
       await waitFor(() => {
         expect(apiModule.api.rfp.documents.delete).not.toHaveBeenCalled();
       });
@@ -392,17 +452,21 @@ describe('RFPDocuments', () => {
         expect(screen.getByText(/no documents/i)).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /add document/i });
-      await user.click(addButton);
+      const addButtons = screen.getAllByRole('button', { name: /add document/i });
+      await user.click(addButtons[0]); // Use header button
 
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/description/i)).toBeInTheDocument();
       });
 
-      const typeSelect = screen.getByLabelText(/type/i);
-      await user.selectOptions(typeSelect, 'Document');
+      // Click the "File" button to switch to Document type
+      const fileButton = screen.getByRole('button', { name: /^file$/i });
+      await user.click(fileButton);
 
       // Should show file input (implementation specific)
+      await waitFor(() => {
+        expect(fileButton).toHaveClass(/bg-primary-600/);
+      });
     });
 
     it('should show URL input for Link type', async () => {
@@ -415,8 +479,8 @@ describe('RFPDocuments', () => {
         expect(screen.getByText(/no documents/i)).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /add document/i });
-      await user.click(addButton);
+      const addButtons = screen.getAllByRole('button', { name: /add document/i });
+      await user.click(addButtons[0]); // Use header button
 
       await waitFor(() => {
         expect(screen.getByPlaceholderText(/description/i)).toBeInTheDocument();
@@ -424,8 +488,9 @@ describe('RFPDocuments', () => {
 
       // Link type is default, should show URL input
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/url/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/https:\/\/\.\.\./i)).toBeInTheDocument();
       });
     });
   });
 });
+

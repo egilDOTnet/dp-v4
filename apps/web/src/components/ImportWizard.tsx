@@ -97,7 +97,12 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!validateCSVFile(selectedFile)) {
+    const isCsvLike =
+      selectedFile.type === "text/csv" ||
+      selectedFile.name.toLowerCase().endsWith(".csv") ||
+      selectedFile.name.toLowerCase().endsWith(".txt");
+
+    if (!isCsvLike || !validateCSVFile(selectedFile)) {
       setError("Please select a valid CSV file (.csv or .txt)");
       return;
     }
@@ -105,26 +110,11 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
     setFile(selectedFile);
     setError("");
     setLoading(true);
+    setColumnMapping({});
 
     try {
       const parsed = await parseCSV(selectedFile);
       setCsvData(parsed);
-
-      // Auto-map columns if headers match expected field names
-      const autoMapping: Record<string, string> = {};
-      if (dataType) {
-        const expectedFields = Object.keys(FIELD_LABELS[dataType]);
-        parsed.headers.forEach((header, idx) => {
-          const normalizedHeader = header.toLowerCase().trim();
-          for (const field of expectedFields) {
-            if (normalizedHeader === field || normalizedHeader.includes(field)) {
-              autoMapping[field] = idx.toString();
-              break;
-            }
-          }
-        });
-      }
-      setColumnMapping(autoMapping);
       setStep(dataType === "tasks" ? "select-phase" : "map-columns");
     } catch (err: any) {
       setError(`Failed to parse CSV: ${err.message}`);
@@ -361,6 +351,59 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
             </DialogDescription>
           </DialogHeader>
 
+          {file && (
+            <div className="mt-2 p-3 bg-background-secondary rounded-md border border-border-primary">
+              <div className="flex items-center space-x-2">
+                <svg
+                  className="h-5 w-5 text-primary-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">
+                    {file.name}
+                  </p>
+                  <p className="text-xs text-text-secondary">
+                    {(file.size / 1024).toFixed(2)} KB
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFile(null);
+                    setCsvData(null);
+                    setColumnMapping({});
+                    setStep("select-file");
+                  }}
+                  className="text-text-tertiary hover:text-text-primary"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
           {step === "select-type" && (
             <div className="space-y-4">
               <div>
@@ -407,7 +450,10 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
           {step === "select-file" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
+                <label
+                  htmlFor="csv-file-input"
+                  className="block text-sm font-medium text-text-primary mb-2"
+                >
                   Select CSV file:
                 </label>
                 <div
@@ -435,9 +481,9 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".csv,.txt"
                     onChange={handleFileSelect}
-                    className="hidden"
+                    aria-label="Select CSV file"
+                    className="sr-only"
                     id="csv-file-input"
                   />
                   <div className="space-y-2">
@@ -463,56 +509,6 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
                     </p>
                   </div>
                 </div>
-                {file && (
-                  <div className="mt-3 p-3 bg-background-secondary rounded-md border border-border-primary">
-                    <div className="flex items-center space-x-2">
-                      <svg
-                        className="h-5 w-5 text-primary-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-text-primary truncate">
-                          {file.name}
-                        </p>
-                        <p className="text-xs text-text-secondary">
-                          {(file.size / 1024).toFixed(2)} KB
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setFile(null);
-                          setCsvData(null);
-                        }}
-                        className="text-text-tertiary hover:text-text-primary"
-                      >
-                        <svg
-                          className="h-5 w-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
               {loading && (
                 <div className="flex items-center justify-center py-4">

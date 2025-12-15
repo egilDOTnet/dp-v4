@@ -331,12 +331,12 @@ describe('Project Setup Workflow Integration Tests', () => {
       const vendor = await api.projects.vendors.create(project.id, {
         name: 'Test Vendor',
         organizationNumber: '123456789',
-        status: 'Active',
+        status: 'Pending',
       });
 
       expect(vendor.name).toBe('Test Vendor');
       expect(vendor.organizationNumber).toBe('123456789');
-      expect(vendor.status).toBe('Active');
+      expect(vendor.status).toBe('Pending');
 
       // List vendors (should now have 1)
       const vendors = await api.projects.vendors.list(project.id);
@@ -351,15 +351,15 @@ describe('Project Setup Workflow Integration Tests', () => {
       // Create vendor
       const vendor = await api.projects.vendors.create(project.id, {
         name: 'Status Test Vendor',
-        status: 'Active',
+        status: 'Pending',
       });
 
       // Update status
       const updatedVendor = await api.projects.vendors.update(project.id, vendor.vendorId, {
-        status: 'Inactive',
+        status: 'Shortlisted',
       });
 
-      expect(updatedVendor.status).toBe('Inactive');
+      expect(updatedVendor.status).toBe('Shortlisted');
     });
 
     it('should add contact person to vendor', async () => {
@@ -369,7 +369,7 @@ describe('Project Setup Workflow Integration Tests', () => {
       // Create vendor
       const vendor = await api.projects.vendors.create(project.id, {
         name: 'Vendor with Contact',
-        status: 'Active',
+        status: 'Pending',
       });
 
       // Add contact person
@@ -392,7 +392,7 @@ describe('Project Setup Workflow Integration Tests', () => {
       // Create vendor
       const vendor = await api.projects.vendors.create(project.id, {
         name: 'Vendor to Delete',
-        status: 'Active',
+        status: 'Pending',
       });
 
       // Verify it exists
@@ -483,12 +483,12 @@ describe('Project Setup Workflow Integration Tests', () => {
       // 6. Add vendors
       const vendor1 = await api.projects.vendors.create(project.id, {
         name: 'Vendor 1',
-        status: 'Active',
+        status: 'Pending',
       });
 
       const vendor2 = await api.projects.vendors.create(project.id, {
         name: 'Vendor 2',
-        status: 'Active',
+        status: 'Pending',
       });
 
       // 7. Add contact persons
@@ -501,7 +501,7 @@ describe('Project Setup Workflow Integration Tests', () => {
 
       // 8. Update vendor status
       await api.projects.vendors.update(project.id, vendor2.vendorId, {
-        status: 'Inactive',
+        status: 'Shortlisted',
       });
 
       // 9. Get dashboard statistics

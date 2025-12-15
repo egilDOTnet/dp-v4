@@ -29,7 +29,7 @@ vi.mock('@/components/ContactPersonForm', () => ({
           firstName: existingContact?.firstName || 'John', 
           lastName: existingContact?.lastName || 'Doe', 
           email: existingContact?.email || 'john@example.com',
-          isMainContact: isFirstContact || false
+          isMainContact: existingContact?.isMainContact ?? isFirstContact
         })}
       >
         Submit
@@ -71,7 +71,7 @@ describe('AddContactsScreen', () => {
         />
       );
 
-      expect(screen.getByText(vendorName)).toBeInTheDocument();
+      expect(screen.getByText(/for Test Vendor/)).toBeInTheDocument();
       expect(screen.getByTestId('contact-person-form')).toBeInTheDocument();
     });
 
@@ -504,3 +504,4 @@ describe('AddContactsScreen', () => {
     });
   });
 });
+

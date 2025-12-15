@@ -692,6 +692,23 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                         href={docFormData.url || "#"}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => {
+                          if (!isNew && doc) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleStartEdit(doc, "url");
+                            // Focus the URL input after it appears
+                            requestAnimationFrame(() => {
+                              setTimeout(() => {
+                                const urlInput = docRefs.current[doc.id]?.querySelector('input[type="url"]') as HTMLInputElement;
+                                if (urlInput) {
+                                  urlInput.focus();
+                                  urlInput.select();
+                                }
+                              }, 0);
+                            });
+                          }
+                        }}
                         className="text-primary-600 hover:underline cursor-pointer"
                       >
                         {docFormData.url}

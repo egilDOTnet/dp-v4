@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { expect, afterEach, vi, beforeAll } from 'vitest';
+import { afterEach, vi, beforeAll } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { resetRouterMocks } from './mocks/next-navigation';
 import { setupApiMocks, resetFetchMock } from './utils/api-mocks';
@@ -13,26 +13,30 @@ const localStorageMock = {
   clear: vi.fn(),
 };
 
-// Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query) => ({
-    matches: false, // Default to light mode
-    media: query,
-    onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+// Mock window.matchMedia (guard for node test environment)
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false, // Default to light mode
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
-// Mock document.queryCommandState for WysiwygEditor
-Object.defineProperty(document, 'queryCommandState', {
-  writable: true,
-  value: vi.fn().mockReturnValue(false),
-});
+// Mock document.queryCommandState for WysiwygEditor (guard for node env)
+if (typeof document !== 'undefined') {
+  Object.defineProperty(document, 'queryCommandState', {
+    writable: true,
+    value: vi.fn().mockReturnValue(false),
+  });
+}
 
 beforeAll(() => {
   global.localStorage = localStorageMock as any;

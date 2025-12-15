@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '../utils/test-utils';
 import userEvent from '@testing-library/user-event';
+import { fireEvent } from '@testing-library/react';
 import { ImportWizard } from '@/components/ImportWizard';
 import { api } from '@/lib/api';
 import { createMockPhase } from '../utils/mock-data';
@@ -21,7 +22,7 @@ vi.mock('next/navigation', () => ({
 
 // Mock ImportHelpDialog
 vi.mock('@/components/ImportHelpDialog', () => ({
-  ImportHelpDialog: ({ open, onOpenChange }: any) => 
+  ImportHelpDialog: ({ open }: any) => 
     open ? <div data-testid="import-help-dialog">Help Dialog</div> : null,
 }));
 
@@ -39,6 +40,7 @@ describe('ImportWizard', () => {
       ['Task 1', 'Description 1'],
       ['Task 2', 'Description 2'],
     ],
+    delimiter: ',',
   };
 
   const mockPhases = [
@@ -59,6 +61,7 @@ describe('ImportWizard', () => {
     // Mock parseCSV
     const csvParser = await import('@/lib/csv-parser');
     vi.mocked(csvParser.parseCSV).mockResolvedValue(mockCsvData);
+    vi.mocked(csvParser.validateCSVFile).mockReturnValue(true);
   });
 
   describe('Dialog visibility', () => {
@@ -219,12 +222,11 @@ describe('ImportWizard', () => {
         expect(screen.getByText(/select csv file/i)).toBeInTheDocument();
       });
 
-      // Select file
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-
+      // Select file using userEvent which properly handles file uploads
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -257,11 +259,10 @@ describe('ImportWizard', () => {
 
       // Try to select invalid file
       const invalidFile = new File(['content'], 'test.pdf', { type: 'application/pdf' });
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(invalidFile);
-      fileInput.files = dataTransfer.files;
-
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, invalidFile);
 
       await waitFor(() => {
@@ -271,7 +272,6 @@ describe('ImportWizard', () => {
 
     it('should show file info after file is selected', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -291,12 +291,11 @@ describe('ImportWizard', () => {
         expect(screen.getByText(/select csv file/i)).toBeInTheDocument();
       });
 
-      // Select file
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-
+      // Select file using userEvent which properly handles file uploads
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -306,7 +305,6 @@ describe('ImportWizard', () => {
 
     it('should proceed to phase selection for tasks after file is parsed', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -326,12 +324,11 @@ describe('ImportWizard', () => {
         expect(screen.getByText(/select csv file/i)).toBeInTheDocument();
       });
 
-      // Select file
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-
+      // Select file using userEvent which properly handles file uploads
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -341,7 +338,6 @@ describe('ImportWizard', () => {
 
     it('should proceed to column mapping for non-task types after file is parsed', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -361,12 +357,11 @@ describe('ImportWizard', () => {
         expect(screen.getByText(/select csv file/i)).toBeInTheDocument();
       });
 
-      // Select file
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-
+      // Select file using userEvent which properly handles file uploads
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -378,7 +373,6 @@ describe('ImportWizard', () => {
   describe('Step 3: Select Phase (Tasks only)', () => {
     it('should show phase selection for tasks', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -398,12 +392,11 @@ describe('ImportWizard', () => {
         expect(screen.getByText(/select csv file/i)).toBeInTheDocument();
       });
 
-      // Select file
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-
+      // Select file using userEvent which properly handles file uploads
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -415,7 +408,6 @@ describe('ImportWizard', () => {
 
     it('should show error when trying to proceed without selecting phase', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -435,12 +427,11 @@ describe('ImportWizard', () => {
         expect(screen.getByText(/select csv file/i)).toBeInTheDocument();
       });
 
-      // Select file
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-
+      // Select file using userEvent which properly handles file uploads
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -458,7 +449,6 @@ describe('ImportWizard', () => {
   describe('Step 4: Map Columns', () => {
     it('should show column mapping interface', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -478,12 +468,11 @@ describe('ImportWizard', () => {
         expect(screen.getByText(/select csv file/i)).toBeInTheDocument();
       });
 
-      // Select file
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-
+      // Select file using userEvent which properly handles file uploads
+      const fileInput = screen.getByLabelText(/select csv file/i).parentElement?.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!fileInput) {
+        throw new Error('File input not found');
+      }
       await user.upload(fileInput, mockFile);
 
       await waitFor(() => {
@@ -504,7 +493,6 @@ describe('ImportWizard', () => {
 
     it('should show error when required fields are not mapped', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -525,10 +513,11 @@ describe('ImportWizard', () => {
       });
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-      await user.upload(fileInput, mockFile);
+      Object.defineProperty(fileInput, 'files', {
+        value: [mockFile],
+        writable: false,
+      });
+      fireEvent.change(fileInput);
 
       await waitFor(() => {
         expect(screen.getByText(/select phase for tasks/i)).toBeInTheDocument();
@@ -554,7 +543,6 @@ describe('ImportWizard', () => {
   describe('Import execution', () => {
     it('should call import API and show success for tasks', async () => {
       const user = userEvent.setup();
-      const csvParser = await import('@/lib/csv-parser');
       
       render(
         <ImportWizard
@@ -576,10 +564,11 @@ describe('ImportWizard', () => {
       });
 
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(mockFile);
-      fileInput.files = dataTransfer.files;
-      await user.upload(fileInput, mockFile);
+      Object.defineProperty(fileInput, 'files', {
+        value: [mockFile],
+        writable: false,
+      });
+      fireEvent.change(fileInput);
 
       await waitFor(() => {
         expect(screen.getByText(/select phase for tasks/i)).toBeInTheDocument();
@@ -693,7 +682,9 @@ describe('ImportWizard', () => {
 
       // Should be back at step 1
       expect(screen.getByText('Tasks')).toBeInTheDocument();
-      expect(tasksRadio).not.toBeChecked();
+      const tasksRadioAfterReopen = screen.getByLabelText(/tasks/i);
+      expect(tasksRadioAfterReopen).not.toBeChecked();
     });
   });
 });
+

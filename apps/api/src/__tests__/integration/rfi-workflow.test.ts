@@ -176,7 +176,7 @@ describe('RFI Workflow Integration Tests', () => {
       const questions = await api.rfi.questions.list(project.id);
       const questionWithOptions = questions.find((q) => q.id === question.id);
       expect(questionWithOptions?.options).toBeDefined();
-      expect(questionWithOptions?.options.length).toBe(2);
+      expect(questionWithOptions?.options?.length).toBe(2);
 
       // Update option
       const updatedOption = await api.rfi.questions.options.update(
@@ -195,7 +195,7 @@ describe('RFI Workflow Integration Tests', () => {
       // Verify deletion
       const updatedQuestions = await api.rfi.questions.list(project.id);
       const updatedQuestion = updatedQuestions.find((q) => q.id === question.id);
-      expect(updatedQuestion?.options.length).toBe(1);
+      expect(updatedQuestion?.options?.length).toBe(1);
     });
   });
 
@@ -207,6 +207,11 @@ describe('RFI Workflow Integration Tests', () => {
       let rfi = await api.rfi.get(project.id);
       expect(rfi.isPublished).toBe(false);
       expect(rfi.publishedAt).toBeNull();
+
+      // Set deadline before publishing
+      await api.rfi.update(project.id, {
+        deadline: new Date('2025-12-31').toISOString(),
+      });
 
       // Publish RFI
       await api.rfi.publish(project.id);
@@ -249,6 +254,9 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Get and publish RFI
       await api.rfi.get(project.id);
+      await api.rfi.update(project.id, {
+        deadline: new Date('2025-12-31').toISOString(),
+      });
       await api.rfi.publish(project.id);
 
       // Send RFI to vendors
@@ -276,6 +284,9 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Get and publish RFI
       await api.rfi.get(project.id);
+      await api.rfi.update(project.id, {
+        deadline: new Date('2025-12-31').toISOString(),
+      });
       await api.rfi.publish(project.id);
 
       // Attempt to send should fail if no vendors with main contacts
@@ -301,6 +312,9 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Get and publish RFI
       await api.rfi.get(project.id);
+      await api.rfi.update(project.id, {
+        deadline: new Date('2025-12-31').toISOString(),
+      });
       await api.rfi.publish(project.id);
 
       // Send RFI
@@ -338,6 +352,9 @@ describe('RFI Workflow Integration Tests', () => {
       });
 
       // Publish and send
+      await api.rfi.update(project.id, {
+        deadline: new Date('2025-12-31').toISOString(),
+      });
       await api.rfi.publish(project.id);
       await api.rfi.send(project.id);
 
@@ -347,13 +364,15 @@ describe('RFI Workflow Integration Tests', () => {
 
       const vendorResponse = vendorResponses[0];
       expect(vendorResponse.status).toBe('Sent');
-      expect(vendorResponse.vendor.id).toBe(vendorResult.vendor.vendorId);
+      expect(vendorResponse.vendor?.id).toBe(vendorResult.vendor.vendorId);
       expect(vendorResponse.sentAt).toBeDefined();
 
       // Get detailed vendor response
+      expect(vendorResponse.id).toBeDefined();
+      expect(vendorResponse.id).not.toBeNull();
       const detailedResponse = await api.rfi.vendorResponses.get(
         project.id,
-        vendorResponse.id
+        vendorResponse.id!
       );
       expect(detailedResponse).toBeDefined();
       expect(detailedResponse.status).toBe('Sent');
@@ -372,6 +391,9 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Setup and send RFI
       await api.rfi.get(project.id);
+      await api.rfi.update(project.id, {
+        deadline: new Date('2025-12-31').toISOString(),
+      });
       await api.rfi.publish(project.id);
       await api.rfi.send(project.id);
 
@@ -381,9 +403,11 @@ describe('RFI Workflow Integration Tests', () => {
       expect(vendorResponses[0].status).toBe('Sent');
 
       // Verify we can get detailed response
+      expect(vendorResponses[0].id).toBeDefined();
+      expect(vendorResponses[0].id).not.toBeNull();
       const detailedResponse = await api.rfi.vendorResponses.get(
         project.id,
-        vendorResponses[0].id
+        vendorResponses[0].id!
       );
       expect(detailedResponse.status).toBe('Sent');
       expect(detailedResponse.vendor).toBeDefined();
@@ -407,6 +431,9 @@ describe('RFI Workflow Integration Tests', () => {
       });
 
       // Publish and send
+      await api.rfi.update(project.id, {
+        deadline: new Date('2025-12-31').toISOString(),
+      });
       await api.rfi.publish(project.id);
       await api.rfi.send(project.id);
 
@@ -416,9 +443,11 @@ describe('RFI Workflow Integration Tests', () => {
       expect(vendorResponses[0].status).toBe('Sent');
 
       // Get detailed response
+      expect(vendorResponses[0].id).toBeDefined();
+      expect(vendorResponses[0].id).not.toBeNull();
       const detailedResponse = await api.rfi.vendorResponses.get(
         project.id,
-        vendorResponses[0].id
+        vendorResponses[0].id!
       );
       
       expect(detailedResponse).toBeDefined();
@@ -459,9 +488,10 @@ describe('RFI Workflow Integration Tests', () => {
       expect(preview.emailText).toBe('Preview RFI Email Text');
       expect(preview.rfiInformation).toBe('Preview RFI Information');
       expect(preview.questions).toBeDefined();
-      expect(preview.questions.length).toBe(2);
-      expect(preview.questions.some((q) => q.id === question1.id)).toBe(true);
-      expect(preview.questions.some((q) => q.id === question2.id)).toBe(true);
+      expect(preview.questions).not.toBeUndefined();
+      expect(preview.questions!.length).toBe(2);
+      expect(preview.questions!.some((q) => q.id === question1.id)).toBe(true);
+      expect(preview.questions!.some((q) => q.id === question2.id)).toBe(true);
     });
   });
 });

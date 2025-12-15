@@ -3,11 +3,11 @@ import { render, screen, waitFor } from '../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import VendorList from '@/components/VendorList';
 import { createMockProjectVendor, createMockVendorContact } from '../utils/mock-data';
-import type { ProjectVendor, VendorStatus } from '@/lib/api';
+import type { VendorStatus } from '@/lib/api';
 
 // Mock ContactPersonForm and VendorForm
 vi.mock('@/components/ContactPersonForm', () => ({
-  default: ({ onSubmit, onCancel, onDelete, existingContact }: any) => (
+  default: ({ onSubmit, onCancel, onDelete }: any) => (
     <div data-testid="contact-person-form">
       <input data-testid="contact-first-name" placeholder="First name" />
       <input data-testid="contact-last-name" placeholder="Last name" />
@@ -290,7 +290,7 @@ describe('VendorList', () => {
   });
 
   describe('Adding Vendors', () => {
-    it('should show add vendor form when showAddVendorForm is true', () => {
+    it('should show add vendor form when showAddVendorForm is true', async () => {
       render(
         <VendorList
           projectId={projectId}
@@ -307,7 +307,9 @@ describe('VendorList', () => {
         />
       );
 
-      expect(screen.getByTestId('vendor-form')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByTestId('vendor-form')).toBeInTheDocument();
+      });
     });
 
     it('should call onAddVendor when vendor form is submitted', async () => {
@@ -329,6 +331,10 @@ describe('VendorList', () => {
           onDeleteContact={mockOnDeleteContact}
         />
       );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('vendor-form')).toBeInTheDocument();
+      });
 
       const submitButton = screen.getByTestId('vendor-submit');
       await user.click(submitButton);
@@ -359,6 +365,10 @@ describe('VendorList', () => {
           onDeleteContact={mockOnDeleteContact}
         />
       );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('vendor-form')).toBeInTheDocument();
+      });
 
       const cancelButton = screen.getByTestId('vendor-cancel');
       await user.click(cancelButton);
@@ -594,7 +604,7 @@ describe('VendorList', () => {
       }, { timeout: 500 });
     });
 
-    it('should display existing contacts', () => {
+    it('should display existing contacts', async () => {
       const contacts = [
         createMockVendorContact({
           id: 'contact-1',
@@ -635,16 +645,23 @@ describe('VendorList', () => {
       );
 
       // Expand to see contacts - find button in the vendor row
+      const user = userEvent.setup();
       const vendorRow = screen.getByText('Test Vendor').closest('tr');
       const expandButton = vendorRow?.querySelector('button');
       if (expandButton) {
-        expandButton.click();
+        await user.click(expandButton);
       }
 
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-      expect(screen.getByText('john@example.com')).toBeInTheDocument();
-      expect(screen.getByText('jane@example.com')).toBeInTheDocument();
+      await waitFor(() => {
+        // Find contacts by email first, then verify names are in the same container
+        const johnEmail = screen.getByText('john@example.com');
+        const johnContainer = johnEmail.closest('div[class*="bg-background"]');
+        expect(johnContainer?.textContent).toMatch(/John\s+Doe/);
+        
+        const janeEmail = screen.getByText('jane@example.com');
+        const janeContainer = janeEmail.closest('div[class*="bg-background"]');
+        expect(janeContainer?.textContent).toMatch(/Jane\s+Smith/);
+      });
     });
 
     it('should show empty state when no contacts', async () => {
@@ -733,8 +750,13 @@ describe('VendorList', () => {
       });
 
       // Click edit to show delete button
-      const editButton = screen.getByRole('button', { name: /edit/i });
-      await user.click(editButton);
+      // There are multiple Edit buttons (vendor and contact), so get all and find the contact one
+      const editButtons = screen.getAllByRole('button', { name: /edit/i });
+      // The contact Edit button should be the one near the contact name
+      const contactEditButton = editButtons.find(btn => 
+        btn.closest('div')?.textContent?.includes('John Doe')
+      ) || editButtons[1]; // Fallback to second button if contact is expanded
+      await user.click(contactEditButton);
 
       await waitFor(() => {
         expect(screen.getByTestId('contact-person-form')).toBeInTheDocument();
@@ -749,3 +771,4 @@ describe('VendorList', () => {
     });
   });
 });
+

@@ -27,7 +27,9 @@ export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined"
+    ? localStorage.getItem("token")
+    : (globalThis as any).localStorage?.getItem("token") ?? (globalThis as any).__TEST_AUTH_TOKEN ?? null;
 
   const headers: HeadersInit = {
     ...(token && { Authorization: `Bearer ${token}` }),

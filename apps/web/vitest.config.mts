@@ -65,7 +65,8 @@ export default defineConfig({
     pool: 'threads',
     poolOptions: {
       threads: {
-        singleThread: false,
+        // Run in a single worker to avoid shared-port conflicts in integration tests
+        singleThread: true,
       },
     },
   },
@@ -83,15 +84,6 @@ export default defineConfig({
     },
     // Preserve symlinks to help resolve workspace packages correctly
     preserveSymlinks: false,
-  },
-  // Configure server deps - don't externalize @prisma/client, let the alias handle it
-  // The alias above should allow Vite to find @prisma/client when transforming API code
-  server: {
-    deps: {
-      // Only externalize actual API source files if needed, but not their dependencies
-      // The alias should handle @prisma/client resolution
-      inline: [],
-    },
   },
   optimizeDeps: {
     // Exclude Prisma from optimization since it's a native module
