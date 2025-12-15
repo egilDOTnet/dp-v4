@@ -25,7 +25,7 @@ export function computeDisplayName(user: UserWithNames): string | null {
 /**
  * Formats a user object for API responses with computed display name.
  * 
- * @param user - User object with id, email, firstName, lastName, name, and optionally role, tenantId
+ * @param user - User object with id, email, firstName, lastName, name, and optionally role, tenantId, profile fields
  * @returns Formatted user object with computed display name
  */
 export function formatUserResponse(user: {
@@ -37,6 +37,9 @@ export function formatUserResponse(user: {
   role?: string;
   tenantId?: string | null;
   companyName?: string | null;
+  profileImageData?: string | null;
+  profileImageFileType?: string | null;
+  profileColor?: string | null;
 }): {
   id: string;
   email: string;
@@ -46,6 +49,9 @@ export function formatUserResponse(user: {
   role?: string;
   tenantId?: string | null;
   companyName?: string | null;
+  profileImageData?: string | null;
+  profileImageFileType?: string | null;
+  profileColor?: string | null;
 } {
   return {
     id: user.id,
@@ -56,5 +62,8 @@ export function formatUserResponse(user: {
     ...(user.role !== undefined && { role: user.role }),
     ...(user.tenantId !== undefined && { tenantId: user.tenantId }),
     ...(user.companyName !== undefined && { companyName: user.companyName }),
+    ...(user.profileImageData !== undefined && { profileImageData: user.profileImageData }),
+    ...(user.profileImageFileType !== undefined && { profileImageFileType: user.profileImageFileType }),
+    ...(user.profileColor !== undefined && { profileColor: user.profileColor }),
   };
 }

@@ -45,6 +45,7 @@ const config: Config = {
           primary: "var(--color-border-primary)",
           secondary: "var(--color-border-secondary)",
         },
+        selection: "var(--color-selection)",
       },
     },
   },

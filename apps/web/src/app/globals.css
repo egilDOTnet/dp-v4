@@ -79,6 +79,9 @@
   /* Semantic Border Colors - Light mode defaults */
   --color-border-primary: #e5e7eb;
   --color-border-secondary: #d1d5db;
+
+  /* Selection/Highlight Colors - for selected/hovered elements */
+  --color-selection: #111827;  /* Gray-900 - dark/black for selection borders */
 }
 
 /* =================================================================
@@ -98,6 +101,8 @@
 
   --color-border-primary: #e5e7eb;
   --color-border-secondary: #d1d5db;
+
+  --color-selection: #111827;  /* Gray-900 - dark/black for selection borders in light mode */
 
   /* Legacy variable names for backwards compatibility */
   --color-bg-primary: var(--color-background-primary);
@@ -154,6 +159,8 @@
 
   --color-border-primary: #374151;
   --color-border-secondary: #4b5563;
+
+  --color-selection: #f9fafb;  /* Gray-50 - light/white for selection borders in dark mode */
 
   /* Legacy variable names for backwards compatibility */
   --color-bg-primary: var(--color-background-primary);

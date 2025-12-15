@@ -14,6 +14,8 @@ import {
   LoadingSpinner,
   PageHeader,
 } from "@/components/ui";
+import { ProfileImageUpload } from "@/components/ProfileImageUpload";
+import { PROFILE_COLOR_PALETTE } from "@/lib/profile-colors";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -24,6 +26,9 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [profileColor, setProfileColor] = useState<string | null>(null);
+  const [profileImageData, setProfileImageData] = useState<string | null>(null);
+  const [profileImageFileType, setProfileImageFileType] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const firstInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +43,9 @@ export default function ProfilePage() {
         setFirstName(data.firstName || "");
         setLastName(data.lastName || "");
         setCompanyName(data.companyName || "");
+        setProfileColor(data.profileColor || null);
+        setProfileImageData(data.profileImageData || null);
+        setProfileImageFileType(data.profileImageFileType || null);
       })
       .catch((err) => {
         console.error("Failed to load profile:", err);
@@ -68,6 +76,9 @@ export default function ProfilePage() {
         firstName?: string;
         lastName?: string;
         companyName?: string;
+        profileImageData?: string | null;
+        profileImageFileType?: "image/png" | "image/jpeg" | "image/gif" | null;
+        profileColor?: string | null;
       } = {};
 
       // Only send fields that have changed
@@ -81,6 +92,23 @@ export default function ProfilePage() {
       // Only include companyName if user is admin and it has changed
       if (isAdmin && companyName !== (user?.companyName || "")) {
         updateData.companyName = companyName || undefined;
+      }
+
+      // Profile image and color
+      if (profileImageData !== (user?.profileImageData || null)) {
+        updateData.profileImageData = profileImageData;
+        // Extract mime type from data URL if not already set
+        if (profileImageData && !profileImageFileType) {
+          const mimeTypeMatch = profileImageData.match(/data:image\/(png|jpeg|gif);base64,/);
+          updateData.profileImageFileType = mimeTypeMatch 
+            ? (`image/${mimeTypeMatch[1]}` as "image/png" | "image/jpeg" | "image/gif")
+            : null;
+        } else {
+          updateData.profileImageFileType = profileImageFileType as "image/png" | "image/jpeg" | "image/gif" | null;
+        }
+      }
+      if (profileColor !== (user?.profileColor || null)) {
+        updateData.profileColor = profileColor;
       }
 
       // If nothing changed, just return early
@@ -97,6 +125,9 @@ export default function ProfilePage() {
       if (updated.companyName) {
         setCompanyName(updated.companyName);
       }
+      setProfileColor(updated.profileColor || null);
+      setProfileImageData(updated.profileImageData || null);
+      setProfileImageFileType(updated.profileImageFileType || null);
       await refreshUser();
 
       // Redirect to dashboard after successful save
@@ -108,6 +139,9 @@ export default function ProfilePage() {
         setFirstName(user.firstName || "");
         setLastName(user.lastName || "");
         setCompanyName(user.companyName || "");
+        setProfileColor(user.profileColor || null);
+        setProfileImageData(user.profileImageData || null);
+        setProfileImageFileType(user.profileImageFileType || null);
       }
     } finally {
       setSaving(false);
@@ -119,9 +153,34 @@ export default function ProfilePage() {
       setFirstName(user.firstName || "");
       setLastName(user.lastName || "");
       setCompanyName(user.companyName || "");
+      setProfileColor(user.profileColor || null);
+      setProfileImageData(user.profileImageData || null);
+      setProfileImageFileType(user.profileImageFileType || null);
     }
     setError("");
     router.push("/dashboard");
+  };
+
+  const handleImageUpload = async (data: string, fileType: string) => {
+    // Store the image data locally - will be saved on save
+    setProfileImageData(data);
+    setProfileImageFileType(fileType);
+  };
+
+  const handleImageDelete = async () => {
+    // Clear the image data locally - will be saved on save
+    setProfileImageData(null);
+    setProfileImageFileType(null);
+  };
+
+  const getCurrentImageDataUrl = (): string | null => {
+    if (profileImageData) {
+      return profileImageData;
+    }
+    if (user?.profileImageData) {
+      return user.profileImageData;
+    }
+    return null;
   };
 
   const themeOptions: { value: ThemePreference; label: string; icon: string }[] =
@@ -207,11 +266,57 @@ export default function ProfilePage() {
           </CardBody>
         </Card>
 
+        {/* Profile Picture and Color Card */}
+        <Card>
+          <CardBody className="space-y-6">
+            <h2 className="text-lg font-semibold text-text-primary">
+              Profile Picture
+            </h2>
+            <p className="text-sm text-text-secondary">
+              Upload a profile picture or choose a color for your avatar
+            </p>
+
+            <ProfileImageUpload
+              currentImage={getCurrentImageDataUrl()}
+              onUpload={handleImageUpload}
+              onDelete={handleImageDelete}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-3">
+                Avatar Background Color
+              </label>
+              <div className="grid grid-cols-8 gap-2">
+                {PROFILE_COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setProfileColor(color)}
+                    className={`
+                      w-10 h-10 rounded-full border-2 transition-all hover:scale-110
+                      ${
+                        (profileColor || user?.profileColor) === color
+                          ? "border-primary-600 ring-2 ring-primary-300 ring-offset-2"
+                          : "border-border-primary"
+                      }
+                    `}
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-text-secondary mt-2">
+                Selected: {(profileColor || user?.profileColor) || "Default"}
+              </p>
+            </div>
+          </CardBody>
+        </Card>
+
         {/* Theme Selection Card */}
         <Card>
           <CardBody className="space-y-4">
             <h2 className="text-lg font-semibold text-text-primary">
-              Appearance
+              Theme
             </h2>
             <p className="text-sm text-text-secondary">
               Choose how the application looks to you

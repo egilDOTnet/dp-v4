@@ -8,6 +8,9 @@ interface UpdateProfileBody {
   firstName?: string;
   lastName?: string;
   companyName?: string;
+  profileImageData?: string | null;
+  profileImageFileType?: "image/png" | "image/jpeg" | "image/gif" | null;
+  profileColor?: string | null;
 }
 
 export default async function userRoutes(fastify: FastifyInstance) {
@@ -35,6 +38,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
               role: { type: "string" },
               tenantId: { type: "string", nullable: true },
               companyName: { type: "string", nullable: true },
+              profileImageData: { type: "string", nullable: true },
+              profileImageFileType: { type: "string", nullable: true },
+              profileColor: { type: "string", nullable: true },
             },
           },
           401: {
@@ -78,6 +84,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
           role: user.role,
           tenantId: user.tenantId,
           companyName: user.tenant?.name,
+          profileImageData: (user as any).profileImageData,
+          profileImageFileType: (user as any).profileImageFileType,
+          profileColor: (user as any).profileColor,
         })
       );
     }
@@ -134,6 +143,22 @@ export default async function userRoutes(fastify: FastifyInstance) {
               nullable: true,
               description: "Company name (only editable by company admins)",
             },
+            profileImageData: {
+              type: "string",
+              nullable: true,
+              description: "Base64 encoded profile image (256x256)",
+            },
+            profileImageFileType: {
+              type: "string",
+              nullable: true,
+              enum: ["image/png", "image/jpeg", "image/gif"],
+              description: "Profile image mime type",
+            },
+            profileColor: {
+              type: "string",
+              nullable: true,
+              description: "Hex color code from 16-color palette for avatar background",
+            },
           },
         },
         response: {
@@ -148,6 +173,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
               role: { type: "string" },
               tenantId: { type: "string", nullable: true },
               companyName: { type: "string", nullable: true },
+              profileImageData: { type: "string", nullable: true },
+              profileImageFileType: { type: "string", nullable: true },
+              profileColor: { type: "string", nullable: true },
             },
           },
           400: {
@@ -217,13 +245,55 @@ export default async function userRoutes(fastify: FastifyInstance) {
         }
 
         request.log.info("Preparing update data");
-        // Update user firstName and lastName
-        const updateData: { firstName?: string | null; lastName?: string | null } = {};
+        // Prepare update data for user fields
+        const updateData: {
+          firstName?: string | null;
+          lastName?: string | null;
+          profileImageData?: string | null;
+          profileImageFileType?: string | null;
+          profileColor?: string | null;
+        } = {};
+        
         if (body.firstName !== undefined) {
           updateData.firstName = typeof body.firstName === 'string' ? body.firstName.trim() || null : null;
         }
         if (body.lastName !== undefined) {
           updateData.lastName = typeof body.lastName === 'string' ? body.lastName.trim() || null : null;
+        }
+        
+        // Handle profile image data
+        if (body.profileImageData !== undefined) {
+          // Validate base64 data size (max ~100KB for 256x256 image)
+          if (body.profileImageData !== null && body.profileImageData.trim() !== "") {
+            // Extract base64 part (remove data:image/...;base64, prefix)
+            const base64Match = body.profileImageData.match(/^data:image\/(png|jpeg|gif);base64,(.+)$/);
+            if (!base64Match) {
+              return reply.status(400).send({ error: "Invalid image data format. Expected data URL with base64 encoded image." });
+            }
+            const base64Data = base64Match[2];
+            const base64Size = base64Data.length * (3 / 4);
+            if (base64Size > 100 * 1024) {
+              return reply.status(400).send({ error: "Profile image too large (max 100KB)" });
+            }
+            updateData.profileImageData = body.profileImageData;
+            // Ensure file type is set if image data is provided
+            if (body.profileImageFileType === undefined && base64Match[1]) {
+              updateData.profileImageFileType = `image/${base64Match[1]}` as "image/png" | "image/jpeg" | "image/gif";
+            }
+          } else {
+            // Setting to null or empty string means delete
+            updateData.profileImageData = null;
+            updateData.profileImageFileType = null;
+          }
+        }
+        
+        // profileImageFileType is handled above when profileImageData is set
+        if (body.profileImageFileType !== undefined && body.profileImageData === undefined) {
+          updateData.profileImageFileType = body.profileImageFileType;
+        }
+        
+        if (body.profileColor !== undefined) {
+          updateData.profileColor = body.profileColor;
         }
         
         request.log.info({ updateData }, "Update data");
@@ -272,6 +342,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
             role: updatedUser.role,
             tenantId: updatedUser.tenantId,
             companyName: updatedUser.tenant?.name,
+            profileImageData: (updatedUser as any).profileImageData,
+            profileImageFileType: (updatedUser as any).profileImageFileType,
+            profileColor: (updatedUser as any).profileColor,
           })
         );
       } catch (error: any) {
@@ -401,6 +474,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
               lastName: { type: "string", nullable: true },
               role: { type: "string" },
               tenantId: { type: "string", nullable: true },
+              profileImageData: { type: "string", nullable: true },
+              profileImageFileType: { type: "string", nullable: true },
+              profileColor: { type: "string", nullable: true },
             },
             description: "User created successfully",
           },

@@ -114,16 +114,19 @@ model Tenant {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  firstName    String?
-  lastName     String?
-  passwordHash String?
-  tenantId     String?
-  role         Role     @default(User)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  name               String?
+  firstName          String?
+  lastName           String?
+  passwordHash       String?
+  tenantId           String?
+  role               Role     @default(User)
+  profileImageData   String?  // Base64 encoded 256x256 image
+  profileImageFileType String? // Mime type: image/png, image/jpeg, image/gif
+  profileColor       String?  // Hex color code from 16-color palette
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   tenant                      Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   projectMembers              ProjectMember[]

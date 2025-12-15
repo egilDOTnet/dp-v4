@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Logo } from "@/components/Logo";
 import { api, Notification } from "@/lib/api";
+import { UserAvatar } from "./UserAvatar";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -132,14 +133,6 @@ export function Header() {
     return user?.name || user?.email || "";
   };
 
-  // Get initial for avatar
-  const getInitial = () => {
-    const displayName = getDisplayName();
-    if (displayName) {
-      return displayName[0].toUpperCase();
-    }
-    return user?.email?.[0]?.toUpperCase() || "?";
-  };
 
   // Toggle theme between light and dark
   const toggleTheme = () => {
@@ -267,9 +260,7 @@ export function Header() {
                 aria-expanded={showMenu}
                 aria-haspopup="true"
               >
-                <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium">
-                  {getInitial()}
-                </div>
+                {user && <UserAvatar user={user} size="md" />}
                 <span className="hidden sm:block text-text-primary">
                   {getDisplayName()}
                 </span>

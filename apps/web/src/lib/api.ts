@@ -130,7 +130,14 @@ export const api = {
   },
   users: {
     getProfile: () => apiRequest<User>("/api/users/profile"),
-    updateProfile: (data: { firstName?: string; lastName?: string; companyName?: string }) =>
+    updateProfile: (data: {
+      firstName?: string;
+      lastName?: string;
+      companyName?: string;
+      profileImageData?: string | null;
+      profileImageFileType?: "image/png" | "image/jpeg" | "image/gif" | null;
+      profileColor?: string | null;
+    }) =>
       apiRequest<User>("/api/users/profile", {
         method: "PUT",
         body: JSON.stringify(data),
@@ -1120,6 +1127,9 @@ export interface User {
   role: string;
   tenantId: string | null;
   companyName?: string;
+  profileImageData?: string | null;
+  profileImageFileType?: string | null;
+  profileColor?: string | null;
 }
 
 export interface Project {

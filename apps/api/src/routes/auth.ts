@@ -161,6 +161,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
                   role: { type: "string" },
                   tenantId: { type: "string", nullable: true },
                   companyName: { type: "string", nullable: true },
+                  profileImageData: { type: "string", nullable: true },
+                  profileImageFileType: { type: "string", nullable: true },
+                  profileColor: { type: "string", nullable: true },
                 },
               },
             },
@@ -236,6 +239,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
           role: user.role,
           tenantId: user.tenantId,
           companyName: user.tenant?.name,
+          profileImageData: (user as any).profileImageData,
+          profileImageFileType: (user as any).profileImageFileType,
+          profileColor: (user as any).profileColor,
         }),
       });
     }
@@ -476,6 +482,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
                   role: { type: "string" },
                   tenantId: { type: "string", nullable: true },
                   companyName: { type: "string", nullable: true },
+                  profileImageData: { type: "string", nullable: true },
+                  profileImageFileType: { type: "string", nullable: true },
+                  profileColor: { type: "string", nullable: true },
                 },
               },
             },
@@ -576,6 +585,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
             role: user.role,
             tenantId: user.tenantId,
             companyName: user.tenant?.name,
+            profileImageData: (user as any).profileImageData,
+            profileImageFileType: (user as any).profileImageFileType,
+            profileColor: (user as any).profileColor,
           }),
         });
       } catch {
@@ -608,6 +620,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
               role: { type: "string" },
               tenantId: { type: "string", nullable: true },
               companyName: { type: "string", nullable: true },
+              profileImageData: { type: "string", nullable: true },
+              profileImageFileType: { type: "string", nullable: true },
+              profileColor: { type: "string", nullable: true },
             },
           },
           401: {
@@ -651,6 +666,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
           role: user.role,
           tenantId: user.tenantId,
           companyName: user.tenant?.name,
+          profileImageData: (user as any).profileImageData,
+          profileImageFileType: (user as any).profileImageFileType,
+          profileColor: (user as any).profileColor,
         })
       );
     }

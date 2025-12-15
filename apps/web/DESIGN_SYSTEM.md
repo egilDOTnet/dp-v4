@@ -102,6 +102,13 @@ const { theme, setTheme, toggleTheme } = useTheme();
 - Centralized color definitions
 - Separate palettes for light and dark modes
 
+**Selection/Highlight Color**: 
+- Used for selected/hovered interactive elements (like avatar borders)
+- **Light mode**: `border-selection` (Gray-900 - #111827, dark/black)
+- **Dark mode**: `border-selection` (Gray-50 - #f9fafb, light/white)
+- Defined in `apps/web/src/app/globals.css` as CSS custom property `--color-selection`
+- Accessible via Tailwind class `border-selection` or `focus:ring-selection`
+
 **CSS Variables**: `apps/web/src/app/globals.css`
 - Theme-aware custom properties
 - Smooth transitions between themes
@@ -133,6 +140,14 @@ The color system is based on the green palette extracted from the Dynamic Purcha
 - **Warning**: #FFCF33 (Alternative yellow)
 - **Error**: #F87171 (Lighter red for dark mode)
 
+### Selection/Highlight Colors
+
+For selected or hovered interactive elements (like avatar borders, selection states), use the `selection` color:
+- **Light mode**: `border-selection` (Gray-900 - #111827, dark/black)
+- **Dark mode**: `border-selection` (Gray-50 - #f9fafb, light/white)
+
+This color is distinct from primary actions (green) and provides clear visual feedback for selection states.
+
 ### Usage in Components
 
 Use semantic color classes:
@@ -140,6 +155,11 @@ Use semantic color classes:
 <div className="bg-background-primary text-text-primary border-border-primary">
   <!-- Content -->
 </div>
+
+<!-- For selection/highlight states -->
+<button className="border-selection hover:border-selection">
+  <!-- Selected element -->
+</button>
 ```
 
 ## Component Library

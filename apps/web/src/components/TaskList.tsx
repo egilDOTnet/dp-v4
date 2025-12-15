@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Task, api, Project, Comment } from "@/lib/api";
 import WysiwygEditor, { WysiwygEditorRef } from "./WysiwygEditor";
+import { UserAvatar } from "./UserAvatar";
 import {
   DndContext,
   closestCenter,
@@ -769,25 +770,6 @@ export default function TaskList({
     saveTimeouts.current[timeoutKey] = delayedSaveTimeout;
   };
 
-  const getInitials = (user: { firstName: string | null; lastName: string | null; name: string | null }) => {
-    if (user.firstName && user.lastName) {
-      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
-    }
-    if (user.firstName) {
-      return user.firstName[0].toUpperCase();
-    }
-    if (user.lastName) {
-      return user.lastName[0].toUpperCase();
-    }
-    if (user.name) {
-      const parts = user.name.split(" ");
-      if (parts.length >= 2) {
-        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-      }
-      return user.name[0].toUpperCase();
-    }
-    return "?";
-  };
 
   const getOwnerDisplay = (task: Task) => {
     if (task.owner) {
@@ -1442,18 +1424,18 @@ export default function TaskList({
                                 const select = document.getElementById(`owner-select-${task.id}`);
                                 select?.click();
                               }}
-                              className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors relative z-10 ${
+                              className={`w-7 h-7 rounded-full border flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-selection transition-colors relative z-10 ${
                                 hoveredOwnerButtonId === task.id
-                                  ? "border-primary-500 bg-primary-50 text-gray-600"
-                                  : "border-gray-300 bg-gray-100 text-gray-600"
+                                  ? "border-selection"
+                                  : "border-gray-300 dark:border-gray-600"
                               }`}
                               title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
                             >
                               {owner ? (
-                                <span className="text-[10px]">{getInitials(owner)}</span>
+                                <UserAvatar user={owner} size="xs" />
                               ) : (
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                                 </svg>
                               )}
                             </button>
@@ -2010,18 +1992,18 @@ export default function TaskList({
                                 const select = document.getElementById(`owner-select-${task.id}`);
                                 select?.click();
                               }}
-                              className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors relative z-10 ${
+                              className={`rounded-full border flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-selection transition-colors relative z-10 ${
                                 hoveredOwnerButtonId === task.id
-                                  ? "border-primary-500 bg-primary-50 text-gray-600"
-                                  : "border-gray-300 bg-gray-100 text-gray-600"
+                                  ? "border-selection"
+                                  : "border-gray-300 dark:border-gray-600"
                               }`}
                               title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
                             >
                               {owner ? (
-                                <span className="text-[10px]">{getInitials(owner)}</span>
+                                <UserAvatar user={owner} size="xs" />
                               ) : (
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                                 </svg>
                               )}
                             </button>

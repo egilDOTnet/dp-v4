@@ -6,7 +6,7 @@ interface ImageCropperProps {
   imageSrc: string;
   onCrop: (croppedDataUrl: string) => void;
   onCancel: () => void;
-  type: "logo" | "banner";
+  type: "logo" | "banner" | "profile";
 }
 
 interface CropArea {
@@ -27,8 +27,9 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const isLogo = type === "logo";
-  const targetWidth = isLogo ? 500 : 1200;
-  const targetHeight = isLogo ? 500 : 300;
+  const isProfile = type === "profile";
+  const targetWidth = isLogo ? 500 : isProfile ? 256 : 1200;
+  const targetHeight = isLogo ? 500 : isProfile ? 256 : 300;
 
   // Load image and initialize crop area
   useEffect(() => {
@@ -39,8 +40,8 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
       // Calculate initial crop area
       let initialCrop: CropArea;
       
-      if (isLogo) {
-        // For logo: largest square from center
+      if (isLogo || isProfile) {
+        // For logo/profile: largest square from center
         const size = Math.min(img.width, img.height);
         initialCrop = {
           x: (img.width - size) / 2,
@@ -131,8 +132,8 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
         setCropArea({ ...cropArea, x: newX, y: newY });
         setDragStart({ x: currentX, y: currentY });
       } else if (isResizing) {
-        // Resize crop area (for logo, maintain square; for banner, maintain 4:1 aspect ratio)
-        if (isLogo) {
+        // Resize crop area (for logo/profile, maintain square; for banner, maintain 4:1 aspect ratio)
+        if (isLogo || isProfile) {
           // Square resize - use the larger delta
           const delta = Math.max(Math.abs(deltaX), Math.abs(deltaY));
           const newSize = Math.max(50, Math.min(cropArea.width + delta, Math.min(image.width, image.height)));
@@ -174,7 +175,7 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging, isResizing, cropArea, image, dragStart, isLogo]);
+  }, [isDragging, isResizing, cropArea, image, dragStart, isLogo, isProfile]);
 
   const handleMouseDown = (e: React.MouseEvent, isResizeHandle: boolean = false) => {
     if (!cropArea || !imageRef.current) return;
@@ -220,8 +221,10 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
         targetHeight
       );
 
-      // Get data URL
-      const dataUrl = canvas.toDataURL("image/png", 0.92); // Use 0.92 quality to reduce size slightly
+      // Get data URL - use PNG for profile, JPEG for others (better compression for photos)
+      const mimeType = isProfile ? "image/png" : "image/jpeg";
+      const quality = isProfile ? undefined : 0.92; // PNG doesn't use quality parameter
+      const dataUrl = canvas.toDataURL(mimeType, quality);
       onCrop(dataUrl);
     } catch (error) {
       console.error("Error generating cropped image:", error);
@@ -249,6 +252,8 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
       <div className="text-sm text-text-secondary">
         {isLogo
           ? "Select the square area to use for your logo (will be resized to 500x500)"
+          : isProfile
+          ? "Select the square area to use for your profile picture (will be resized to 256x256)"
           : "Select the area to use for your banner (will be resized to 1200x300)"}
       </div>
 
@@ -289,7 +294,7 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
             onMouseDown={(e) => handleMouseDown(e, false)}
           >
             {/* Resize handles */}
-            {isLogo && (
+            {(isLogo || isProfile) && (
               <>
                 <div
                   className="absolute -top-1 -left-1 w-3 h-3 bg-primary-600 border border-white rounded cursor-nwse-resize"
@@ -356,3 +361,4 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
     </div>
   );
 }
+
