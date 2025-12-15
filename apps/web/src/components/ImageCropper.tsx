@@ -78,7 +78,7 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
       setCropArea(initialCrop);
     };
     img.src = imageSrc;
-  }, [imageSrc, isLogo]);
+  }, [imageSrc, isLogo, isProfile]);
 
   // Update preview canvas when crop area changes
   useEffect(() => {
@@ -134,15 +134,51 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
       } else if (isResizing) {
         // Resize crop area (for logo/profile, maintain square; for banner, maintain 4:1 aspect ratio)
         if (isLogo || isProfile) {
-          // Square resize - use the larger delta
-          const delta = Math.max(Math.abs(deltaX), Math.abs(deltaY));
-          const newSize = Math.max(50, Math.min(cropArea.width + delta, Math.min(image.width, image.height)));
+          // Square resize - resize from center maintaining 1:1 aspect ratio
+          // Calculate crop center
+          const centerX = cropArea.x + cropArea.width / 2;
+          const centerY = cropArea.y + cropArea.height / 2;
           
-          // Keep centered or adjust position
-          const newX = Math.max(0, Math.min(cropArea.x - (newSize - cropArea.width) / 2, image.width - newSize));
-          const newY = Math.max(0, Math.min(cropArea.y - (newSize - cropArea.height) / 2, image.height - newSize));
+          // Calculate distance from center to drag start point
+          const startDistanceX = dragStart.x - centerX;
+          const startDistanceY = dragStart.y - centerY;
+          const startDistance = Math.sqrt(startDistanceX * startDistanceX + startDistanceY * startDistanceY);
           
-          setCropArea({ x: newX, y: newY, width: newSize, height: newSize });
+          // Calculate distance from center to current mouse position
+          const currentDistanceX = currentX - centerX;
+          const currentDistanceY = currentY - centerY;
+          const currentDistance = Math.sqrt(currentDistanceX * currentDistanceX + currentDistanceY * currentDistanceY);
+          
+          // If current distance is greater than start distance, we're dragging outward (grow)
+          // If current distance is less than start distance, we're dragging inward (shrink)
+          const distanceDelta = currentDistance - startDistance;
+          
+          // Calculate new size maintaining square aspect ratio
+          // Multiply by 2 because we're resizing from center (both sides grow/shrink)
+          const sizeDelta = distanceDelta * 2;
+          const desiredSize = cropArea.width + sizeDelta;
+          
+          // Calculate new position to keep crop area centered on original center
+          let newX = centerX - desiredSize / 2;
+          let newY = centerY - desiredSize / 2;
+          
+          // Constrain position to image bounds
+          newX = Math.max(0, Math.min(newX, image.width));
+          newY = Math.max(0, Math.min(newY, image.height));
+          
+          // Calculate maximum size that fits at the constrained position
+          const maxSizeFromX = image.width - newX;
+          const maxSizeFromY = image.height - newY;
+          const maxSize = Math.min(maxSizeFromX, maxSizeFromY);
+          
+          // Use the desired size, but constrained by minimum (50px) and maximum possible size
+          const newSize = Math.max(50, Math.min(desiredSize, maxSize, image.width, image.height));
+          
+          // Recalculate position to center the final size
+          const finalX = Math.max(0, Math.min(centerX - newSize / 2, image.width - newSize));
+          const finalY = Math.max(0, Math.min(centerY - newSize / 2, image.height - newSize));
+          
+          setCropArea({ x: finalX, y: finalY, width: newSize, height: newSize });
         } else {
           // Banner resize - maintain 4:1 aspect ratio
           const aspectRatio = 4; // 1200/300
@@ -269,7 +305,7 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
             src={imageSrc}
             alt="Crop preview"
             className="block"
-            style={{ width: imageDisplayWidth, height: imageDisplayHeight, objectFit: "contain" }}
+            style={{ width: imageDisplayWidth, height: imageDisplayHeight }}
             draggable={false}
           />
           
@@ -335,7 +371,7 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
           <canvas
             ref={canvasRef}
             className="border border-border-primary rounded bg-background-secondary"
-            style={{ width: isLogo ? 200 : 400, height: isLogo ? 200 : 100 }}
+            style={{ width: isLogo ? 200 : isProfile ? 256 : 400, height: isLogo ? 200 : isProfile ? 256 : 100 }}
           />
           <div className="text-xs text-text-secondary">
             {targetWidth} × {targetHeight}px

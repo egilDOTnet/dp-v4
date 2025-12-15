@@ -47,13 +47,19 @@ export const updateProfileSchema = z.object({
   lastName: z.string().optional(),
   companyName: z.string().min(1).optional(),
   profileImageData: z.string().optional().nullable(),
-  profileImageFileType: z.enum(["image/png", "image/jpeg", "image/gif"]).optional().nullable(),
-  profileColor: z.enum([
-    "#EF4444", "#F97316", "#F59E0B", "#EAB308",
-    "#84CC16", "#22C55E", "#10B981", "#14B8A6",
-    "#06B6D4", "#0EA5E9", "#3B82F6", "#6366F1",
-    "#8B5CF6", "#A855F7", "#D946EF", "#EC4899",
-  ]).optional().nullable(),
+  profileImageFileType: z.union([
+    z.enum(["image/png", "image/jpeg", "image/gif"]),
+    z.null(),
+  ]).optional(),
+  profileColor: z.union([
+    z.enum([
+      "#EF4444", "#F97316", "#F59E0B", "#EAB308",
+      "#84CC16", "#22C55E", "#10B981", "#14B8A6",
+      "#06B6D4", "#0EA5E9", "#3B82F6", "#6366F1",
+      "#8B5CF6", "#A855F7", "#D946EF", "#EC4899",
+    ]),
+    z.null(),
+  ]).optional(),
 });
 
 export const createUserSchema = z.object({

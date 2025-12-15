@@ -168,9 +168,22 @@ export default function ProfilePage() {
   };
 
   const handleImageDelete = async () => {
-    // Clear the image data locally - will be saved on save
-    setProfileImageData(null);
-    setProfileImageFileType(null);
+    try {
+      // Immediately delete the profile image via API
+      // Only send profileImageData: null - backend will automatically set profileImageFileType to null
+      const updated = await api.users.updateProfile({
+        profileImageData: null,
+      });
+      
+      // Update local state
+      setUser(updated);
+      setProfileImageData(null);
+      setProfileImageFileType(null);
+      await refreshUser();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete profile image");
+      throw err; // Re-throw so ProfileImageUpload can handle the error
+    }
   };
 
   const getCurrentImageDataUrl = (): string | null => {
@@ -296,7 +309,7 @@ export default function ProfilePage() {
                       w-10 h-10 rounded-full border-2 transition-all hover:scale-110
                       ${
                         (profileColor || user?.profileColor) === color
-                          ? "border-primary-600 ring-2 ring-primary-300 ring-offset-2"
+                          ? "border-black dark:border-white"
                           : "border-border-primary"
                       }
                     `}
@@ -305,9 +318,6 @@ export default function ProfilePage() {
                   />
                 ))}
               </div>
-              <p className="text-xs text-text-secondary mt-2">
-                Selected: {(profileColor || user?.profileColor) || "Default"}
-              </p>
             </div>
           </CardBody>
         </Card>

@@ -51,7 +51,12 @@ export function UserAvatar({ user, size = "md", className }: UserAvatarProps) {
     : user;
   
   const initials = getInitials(displayUser);
-  const hasImage = !!displayUser.profileImageData;
+  // Check if profileImageData exists and is a non-empty string
+  const hasImage = !!(
+    displayUser.profileImageData && 
+    typeof displayUser.profileImageData === 'string' &&
+    displayUser.profileImageData.length > 0
+  );
   
   // Use profile color if available, otherwise use default
   const bgColor = displayUser.profileColor || DEFAULT_PROFILE_COLOR;
@@ -62,7 +67,10 @@ export function UserAvatar({ user, size = "md", className }: UserAvatarProps) {
     : undefined;
 
   return (
-    <Avatar className={cn(sizeClasses[size], className)}>
+    <Avatar 
+      key={displayUser.profileImageData || 'no-image'} 
+      className={cn(sizeClasses[size], className)}
+    >
       {imageSrc && (
         <AvatarImage
           src={imageSrc}

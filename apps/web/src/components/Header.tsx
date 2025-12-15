@@ -159,7 +159,7 @@ export function Header() {
                     loadNotifications();
                   }
                 }}
-                className={`relative p-2 rounded-md hover:bg-background-primary transition-colors ${
+                className={`relative p-2 rounded-md hover:bg-background-primary transition-colors cursor-pointer ${
                   hasNewNotifications ? "animate-jiggle" : ""
                 }`}
                 aria-expanded={showNotifications}
@@ -191,7 +191,7 @@ export function Header() {
                     <div className="border-b border-border-primary">
                       <button
                         onClick={handleMarkAllRead}
-                        className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-background-primary transition-colors"
+                        className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-background-primary transition-colors cursor-pointer"
                       >
                         Clear all notifications
                       </button>
@@ -221,7 +221,7 @@ export function Header() {
                           <button
                             key={notification.id}
                             onClick={() => handleNotificationClick(notification)}
-                            className={`w-full text-left px-4 py-3 hover:bg-background-primary transition-colors ${
+                            className={`w-full text-left px-4 py-3 hover:bg-background-primary transition-colors cursor-pointer ${
                               !notification.read ? "bg-primary-50/50" : ""
                             }`}
                           >
@@ -256,7 +256,7 @@ export function Header() {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-background-primary transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-background-primary transition-colors cursor-pointer"
                 aria-expanded={showMenu}
                 aria-haspopup="true"
               >
@@ -297,7 +297,7 @@ export function Header() {
                         setShowMenu(false);
                         router.push("/dashboard");
                       }}
-                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-primary transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-primary transition-colors cursor-pointer"
                     >
                       <svg
                         className="w-4 h-4"
@@ -320,7 +320,7 @@ export function Header() {
                         setShowMenu(false);
                         router.push("/profile");
                       }}
-                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-primary transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-primary transition-colors cursor-pointer"
                     >
                       <svg
                         className="w-4 h-4"
@@ -343,7 +343,7 @@ export function Header() {
                   <div className="border-t border-border-primary py-1">
                     <button
                       onClick={toggleTheme}
-                      className="flex items-center justify-between w-full px-4 py-2 text-sm text-text-primary hover:bg-background-secondary transition-colors"
+                      className="flex items-center justify-between w-full px-4 py-2 text-sm text-text-primary hover:bg-background-secondary transition-colors cursor-pointer"
                     >
                       <span className="flex items-center gap-3">
                         {resolvedTheme === "light" ? (
@@ -386,7 +386,7 @@ export function Header() {
                   <div className="border-t border-border-primary py-1">
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-background-secondary transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-background-secondary transition-colors cursor-pointer"
                     >
                       <svg
                         className="w-4 h-4"
