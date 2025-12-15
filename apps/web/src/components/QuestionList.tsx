@@ -293,6 +293,7 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
       description?: string | null;
       type?: RFIQuestionType;
       required?: boolean;
+      scaleLabels?: Record<string, string> | null;
     } = {};
 
     if (field === "title") {
@@ -312,6 +313,85 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
     setSavingFields((prev) => new Set(prev).add(saveKey));
 
     try {
+      // If changing type, clean up old options/scale labels
+      if (field === "type") {
+        const oldType = question.type;
+        const newType = value as RFIQuestionType;
+        
+        // Get current question state to check for existing options
+        const currentQuestions = await api.rfi.questions.list(projectId);
+        const currentQuestion = currentQuestions.find((q) => q.id === questionId);
+        const hasOptions = currentQuestion?.options && currentQuestion.options.length > 0;
+        
+        // If switching TO Scale, delete all options (Scale doesn't use options)
+        const newTypeIsScale = newType === "Scale";
+        if (newTypeIsScale && hasOptions) {
+          try {
+            // Delete all options when switching to Scale
+            await Promise.all(
+              currentQuestion!.options!.map((option) =>
+                api.rfi.questions.options.delete(projectId, questionId, option.id)
+              )
+            );
+          } catch (err: any) {
+            console.error("Error deleting old options when switching to Scale:", err);
+            // Continue with type update even if option deletion fails
+          }
+        }
+        
+        // If switching FROM Dropdown/MultipleChoice to something else (not Scale, already handled above), delete all options
+        const oldTypeUsesOptions = oldType === "Dropdown" || oldType === "MultipleChoice";
+        const newTypeUsesOptions = newType === "Dropdown" || newType === "MultipleChoice";
+        
+        if (oldTypeUsesOptions && !newTypeUsesOptions && !newTypeIsScale && hasOptions) {
+          // Switching away from options-based type (but not to Scale, which is handled above), delete all options
+          try {
+            await Promise.all(
+              currentQuestion!.options!.map((option) =>
+                api.rfi.questions.options.delete(projectId, questionId, option.id)
+              )
+            );
+          } catch (err: any) {
+            console.error("Error deleting old options:", err);
+            // Continue with type update even if option deletion fails
+          }
+        } else if (oldTypeUsesOptions && newTypeUsesOptions && oldType !== newType && hasOptions) {
+          // Switching between Dropdown and MultipleChoice, delete all options (different structures)
+          try {
+            await Promise.all(
+              currentQuestion!.options!.map((option) =>
+                api.rfi.questions.options.delete(projectId, questionId, option.id)
+              )
+            );
+          } catch (err: any) {
+            console.error("Error deleting old options:", err);
+            // Continue with type update even if option deletion fails
+          }
+        }
+        
+        // If switching FROM Scale to something else, clear scaleLabels and delete any existing options
+        const oldTypeIsScale = oldType === "Scale";
+        
+        if (oldTypeIsScale && !newTypeIsScale) {
+          // Clear scaleLabels when switching away from Scale
+          updatePayload.scaleLabels = null;
+          
+          // Also delete any options that might exist (in case question had options before being changed to Scale)
+          if (hasOptions) {
+            try {
+              await Promise.all(
+                currentQuestion!.options!.map((option) =>
+                  api.rfi.questions.options.delete(projectId, questionId, option.id)
+                )
+              );
+            } catch (err: any) {
+              console.error("Error deleting old options when switching from Scale:", err);
+              // Continue with type update even if option deletion fails
+            }
+          }
+        }
+      }
+      
       console.log("Updating question field:", { questionId, field, updatePayload });
       await api.rfi.questions.update(projectId, questionId, updatePayload);
       await loadQuestions(true);
@@ -860,14 +940,93 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                   value={type}
                   onChange={async (e) => {
                     const newType = e.target.value as RFIQuestionType;
+                    const oldType = type;
                     setType(newType);
                     
                     // If question is already created, update it in the backend
                     if (createdQuestionId) {
                       try {
-                        await api.rfi.questions.update(projectId, createdQuestionId, {
+                        const updatePayload: {
+                          type: RFIQuestionType;
+                          scaleLabels?: Record<string, string> | null;
+                        } = {
                           type: newType,
-                        });
+                        };
+                        
+                        // Get current question state to check for existing options
+                        const currentQuestions = await api.rfi.questions.list(projectId);
+                        const currentQuestion = currentQuestions.find((q) => q.id === createdQuestionId);
+                        const hasOptions = currentQuestion?.options && currentQuestion.options.length > 0;
+                        
+                        // If switching TO Scale, delete all options (Scale doesn't use options)
+                        const newTypeIsScale = newType === "Scale";
+                        if (newTypeIsScale && hasOptions) {
+                          try {
+                            // Delete all options when switching to Scale
+                            await Promise.all(
+                              currentQuestion!.options!.map((option) =>
+                                api.rfi.questions.options.delete(projectId, createdQuestionId, option.id)
+                              )
+                            );
+                          } catch (err: any) {
+                            console.error("Error deleting old options when switching to Scale:", err);
+                            // Continue with type update even if option deletion fails
+                          }
+                        }
+                        
+                        // If switching FROM Dropdown/MultipleChoice to something else (not Scale, already handled above), delete all options
+                        const oldTypeUsesOptions = oldType === "Dropdown" || oldType === "MultipleChoice";
+                        const newTypeUsesOptions = newType === "Dropdown" || newType === "MultipleChoice";
+                        
+                        if (oldTypeUsesOptions && !newTypeUsesOptions && !newTypeIsScale && hasOptions) {
+                          // Switching away from options-based type (but not to Scale, which is handled above), delete all options
+                          try {
+                            await Promise.all(
+                              currentQuestion!.options!.map((option) =>
+                                api.rfi.questions.options.delete(projectId, createdQuestionId, option.id)
+                              )
+                            );
+                          } catch (err: any) {
+                            console.error("Error deleting old options:", err);
+                            // Continue with type update even if option deletion fails
+                          }
+                        } else if (oldTypeUsesOptions && newTypeUsesOptions && oldType !== newType && hasOptions) {
+                          // Switching between Dropdown and MultipleChoice, delete all options (different structures)
+                          try {
+                            await Promise.all(
+                              currentQuestion!.options!.map((option) =>
+                                api.rfi.questions.options.delete(projectId, createdQuestionId, option.id)
+                              )
+                            );
+                          } catch (err: any) {
+                            console.error("Error deleting old options:", err);
+                            // Continue with type update even if option deletion fails
+                          }
+                        }
+                        
+                        // If switching FROM Scale to something else, clear scaleLabels and delete any existing options
+                        const oldTypeIsScale = oldType === "Scale";
+                        
+                        if (oldTypeIsScale && !newTypeIsScale) {
+                          // Clear scaleLabels when switching away from Scale
+                          updatePayload.scaleLabels = null;
+                          
+                          // Also delete any options that might exist (in case question had options before being changed to Scale)
+                          if (hasOptions) {
+                            try {
+                              await Promise.all(
+                                currentQuestion!.options!.map((option) =>
+                                  api.rfi.questions.options.delete(projectId, createdQuestionId, option.id)
+                                )
+                              );
+                            } catch (err: any) {
+                              console.error("Error deleting old options when switching from Scale:", err);
+                              // Continue with type update even if option deletion fails
+                            }
+                          }
+                        }
+                        
+                        await api.rfi.questions.update(projectId, createdQuestionId, updatePayload);
                         // Parent component will reload questions automatically
                       } catch (err: any) {
                         setError(err.message || "Failed to update question type");
@@ -1276,10 +1435,12 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                                   onFocus={(e) => {
                                     handleFieldFocus(question.id, "description");
                                     // Expand to 3 rows on focus with animation
+                                    const textarea = e.currentTarget;
                                     requestAnimationFrame(() => {
-                                      e.currentTarget.style.height = "auto";
-                                      const targetHeight = Math.min(e.currentTarget.scrollHeight || 4.5 * 1.5 * 16, 4.5 * 1.5 * 16);
-                                      e.currentTarget.style.height = `${targetHeight}px`;
+                                      if (!textarea) return;
+                                      textarea.style.height = "auto";
+                                      const targetHeight = Math.min(textarea.scrollHeight || 4.5 * 1.5 * 16, 4.5 * 1.5 * 16);
+                                      textarea.style.height = `${targetHeight}px`;
                                     });
                                   }}
                                   onBlur={(e) => {
@@ -1376,22 +1537,19 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                                   </div>
 
                                   {/* Options manager for MultipleChoice and Dropdown */}
-                                  {/* Show based on form data type (current selection) not saved type */}
-                                  {((questionFormData.type === "MultipleChoice" || questionFormData.type === "Dropdown") || 
-                                    (question.type === "MultipleChoice" || question.type === "Dropdown")) && (
+                                  {/* Show only if current form data type is MultipleChoice or Dropdown (not Scale) */}
+                                  {(questionFormData.type === "MultipleChoice" || questionFormData.type === "Dropdown") && (
                                     <QuestionOptionManager
                                       questionId={question.id}
-                                      questionType={questionFormData.type === "MultipleChoice" || questionFormData.type === "Dropdown" 
-                                        ? questionFormData.type 
-                                        : question.type}
+                                      questionType={questionFormData.type}
                                       projectId={projectId}
                                     />
                                   )}
 
                                   {/* Scale configurator for Scale type */}
-                                  {/* Show based on form data type (current selection) not saved type */}
-                                  {((questionFormData.type === "Scale") || (question.type === "Scale")) && (
-                                    <div className="border-t pt-4 mt-4">
+                                  {/* Show only if current form data type is Scale (not MultipleChoice or Dropdown) */}
+                                  {questionFormData.type === "Scale" && (
+                                    <div className="mt-4">
                                       <ScaleConfigurator
                                         scaleLabels={(question.scaleLabels as Record<string, string>) || {}}
                                         onChange={async (newScaleLabels) => {
