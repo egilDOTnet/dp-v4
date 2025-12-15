@@ -5,10 +5,10 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   error?: string;
   hint?: string;
   autoGrow?: boolean;
+  ref?: React.Ref<HTMLTextAreaElement>;
 }
 
-export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, hint, autoGrow = false, className = '', id, ...props }, ref) => {
+export const Textarea: React.FC<TextareaProps> = ({ label, error, hint, autoGrow = false, className = '', id, ref, ...props }) => {
     const textareaId = id || label?.toLowerCase().replace(/\s+/g, '-');
     const internalRef = useRef<HTMLTextAreaElement>(null);
     const textareaRef = (ref as React.RefObject<HTMLTextAreaElement>) || internalRef;
@@ -51,7 +51,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         )}
       </div>
     );
-  }
-);
+};
 
 Textarea.displayName = 'Textarea';

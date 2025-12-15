@@ -1,6 +1,6 @@
 "use client";
 
-import React, { forwardRef, useId } from "react";
+import React, { useId } from "react";
 
 /* =================================================================
    Base Input Styles
@@ -106,10 +106,10 @@ export function FormField({
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /** Whether the input has an error */
   hasError?: boolean;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className = "", hasError = false, onKeyDown, ...props }, ref) => {
+export const Input: React.FC<InputProps> = ({ className = "", hasError = false, onKeyDown, ref, ...props }) => {
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       // Handle Ctrl-A/Command-A to select all text
       if ((e.metaKey || e.ctrlKey) && e.key === "a") {
@@ -128,8 +128,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {...props}
       />
     );
-  }
-);
+};
 Input.displayName = "Input";
 
 /* =================================================================
@@ -141,10 +140,10 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
   hasError?: boolean;
   /** Whether to auto-resize based on content */
   autoResize?: boolean;
+  ref?: React.Ref<HTMLTextAreaElement>;
 }
 
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className = "", hasError = false, autoResize = false, onChange, onKeyDown, ...props }, ref) => {
+export const Textarea: React.FC<TextareaProps> = ({ className = "", hasError = false, autoResize = false, onChange, onKeyDown, ref, ...props }) => {
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       if (autoResize) {
         e.target.style.height = "auto";
@@ -174,8 +173,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {...props}
       />
     );
-  }
-);
+};
 Textarea.displayName = "Textarea";
 
 /* =================================================================
@@ -189,10 +187,10 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   placeholder?: string;
   /** Options to render */
   options?: Array<{ value: string; label: string; disabled?: boolean }>;
+  ref?: React.Ref<HTMLSelectElement>;
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className = "", hasError = false, placeholder, options, children, ...props }, ref) => {
+export const Select: React.FC<SelectProps> = ({ className = "", hasError = false, placeholder, options, children, ref, ...props }) => {
     return (
       <select
         ref={ref}
@@ -217,8 +215,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           : children}
       </select>
     );
-  }
-);
+};
 Select.displayName = "Select";
 
 /* =================================================================
@@ -228,10 +225,10 @@ Select.displayName = "Select";
 interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
   /** Label for the checkbox */
   label?: string;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
-export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className = "", label, id, ...props }, ref) => {
+export const Checkbox: React.FC<CheckboxProps> = ({ className = "", label, id, ref, ...props }) => {
     const generatedId = useId();
     const checkboxId = id || generatedId;
 
@@ -254,8 +251,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
         )}
       </div>
     );
-  }
-);
+};
 Checkbox.displayName = "Checkbox";
 
 /* =================================================================
@@ -274,6 +270,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   /** Full width */
   fullWidth?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
 const buttonVariantClasses: Record<ButtonVariant, string> = {
@@ -293,20 +290,19 @@ const buttonSizeClasses: Record<ButtonSize, string> = {
   lg: "px-6 py-3 text-base",
 };
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      className = "",
-      variant = "primary",
-      size = "md",
-      loading = false,
-      fullWidth = false,
-      disabled,
-      children,
-      ...props
-    },
-    ref
-  ) => {
+export const Button: React.FC<ButtonProps> = (
+  {
+    className = "",
+    variant = "primary",
+    size = "md",
+    loading = false,
+    fullWidth = false,
+    disabled,
+    children,
+    ref,
+    ...props
+  }
+) => {
     return (
       <button
         ref={ref}
@@ -348,6 +344,5 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {children}
       </button>
     );
-  }
-);
+};
 Button.displayName = "Button";

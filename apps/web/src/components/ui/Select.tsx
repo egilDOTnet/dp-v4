@@ -5,10 +5,10 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
   error?: string;
   hint?: string;
   children: React.ReactNode;
+  ref?: React.Ref<HTMLSelectElement>;
 }
 
-export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, className = '', id, children, ...props }, ref) => {
+export const Select: React.FC<SelectProps> = ({ label, error, hint, className = '', id, children, ref, ...props }) => {
     const selectId = id || label?.toLowerCase().replace(/\s+/g, '-');
     
     const baseStyles = 'w-full px-3 py-2 rounded-md bg-background-primary text-text-primary border border-border-primary transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed';
@@ -37,7 +37,6 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         )}
       </div>
     );
-  }
-);
+};
 
 Select.displayName = 'Select';
