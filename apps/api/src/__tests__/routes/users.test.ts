@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { buildTestApp, generateTestToken, createAuthHeader } from "../utils/test-helpers";
 import { createTestUser, createTestTenant } from "../utils/db-helpers";
 import type { FastifyInstance } from "fastify";
+import { randomUUID } from "crypto";
 
 describe("User Routes", () => {
   let app: FastifyInstance;
@@ -99,17 +100,14 @@ describe("User Routes", () => {
 
     it("should return user profile with null name fields", async () => {
       const tenant = await createTestTenant();
-      // Create user directly to set null values
-      const { db } = await import("@dp/db");
-      const user = await db.user.create({
-        data: {
-          email: `test-${Date.now()}@example.com`,
-          firstName: null,
-          lastName: null,
-          name: null,
-          tenantId: tenant.id,
-          role: "User",
-        },
+      // Create user using helper to ensure tenant exists
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const user = await createTestUser({
+        email: `test-${uniqueSuffix}@example.com`,
+        firstName: null,
+        lastName: null,
+        tenantId: tenant.id,
+        role: "User",
       });
 
       const token = generateTestToken(app, {
@@ -410,9 +408,10 @@ describe("User Routes", () => {
     it("should return 403 when user has no tenant", async () => {
       // Create user directly without tenant
       const { db } = await import("@dp/db");
+      const uniqueId = randomUUID();
       const user = await db.user.create({
         data: {
-          email: `test-${Date.now()}@example.com`,
+          email: `test-${uniqueId}@example.com`,
           firstName: "Test",
           lastName: "User",
           role: "User",
@@ -554,9 +553,10 @@ describe("User Routes", () => {
     it("should return 403 when user has no tenant", async () => {
       // Create user directly without tenant
       const { db } = await import("@dp/db");
+      const uniqueId = randomUUID();
       const user = await db.user.create({
         data: {
-          email: `admin-${Date.now()}@example.com`,
+          email: `admin-${uniqueId}@example.com`,
           firstName: "Admin",
           lastName: "User",
           role: "CompanyAdministrator",
@@ -778,9 +778,10 @@ describe("User Routes", () => {
     it("should return 403 when user has no tenant", async () => {
       // Create user directly without tenant
       const { db } = await import("@dp/db");
+      const uniqueId = randomUUID();
       const user = await db.user.create({
         data: {
-          email: `admin-${Date.now()}@example.com`,
+          email: `admin-${uniqueId}@example.com`,
           firstName: "Admin",
           lastName: "User",
           role: "CompanyAdministrator",

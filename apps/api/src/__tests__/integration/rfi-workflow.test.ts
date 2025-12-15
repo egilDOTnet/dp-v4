@@ -4,7 +4,6 @@ import { api } from './api-client';
 import {
   createProjectWithMember,
   createVendorWithContact,
-  authenticatedRequest,
 } from './utils';
 
 /**
@@ -19,10 +18,9 @@ describe('RFI Workflow Integration Tests', () => {
   describe('RFI Creation and Setup', () => {
     it('should auto-create RFI when accessing project RFI endpoint', async () => {
       // Create authenticated user and project
-      const { project, token } = await createProjectWithMember({
+      const { project } = await createProjectWithMember({
         projectName: 'RFI Test Project',
       });
-
       // Token is automatically set by createProjectWithMember via setToken
 
       // Access RFI endpoint - should auto-create RFI
@@ -40,10 +38,10 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should update RFI settings', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Get RFI (auto-creates if needed)
-      const rfi = await api.rfi.get(project.id);
+      await api.rfi.get(project.id);
 
       // Update RFI settings
       const updatedRfi = await api.rfi.update(project.id, {
@@ -62,7 +60,7 @@ describe('RFI Workflow Integration Tests', () => {
 
   describe('Question Management', () => {
     it('should create, update, and delete questions', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Get RFI
       await api.rfi.get(project.id);
@@ -113,7 +111,7 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should reorder questions', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       await api.rfi.get(project.id);
 
@@ -150,7 +148,7 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should manage question options for Dropdown and MultipleChoice questions', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       await api.rfi.get(project.id);
 
@@ -203,7 +201,7 @@ describe('RFI Workflow Integration Tests', () => {
 
   describe('Publishing RFI', () => {
     it('should publish and unpublish RFI', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Get RFI
       let rfi = await api.rfi.get(project.id);
@@ -229,7 +227,7 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should not allow sending RFI when not published', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       await api.rfi.get(project.id);
       // RFI is not published
@@ -241,7 +239,7 @@ describe('RFI Workflow Integration Tests', () => {
 
   describe('Vendor Setup and Sending RFI', () => {
     it('should send RFI to vendors with main contacts', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Create vendor with main contact using API
       const vendorResult = await createVendorWithContact({
@@ -265,10 +263,10 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should not send RFI to vendors without main contacts', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Create vendor via API (without main contact)
-      const vendor = await api.projects.vendors.create(project.id, {
+      await api.projects.vendors.create(project.id, {
         name: 'Vendor Without Contact',
       });
       // No contact person created - vendors created via API might auto-create a contact
@@ -293,7 +291,7 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should resend RFI to a specific vendor', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Create vendor with contact using API
       const vendorResult = await createVendorWithContact({
@@ -320,7 +318,7 @@ describe('RFI Workflow Integration Tests', () => {
 
   describe('Vendor Response Workflow', () => {
     it('should create vendor response when RFI is sent', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Setup vendor with contact using API
       const vendorResult = await createVendorWithContact({
@@ -329,12 +327,12 @@ describe('RFI Workflow Integration Tests', () => {
       });
 
       // Setup RFI with questions
-      const rfi = await api.rfi.get(project.id);
-      const question1 = await api.rfi.questions.create(project.id, {
+      await api.rfi.get(project.id);
+      await api.rfi.questions.create(project.id, {
         title: 'Question 1',
         type: 'SingleText',
       });
-      const question2 = await api.rfi.questions.create(project.id, {
+      await api.rfi.questions.create(project.id, {
         title: 'Question 2',
         type: 'YesNo',
       });
@@ -364,7 +362,7 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should list vendor responses with correct status', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Setup vendor with contact using API
       await createVendorWithContact({
@@ -393,7 +391,7 @@ describe('RFI Workflow Integration Tests', () => {
     });
 
     it('should retrieve vendor response details with questions and answers', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Setup vendor with contact using API
       await createVendorWithContact({
@@ -402,7 +400,7 @@ describe('RFI Workflow Integration Tests', () => {
       });
 
       // Setup RFI with questions
-      const rfi = await api.rfi.get(project.id);
+      await api.rfi.get(project.id);
       const question = await api.rfi.questions.create(project.id, {
         title: 'Test Question',
         type: 'SingleText',
@@ -436,7 +434,7 @@ describe('RFI Workflow Integration Tests', () => {
 
   describe('RFI Preview', () => {
     it('should generate RFI preview with questions', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
 
       // Setup RFI with content and questions
       await api.rfi.update(project.id, {

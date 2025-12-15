@@ -3,7 +3,6 @@ import './setup'; // Import setup to ensure test server is running
 import { api } from './api-client';
 import {
   createProjectWithMember,
-  createRequirementsSetup,
 } from './utils';
 
 /**
@@ -21,10 +20,9 @@ describe('Requirements Management Workflow Integration Tests', () => {
 
   describe('Hierarchy Management', () => {
     it('should create, list, and delete hierarchies', async () => {
-      const { project, token } = await createProjectWithMember({
+      const { project } = await createProjectWithMember({
         projectName: 'Requirements Test Project',
       });
-
       // Token is automatically set by createProjectWithMember via setToken
 
       // List hierarchies (should be empty initially)
@@ -75,7 +73,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
     });
 
     it('should create nested hierarchies', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       // Create parent hierarchy
@@ -101,7 +99,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
     });
 
     it('should reorder hierarchies', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       // Create multiple hierarchies
@@ -114,10 +112,6 @@ describe('Requirements Management Workflow Integration Tests', () => {
       const hierarchy3 = await api.requirements.hierarchies.create(project.id, {
         title: 'Hierarchy 3',
       });
-
-      // Get initial order
-      const initialHierarchies = await api.requirements.hierarchies.list(project.id);
-      const initialOrder = [hierarchy1.id, hierarchy2.id, hierarchy3.id];
 
       // Reorder: 3, 1, 2
       await api.requirements.hierarchies.reorder(project.id, {
@@ -137,7 +131,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
 
   describe('Requirement CRUD Operations', () => {
     it('should create, list, update, and delete requirements', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       // Create hierarchy
@@ -199,7 +193,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
     });
 
     it('should create requirements with different types and statuses', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       const hierarchy = await api.requirements.hierarchies.create(project.id, {
@@ -248,7 +242,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
 
   describe('Requirement Reordering', () => {
     it('should reorder requirements within a hierarchy', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       const hierarchy = await api.requirements.hierarchies.create(project.id, {
@@ -275,12 +269,6 @@ describe('Requirements Management Workflow Integration Tests', () => {
         status: null,
       });
 
-      // Get initial order
-      const initialRequirements = await api.requirements.list(project.id);
-      const req1InitialOrder = initialRequirements.find(r => r.id === req1.id)?.order || 0;
-      const req2InitialOrder = initialRequirements.find(r => r.id === req2.id)?.order || 0;
-      const req3InitialOrder = initialRequirements.find(r => r.id === req3.id)?.order || 0;
-
       // Reorder: 3, 1, 2
       await api.requirements.reorder(project.id, {
         requirementIds: [req3.id, req1.id, req2.id],
@@ -300,7 +288,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
 
   describe('Requirement Movement', () => {
     it('should move requirement between hierarchies', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       // Create two hierarchies
@@ -335,7 +323,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
     });
 
     it('should move requirement with specific order', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       const hierarchy = await api.requirements.hierarchies.create(project.id, {
@@ -349,7 +337,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
         type: 'Information',
         status: null,
       });
-      const req2 = await api.requirements.create(project.id, {
+      await api.requirements.create(project.id, {
         hierarchyId: hierarchy.id,
         description: 'Requirement 2',
         type: 'Information',
@@ -367,7 +355,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
         status: null,
       });
 
-      // Move new requirement to first hierarchy with specific order (between req1 and req2)
+      // Move new requirement to first hierarchy with specific order
       const movedReq = await api.requirements.move(project.id, newReq.id, {
         hierarchyId: hierarchy.id,
         order: req1.order + 1,
@@ -379,7 +367,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
 
   describe('Bulk Operations', () => {
     it('should bulk update requirements', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       const hierarchy = await api.requirements.hierarchies.create(project.id, {
@@ -434,7 +422,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
     });
 
     it('should bulk update requirements to move to different hierarchy', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       const hierarchy1 = await api.requirements.hierarchies.create(project.id, {
@@ -479,7 +467,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
     });
 
     it('should bulk delete requirements', async () => {
-      const { project, token } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
       // Token is automatically set by createProjectWithMember via setToken
 
       const hierarchy = await api.requirements.hierarchies.create(project.id, {
@@ -527,7 +515,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
 
   describe('Complete Workflow', () => {
     it('should complete full requirements management workflow', async () => {
-      const { project, token } = await createProjectWithMember({
+      const { project } = await createProjectWithMember({
         projectName: 'Complete Requirements Workflow Project',
       });
       // Token is automatically set by createProjectWithMember via setToken

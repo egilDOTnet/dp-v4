@@ -1,5 +1,6 @@
 import { db, Role, VendorStatus, Prisma } from "@dp/db";
 import bcrypt from "bcrypt";
+import { randomUUID } from "crypto";
 
 /**
  * Clean up all test data from the database
@@ -21,7 +22,7 @@ export async function cleanupDatabase() {
   try {
     const url = new URL(dbUrl);
     dbName = url.pathname.replace('/', '');
-  } catch (error) {
+  } catch {
     throw new Error(
       `Invalid DATABASE_URL format: ${dbUrl}. Cannot verify test database safety.`
     );
@@ -51,121 +52,121 @@ export async function cleanupDatabase() {
   // Use proper Prisma model names (camelCase)
   try {
     await db.rFPQuestion.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFPChangelogEntry.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFPAnnouncement.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFPDocument.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFPScheduleItem.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFP.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFIQuestion.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFIVendorResponse.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.rFI.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.requirement.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.requirementHierarchy.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.task.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.phase.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.vendorContactPerson.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.projectVendor.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.projectMember.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.project.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.user.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.vendor.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 
   try {
     await db.tenant.deleteMany({});
-  } catch (error) {
+  } catch {
     // Ignore if model doesn't exist
   }
 }
@@ -207,41 +208,49 @@ export async function createTestUser(overrides?: {
   firstName?: string;
   lastName?: string;
   role?: string;
-  tenantId?: string;
+  tenantId?: string | null;
   passwordHash?: string | null;
 }) {
-  const tenantId = overrides?.tenantId || "test-tenant-id";
+  // Handle tenantId: use provided value (including null), or default to "test-tenant-id"
+  const tenantId = overrides?.tenantId !== undefined ? overrides.tenantId : "test-tenant-id";
   
-  // Ensure tenant exists - always verify/ensure tenant exists
-  // This handles both cases: when tenantId is provided (from test) or when using default
-  const existingTenant = await db.tenant.findUnique({
-    where: { id: tenantId },
-  });
+  // Hash password before transaction to avoid async operations inside transaction
+  const passwordHash = overrides?.passwordHash !== undefined 
+    ? overrides.passwordHash 
+    : await hashPassword("password123");
   
-  if (!existingTenant) {
-    // Tenant doesn't exist, create it
-    await db.tenant.create({
+  // Use transaction to ensure tenant exists before creating user
+  const user = await db.$transaction(async (tx) => {
+    // Always ensure tenant exists if tenantId is not null
+    if (tenantId !== null) {
+      await tx.tenant.upsert({
+        where: { id: tenantId },
+        create: {
+          id: tenantId,
+          name: "Test Company",
+          updatedAt: new Date(),
+        },
+        update: {
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    // Create user in the same transaction - tenant is guaranteed to exist
+    // Use crypto.randomUUID() to ensure unique emails even in parallel tests
+    const uniqueId = randomUUID();
+    return await tx.user.create({
       data: {
-        id: tenantId,
-        name: "Test Company",
-        updatedAt: new Date(),
+        id: overrides?.id || `test-user-${uniqueId}`,
+        email: overrides?.email || `test-${uniqueId}@example.com`,
+        firstName: overrides?.firstName || "Test",
+        lastName: overrides?.lastName || "User",
+        name: `${overrides?.firstName || "Test"} ${overrides?.lastName || "User"}`,
+        role: (overrides?.role || "User") as Role,
+        tenantId,
+        passwordHash,
       },
     });
-  }
-
-  const user = await db.user.create({
-    data: {
-      id: overrides?.id || `test-user-${Date.now()}`,
-      email: overrides?.email || `test-${Date.now()}@example.com`,
-      firstName: overrides?.firstName || "Test",
-      lastName: overrides?.lastName || "User",
-      name: `${overrides?.firstName || "Test"} ${overrides?.lastName || "User"}`,
-      role: (overrides?.role || "User") as Role,
-      tenantId,
-      passwordHash: overrides?.passwordHash !== undefined 
-        ? overrides.passwordHash 
-        : await hashPassword("password123"),
-    },
   });
 
   return user;
@@ -254,9 +263,16 @@ export async function createTestTenant(overrides?: {
   id?: string;
   name?: string;
 }) {
-  const tenant = await db.tenant.create({
-    data: {
-      id: overrides?.id || `test-tenant-${Date.now()}`,
+  const tenantId = overrides?.id || `test-tenant-${randomUUID()}`;
+  
+  const tenant = await db.tenant.upsert({
+    where: { id: tenantId },
+    create: {
+      id: tenantId,
+      name: overrides?.name || "Test Company",
+      updatedAt: new Date(),
+    },
+    update: {
       name: overrides?.name || "Test Company",
       updatedAt: new Date(),
     },
@@ -275,24 +291,30 @@ export async function createTestProject(overrides?: {
 }) {
   const tenantId = overrides?.tenantId || "test-tenant-id";
   
-  // Ensure tenant exists
-  await db.tenant.upsert({
-    where: { id: tenantId },
-    create: {
-      id: tenantId,
-      name: "Test Company",
-      updatedAt: new Date(),
-    },
-    update: {},
-  });
+  // Use transaction to ensure tenant exists before creating project
+  const project = await db.$transaction(async (tx) => {
+    // Ensure tenant exists
+    await tx.tenant.upsert({
+      where: { id: tenantId },
+      create: {
+        id: tenantId,
+        name: "Test Company",
+        updatedAt: new Date(),
+      },
+      update: {
+        updatedAt: new Date(),
+      },
+    });
 
-  const project = await db.project.create({
-    data: {
-      id: overrides?.id || `test-project-${Date.now()}`,
-      name: overrides?.name || "Test Project",
-      tenantId,
-      updatedAt: new Date(),
-    },
+    // Create project in the same transaction - tenant is guaranteed to exist
+    return await tx.project.create({
+      data: {
+        id: overrides?.id || `test-project-${randomUUID()}`,
+        name: overrides?.name || "Test Project",
+        tenantId,
+        updatedAt: new Date(),
+      },
+    });
   });
 
   return project;
@@ -310,12 +332,32 @@ export async function createTestProjectMember(overrides?: {
     throw new Error("projectId and userId are required");
   }
 
-  const member = await db.projectMember.create({
-    data: {
-      id: overrides.id || `test-member-${Date.now()}`,
-      projectId: overrides.projectId,
-      userId: overrides.userId,
-    },
+  // Use transaction to verify project and user exist before creating member
+  const member = await db.$transaction(async (tx) => {
+    // Verify project exists
+    const project = await tx.project.findUnique({
+      where: { id: overrides.projectId },
+    });
+    if (!project) {
+      throw new Error(`Project with id ${overrides.projectId} does not exist`);
+    }
+
+    // Verify user exists
+    const user = await tx.user.findUnique({
+      where: { id: overrides.userId },
+    });
+    if (!user) {
+      throw new Error(`User with id ${overrides.userId} does not exist`);
+    }
+
+    // Create member in the same transaction - parent entities are guaranteed to exist
+    return await tx.projectMember.create({
+      data: {
+        id: overrides.id || `test-member-${randomUUID()}`,
+        projectId: overrides.projectId,
+        userId: overrides.userId,
+      },
+    });
   });
 
   return member;
@@ -334,14 +376,26 @@ export async function createTestPhase(overrides?: {
     throw new Error("projectId is required");
   }
 
-  const phase = await db.phase.create({
-    data: {
-      id: overrides.id || `test-phase-${Date.now()}`,
-      projectId: overrides.projectId,
-      name: overrides.name || "Test Phase",
-      order: overrides.order ?? 0,
-      updatedAt: new Date(),
-    },
+  // Use transaction to verify project exists before creating phase
+  const phase = await db.$transaction(async (tx) => {
+    // Verify project exists
+    const project = await tx.project.findUnique({
+      where: { id: overrides.projectId },
+    });
+    if (!project) {
+      throw new Error(`Project with id ${overrides.projectId} does not exist`);
+    }
+
+    // Create phase in the same transaction
+    return await tx.phase.create({
+      data: {
+        id: overrides.id || `test-phase-${randomUUID()}`,
+        projectId: overrides.projectId,
+        name: overrides.name || "Test Phase",
+        order: overrides.order ?? 0,
+        updatedAt: new Date(),
+      },
+    });
   });
 
   return phase;
@@ -364,17 +418,29 @@ export async function createTestTask(overrides?: {
     throw new Error("phaseId is required");
   }
 
-  const task = await db.task.create({
-    data: {
-      id: overrides.id || `test-task-${Date.now()}`,
-      phaseId: overrides.phaseId,
-      name: overrides.name || "Test Task",
-      description: overrides.description ?? null,
-      ownerId: overrides.ownerId ?? null,
-      order: overrides.order ?? 1,
-      plannedCompletionDate: overrides.plannedCompletionDate ?? null,
-      actualCompletionDate: overrides.actualCompletionDate ?? null,
-    },
+  // Use transaction to verify phase exists before creating task
+  const task = await db.$transaction(async (tx) => {
+    // Verify phase exists
+    const phase = await tx.phase.findUnique({
+      where: { id: overrides.phaseId },
+    });
+    if (!phase) {
+      throw new Error(`Phase with id ${overrides.phaseId} does not exist`);
+    }
+
+    // Create task in the same transaction
+    return await tx.task.create({
+      data: {
+        id: overrides.id || `test-task-${randomUUID()}`,
+        phaseId: overrides.phaseId,
+        name: overrides.name || "Test Task",
+        description: overrides.description ?? null,
+        ownerId: overrides.ownerId ?? null,
+        order: overrides.order ?? 1,
+        plannedCompletionDate: overrides.plannedCompletionDate ?? null,
+        actualCompletionDate: overrides.actualCompletionDate ?? null,
+      },
+    });
   });
 
   return task;
@@ -392,25 +458,31 @@ export async function createTestVendor(overrides?: {
 }) {
   const tenantId = overrides?.tenantId || "test-tenant-id";
   
-  // Ensure tenant exists
-  await db.tenant.upsert({
-    where: { id: tenantId },
-    create: {
-      id: tenantId,
-      name: "Test Company",
-      updatedAt: new Date(),
-    },
-    update: {},
-  });
+  // Use transaction to ensure tenant exists before creating vendor
+  const vendor = await db.$transaction(async (tx) => {
+    // Ensure tenant exists
+    await tx.tenant.upsert({
+      where: { id: tenantId },
+      create: {
+        id: tenantId,
+        name: "Test Company",
+        updatedAt: new Date(),
+      },
+      update: {
+        updatedAt: new Date(),
+      },
+    });
 
-  const vendor = await db.vendor.create({
-    data: {
-      id: overrides?.id || `test-vendor-${Date.now()}`,
-      name: overrides?.name || "Test Vendor",
-      organizationNumber: overrides?.organizationNumber ?? null,
-      emailDomain: overrides?.emailDomain ?? null,
-      tenantId,
-    },
+    // Create vendor in the same transaction - tenant is guaranteed to exist
+    return await tx.vendor.create({
+      data: {
+        id: overrides?.id || `test-vendor-${randomUUID()}`,
+        name: overrides?.name || "Test Vendor",
+        organizationNumber: overrides?.organizationNumber ?? null,
+        emailDomain: overrides?.emailDomain ?? null,
+        tenantId,
+      },
+    });
   });
 
   return vendor;
@@ -429,13 +501,33 @@ export async function createTestProjectVendor(overrides?: {
     throw new Error("projectId and vendorId are required");
   }
 
-  const projectVendor = await db.projectVendor.create({
-    data: {
-      id: overrides?.id || `test-project-vendor-${Date.now()}`,
-      projectId: overrides.projectId,
-      vendorId: overrides.vendorId,
-      status: (overrides?.status || "Pending") as VendorStatus,
-    },
+  // Use transaction to verify project and vendor exist before creating project vendor
+  const projectVendor = await db.$transaction(async (tx) => {
+    // Verify project exists
+    const project = await tx.project.findUnique({
+      where: { id: overrides.projectId },
+    });
+    if (!project) {
+      throw new Error(`Project with id ${overrides.projectId} does not exist`);
+    }
+
+    // Verify vendor exists
+    const vendor = await tx.vendor.findUnique({
+      where: { id: overrides.vendorId },
+    });
+    if (!vendor) {
+      throw new Error(`Vendor with id ${overrides.vendorId} does not exist`);
+    }
+
+    // Create project vendor in the same transaction - parent entities are guaranteed to exist
+    return await tx.projectVendor.create({
+      data: {
+        id: overrides?.id || `test-project-vendor-${randomUUID()}`,
+        projectId: overrides.projectId,
+        vendorId: overrides.vendorId,
+        status: (overrides?.status || "Pending") as VendorStatus,
+      },
+    });
   });
 
   return projectVendor;
@@ -457,16 +549,38 @@ export async function createTestRequirementHierarchy(overrides?: {
     throw new Error("projectId is required");
   }
 
-  const hierarchy = await db.requirementHierarchy.create({
-    data: {
-      id: overrides.id || `test-hierarchy-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      projectId: overrides.projectId,
-      parentId: overrides.parentId ?? null,
-      title: overrides.title || "Test Hierarchy",
-      description: overrides.description ?? null,
-      number: overrides.number || "1.",
-      order: overrides.order ?? 1,
-    },
+  // Use transaction to verify project and parent exist before creating hierarchy
+  const hierarchy = await db.$transaction(async (tx) => {
+    // Verify project exists
+    const project = await tx.project.findUnique({
+      where: { id: overrides.projectId },
+    });
+    if (!project) {
+      throw new Error(`Project with id ${overrides.projectId} does not exist`);
+    }
+
+    // If parentId is provided, verify parent hierarchy exists
+    if (overrides.parentId) {
+      const parent = await tx.requirementHierarchy.findUnique({
+        where: { id: overrides.parentId },
+      });
+      if (!parent) {
+        throw new Error(`RequirementHierarchy with id ${overrides.parentId} does not exist`);
+      }
+    }
+
+    // Create hierarchy in the same transaction - project and parent (if provided) are guaranteed to exist
+    return await tx.requirementHierarchy.create({
+      data: {
+        id: overrides.id || `test-hierarchy-${randomUUID()}`,
+        projectId: overrides.projectId,
+        parentId: overrides.parentId ?? null,
+        title: overrides.title || "Test Hierarchy",
+        description: overrides.description ?? null,
+        number: overrides.number || "1.",
+        order: overrides.order ?? 1,
+      },
+    });
   });
 
   return hierarchy;
@@ -490,18 +604,46 @@ export async function createTestRequirement(overrides?: {
     throw new Error("hierarchyId, createdById, and lastModifiedById are required");
   }
 
-  const requirement = await db.requirement.create({
-    data: {
-      id: overrides.id || `test-requirement-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      hierarchyId: overrides.hierarchyId,
-      description: overrides.description || "Test Requirement",
-      type: (overrides.type || "Information") as any,
-      status: (overrides.status ?? null) as any,
-      number: overrides.number || "1.1.",
-      order: overrides.order ?? 1,
-      createdById: overrides.createdById,
-      lastModifiedById: overrides.lastModifiedById,
-    },
+  // Use transaction to verify hierarchy and users exist before creating requirement
+  const requirement = await db.$transaction(async (tx) => {
+    // Verify hierarchy exists
+    const hierarchy = await tx.requirementHierarchy.findUnique({
+      where: { id: overrides.hierarchyId },
+    });
+    if (!hierarchy) {
+      throw new Error(`RequirementHierarchy with id ${overrides.hierarchyId} does not exist`);
+    }
+
+    // Verify createdBy user exists
+    const createdBy = await tx.user.findUnique({
+      where: { id: overrides.createdById },
+    });
+    if (!createdBy) {
+      throw new Error(`User with id ${overrides.createdById} does not exist`);
+    }
+
+    // Verify lastModifiedBy user exists
+    const lastModifiedBy = await tx.user.findUnique({
+      where: { id: overrides.lastModifiedById },
+    });
+    if (!lastModifiedBy) {
+      throw new Error(`User with id ${overrides.lastModifiedById} does not exist`);
+    }
+
+    // Create requirement in the same transaction - parent entities are guaranteed to exist
+    return await tx.requirement.create({
+      data: {
+        id: overrides.id || `test-requirement-${randomUUID()}`,
+        hierarchyId: overrides.hierarchyId,
+        description: overrides.description || "Test Requirement",
+        type: (overrides.type || "Information") as any,
+        status: (overrides.status ?? null) as any,
+        number: overrides.number || "1.1.",
+        order: overrides.order ?? 1,
+        createdById: overrides.createdById,
+        lastModifiedById: overrides.lastModifiedById,
+      },
+    });
   });
 
   return requirement;
@@ -526,19 +668,31 @@ export async function createTestRFI(overrides?: {
     throw new Error("projectId is required");
   }
 
-  const rfi = await db.rFI.create({
-    data: {
-      id: overrides.id || `test-rfi-${Date.now()}`,
-      projectId: overrides.projectId,
-      emailSubject: overrides.emailSubject || "Test RFI Subject",
-      emailText: overrides.emailText || "Test RFI Email Text",
-      rfiInformation: overrides.rfiInformation || "Test RFI Information",
-      deadline: overrides.deadline ?? null,
-      autoPublishDate: overrides.autoPublishDate ?? null,
-      isPublished: overrides.isPublished ?? false,
-      publishedAt: overrides.publishedAt ?? null,
-      unpublishedAt: overrides.unpublishedAt ?? null,
-    },
+  // Use transaction to verify project exists before creating RFI
+  const rfi = await db.$transaction(async (tx) => {
+    // Verify project exists
+    const project = await tx.project.findUnique({
+      where: { id: overrides.projectId },
+    });
+    if (!project) {
+      throw new Error(`Project with id ${overrides.projectId} does not exist`);
+    }
+
+    // Create RFI in the same transaction - project is guaranteed to exist
+    return await tx.rFI.create({
+      data: {
+        id: overrides.id || `test-rfi-${randomUUID()}`,
+        projectId: overrides.projectId,
+        emailSubject: overrides.emailSubject || "Test RFI Subject",
+        emailText: overrides.emailText || "Test RFI Email Text",
+        rfiInformation: overrides.rfiInformation || "Test RFI Information",
+        deadline: overrides.deadline ?? null,
+        autoPublishDate: overrides.autoPublishDate ?? null,
+        isPublished: overrides.isPublished ?? false,
+        publishedAt: overrides.publishedAt ?? null,
+        unpublishedAt: overrides.unpublishedAt ?? null,
+      },
+    });
   });
 
   return rfi;
@@ -561,17 +715,29 @@ export async function createTestRFIQuestion(overrides?: {
     throw new Error("rfiId is required");
   }
 
-  const question = await db.rFIQuestion.create({
-    data: {
-      id: overrides.id || `test-rfi-question-${Date.now()}`,
-      rfiId: overrides.rfiId,
-      title: overrides.title || "Test Question",
-      description: overrides.description ?? null,
-      type: (overrides.type || "SingleText") as any,
-      order: overrides.order ?? 1,
-      required: overrides.required ?? false,
-      scaleLabels: overrides.scaleLabels ?? Prisma.JsonNull,
-    },
+  // Use transaction to verify RFI exists before creating question
+  const question = await db.$transaction(async (tx) => {
+    // Verify RFI exists
+    const rfi = await tx.rFI.findUnique({
+      where: { id: overrides.rfiId },
+    });
+    if (!rfi) {
+      throw new Error(`RFI with id ${overrides.rfiId} does not exist`);
+    }
+
+    // Create question in the same transaction
+    return await tx.rFIQuestion.create({
+      data: {
+        id: overrides.id || `test-rfi-question-${randomUUID()}`,
+        rfiId: overrides.rfiId,
+        title: overrides.title || "Test Question",
+        description: overrides.description ?? null,
+        type: (overrides.type || "SingleText") as any,
+        order: overrides.order ?? 1,
+        required: overrides.required ?? false,
+        scaleLabels: overrides.scaleLabels ?? Prisma.JsonNull,
+      },
+    });
   });
 
   return question;
@@ -593,16 +759,28 @@ export async function createTestRFIQuestionOption(overrides?: {
     throw new Error("questionId is required");
   }
 
-  const option = await db.rFIQuestionOption.create({
-    data: {
-      id: overrides.id || `test-rfi-option-${Date.now()}`,
-      questionId: overrides.questionId,
-      label: overrides.label || "Test Option",
-      value: overrides.value ?? null,
-      xAxis: overrides.xAxis ?? false,
-      yAxis: overrides.yAxis ?? false,
-      order: overrides.order ?? 1,
-    },
+  // Use transaction to verify question exists before creating option
+  const option = await db.$transaction(async (tx) => {
+    // Verify question exists
+    const question = await tx.rFIQuestion.findUnique({
+      where: { id: overrides.questionId },
+    });
+    if (!question) {
+      throw new Error(`RFIQuestion with id ${overrides.questionId} does not exist`);
+    }
+
+    // Create option in the same transaction
+    return await tx.rFIQuestionOption.create({
+      data: {
+        id: overrides.id || `test-rfi-option-${randomUUID()}`,
+        questionId: overrides.questionId,
+        label: overrides.label || "Test Option",
+        value: overrides.value ?? null,
+        xAxis: overrides.xAxis ?? false,
+        yAxis: overrides.yAxis ?? false,
+        order: overrides.order ?? 1,
+      },
+    });
   });
 
   return option;
@@ -624,16 +802,44 @@ export async function createTestRFIVendorResponse(overrides?: {
     throw new Error("rfiId, projectVendorId, and contactPersonId are required");
   }
 
-  const response = await db.rFIVendorResponse.create({
-    data: {
-      id: overrides.id || `test-rfi-vendor-response-${Date.now()}`,
-      rfiId: overrides.rfiId,
-      projectVendorId: overrides.projectVendorId,
-      contactPersonId: overrides.contactPersonId,
-      status: (overrides.status || "Sent") as any,
-      sentAt: overrides.sentAt ?? null,
-      answeredAt: overrides.answeredAt ?? null,
-    },
+  // Use transaction to verify RFI, project vendor, and contact person exist before creating response
+  const response = await db.$transaction(async (tx) => {
+    // Verify RFI exists
+    const rfi = await tx.rFI.findUnique({
+      where: { id: overrides.rfiId },
+    });
+    if (!rfi) {
+      throw new Error(`RFI with id ${overrides.rfiId} does not exist`);
+    }
+
+    // Verify project vendor exists
+    const projectVendor = await tx.projectVendor.findUnique({
+      where: { id: overrides.projectVendorId },
+    });
+    if (!projectVendor) {
+      throw new Error(`ProjectVendor with id ${overrides.projectVendorId} does not exist`);
+    }
+
+    // Verify contact person exists
+    const contactPerson = await tx.vendorContactPerson.findUnique({
+      where: { id: overrides.contactPersonId },
+    });
+    if (!contactPerson) {
+      throw new Error(`VendorContactPerson with id ${overrides.contactPersonId} does not exist`);
+    }
+
+    // Create response in the same transaction - parent entities are guaranteed to exist
+    return await tx.rFIVendorResponse.create({
+      data: {
+        id: overrides.id || `test-rfi-vendor-response-${randomUUID()}`,
+        rfiId: overrides.rfiId,
+        projectVendorId: overrides.projectVendorId,
+        contactPersonId: overrides.contactPersonId,
+        status: (overrides.status || "Sent") as any,
+        sentAt: overrides.sentAt ?? null,
+        answeredAt: overrides.answeredAt ?? null,
+      },
+    });
   });
 
   return response;
@@ -655,16 +861,29 @@ export async function createTestVendorContactPerson(overrides?: {
     throw new Error("vendorId is required");
   }
 
-  const contactPerson = await db.vendorContactPerson.create({
-    data: {
-      id: overrides.id || `test-vendor-contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      vendorId: overrides.vendorId,
-      firstName: overrides.firstName || "John",
-      lastName: overrides.lastName || "Doe",
-      email: overrides.email || `contact-${Date.now()}@example.com`,
-      phone: overrides.phone ?? null,
-      isMainContact: overrides.isMainContact ?? false,
-    },
+  // Use transaction to verify vendor exists before creating contact person
+  const contactPerson = await db.$transaction(async (tx) => {
+    // Verify vendor exists
+    const vendor = await tx.vendor.findUnique({
+      where: { id: overrides.vendorId },
+    });
+    if (!vendor) {
+      throw new Error(`Vendor with id ${overrides.vendorId} does not exist`);
+    }
+
+    // Create contact person in the same transaction
+    const contactId = randomUUID();
+    return await tx.vendorContactPerson.create({
+      data: {
+        id: overrides.id || `test-vendor-contact-${contactId}`,
+        vendorId: overrides.vendorId,
+        firstName: overrides.firstName || "John",
+        lastName: overrides.lastName || "Doe",
+        email: overrides.email || `contact-${contactId}@example.com`,
+        phone: overrides.phone ?? null,
+        isMainContact: overrides.isMainContact ?? false,
+      },
+    });
   });
 
   return contactPerson;
@@ -686,16 +905,28 @@ export async function createTestRFP(overrides?: {
     throw new Error("projectId is required");
   }
 
-  const rfp = await db.rFP.create({
-    data: {
-      id: overrides.id || `test-rfp-${Date.now()}`,
-      projectId: overrides.projectId,
-      status: (overrides.status || "Draft") as any,
-      contactPersonId: overrides.contactPersonId ?? null,
-      alternativeContactPersonId: overrides.alternativeContactPersonId ?? null,
-      publishDate: overrides.publishDate ?? null,
-      deliveryDate: overrides.deliveryDate ?? null,
-    },
+  // Use transaction to verify project exists before creating RFP
+  const rfp = await db.$transaction(async (tx) => {
+    // Verify project exists
+    const project = await tx.project.findUnique({
+      where: { id: overrides.projectId },
+    });
+    if (!project) {
+      throw new Error(`Project with id ${overrides.projectId} does not exist`);
+    }
+
+    // Create RFP in the same transaction - project is guaranteed to exist
+    return await tx.rFP.create({
+      data: {
+        id: overrides.id || `test-rfp-${randomUUID()}`,
+        projectId: overrides.projectId,
+        status: (overrides.status || "Draft") as any,
+        contactPersonId: overrides.contactPersonId ?? null,
+        alternativeContactPersonId: overrides.alternativeContactPersonId ?? null,
+        publishDate: overrides.publishDate ?? null,
+        deliveryDate: overrides.deliveryDate ?? null,
+      },
+    });
   });
 
   return rfp;
@@ -719,18 +950,30 @@ export async function createTestRFPScheduleItem(overrides?: {
     throw new Error("rfpId is required");
   }
 
-  const item = await db.rFPScheduleItem.create({
-    data: {
-      id: overrides.id || `test-rfp-schedule-${Date.now()}`,
-      rfpId: overrides.rfpId,
-      type: (overrides.type || "CustomDate") as any,
-      description: overrides.description || "Test Schedule Item",
-      date: overrides.date ?? null,
-      fromDate: overrides.fromDate ?? null,
-      toDate: overrides.toDate ?? null,
-      order: overrides.order ?? 0,
-      isRequired: overrides.isRequired ?? false,
-    },
+  // Use transaction to verify RFP exists before creating schedule item
+  const item = await db.$transaction(async (tx) => {
+    // Verify RFP exists
+    const rfp = await tx.rFP.findUnique({
+      where: { id: overrides.rfpId },
+    });
+    if (!rfp) {
+      throw new Error(`RFP with id ${overrides.rfpId} does not exist`);
+    }
+
+    // Create schedule item in the same transaction
+    return await tx.rFPScheduleItem.create({
+      data: {
+        id: overrides.id || `test-rfp-schedule-${randomUUID()}`,
+        rfpId: overrides.rfpId,
+        type: (overrides.type || "CustomDate") as any,
+        description: overrides.description || "Test Schedule Item",
+        date: overrides.date ?? null,
+        fromDate: overrides.fromDate ?? null,
+        toDate: overrides.toDate ?? null,
+        order: overrides.order ?? 0,
+        isRequired: overrides.isRequired ?? false,
+      },
+    });
   });
 
   return item;
@@ -755,19 +998,31 @@ export async function createTestRFPDocument(overrides?: {
     throw new Error("rfpId is required");
   }
 
-  const document = await db.rFPDocument.create({
-    data: {
-      id: overrides.id || `test-rfp-document-${Date.now()}`,
-      rfpId: overrides.rfpId,
-      type: (overrides.type || "Link") as any,
-      description: overrides.description || "Test Document",
-      fileName: overrides.fileName ?? null,
-      fileType: overrides.fileType ?? null,
-      fileData: overrides.fileData ?? null,
-      fileSize: overrides.fileSize ?? null,
-      url: overrides.url ?? null,
-      order: overrides.order ?? 0,
-    },
+  // Use transaction to verify RFP exists before creating document
+  const document = await db.$transaction(async (tx) => {
+    // Verify RFP exists
+    const rfp = await tx.rFP.findUnique({
+      where: { id: overrides.rfpId },
+    });
+    if (!rfp) {
+      throw new Error(`RFP with id ${overrides.rfpId} does not exist`);
+    }
+
+    // Create document in the same transaction
+    return await tx.rFPDocument.create({
+      data: {
+        id: overrides.id || `test-rfp-document-${randomUUID()}`,
+        rfpId: overrides.rfpId,
+        type: (overrides.type || "Link") as any,
+        description: overrides.description || "Test Document",
+        fileName: overrides.fileName ?? null,
+        fileType: overrides.fileType ?? null,
+        fileData: overrides.fileData ?? null,
+        fileSize: overrides.fileSize ?? null,
+        url: overrides.url ?? null,
+        order: overrides.order ?? 0,
+      },
+    });
   });
 
   return document;
@@ -786,13 +1041,33 @@ export async function createTestRFPChangelogEntry(overrides?: {
     throw new Error("rfpId and createdById are required");
   }
 
-  const entry = await db.rFPChangelogEntry.create({
-    data: {
-      id: overrides.id || `test-rfp-changelog-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      rfpId: overrides.rfpId,
-      description: overrides.description || "Test changelog entry",
-      createdById: overrides.createdById,
-    },
+  // Use transaction to verify RFP and user exist before creating changelog entry
+  const entry = await db.$transaction(async (tx) => {
+    // Verify RFP exists
+    const rfp = await tx.rFP.findUnique({
+      where: { id: overrides.rfpId },
+    });
+    if (!rfp) {
+      throw new Error(`RFP with id ${overrides.rfpId} does not exist`);
+    }
+
+    // Verify user exists
+    const user = await tx.user.findUnique({
+      where: { id: overrides.createdById },
+    });
+    if (!user) {
+      throw new Error(`User with id ${overrides.createdById} does not exist`);
+    }
+
+    // Create changelog entry in the same transaction
+    return await tx.rFPChangelogEntry.create({
+      data: {
+        id: overrides.id || `test-rfp-changelog-${randomUUID()}`,
+        rfpId: overrides.rfpId,
+        description: overrides.description || "Test changelog entry",
+        createdById: overrides.createdById,
+      },
+    });
   });
 
   return entry;
@@ -817,19 +1092,47 @@ export async function createTestRFPQuestion(overrides?: {
     throw new Error("rfpId, vendorId, and contactPersonId are required");
   }
 
-  const question = await db.rFPQuestion.create({
-    data: {
-      id: overrides.id || `test-rfp-question-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      rfpId: overrides.rfpId,
-      question: overrides.question || "Test question?",
-      cleanedQuestion: overrides.cleanedQuestion ?? null,
-      answer: overrides.answer ?? null,
-      answeredAt: overrides.answeredAt ?? null,
-      answeredById: overrides.answeredById ?? null,
-      vendorId: overrides.vendorId,
-      contactPersonId: overrides.contactPersonId,
-      createdAt: overrides.createdAt,
-    },
+  // Use transaction to verify RFP, vendor, and contact person exist before creating question
+  const question = await db.$transaction(async (tx) => {
+    // Verify RFP exists
+    const rfp = await tx.rFP.findUnique({
+      where: { id: overrides.rfpId },
+    });
+    if (!rfp) {
+      throw new Error(`RFP with id ${overrides.rfpId} does not exist`);
+    }
+
+    // Verify vendor exists
+    const vendor = await tx.vendor.findUnique({
+      where: { id: overrides.vendorId },
+    });
+    if (!vendor) {
+      throw new Error(`Vendor with id ${overrides.vendorId} does not exist`);
+    }
+
+    // Verify contact person exists
+    const contactPerson = await tx.vendorContactPerson.findUnique({
+      where: { id: overrides.contactPersonId },
+    });
+    if (!contactPerson) {
+      throw new Error(`VendorContactPerson with id ${overrides.contactPersonId} does not exist`);
+    }
+
+    // Create question in the same transaction - parent entities are guaranteed to exist
+    return await tx.rFPQuestion.create({
+      data: {
+        id: overrides.id || `test-rfp-question-${randomUUID()}`,
+        rfpId: overrides.rfpId,
+        question: overrides.question || "Test question?",
+        cleanedQuestion: overrides.cleanedQuestion ?? null,
+        answer: overrides.answer ?? null,
+        answeredAt: overrides.answeredAt ?? null,
+        answeredById: overrides.answeredById ?? null,
+        vendorId: overrides.vendorId,
+        contactPersonId: overrides.contactPersonId,
+        createdAt: overrides.createdAt,
+      },
+    });
   });
 
   return question;
@@ -851,16 +1154,36 @@ export async function createTestRFPAnnouncement(overrides?: {
     throw new Error("rfpId and createdById are required");
   }
 
-  const announcement = await db.rFPAnnouncement.create({
-    data: {
-      id: overrides.id || `test-rfp-announcement-${Date.now()}`,
-      rfpId: overrides.rfpId,
-      title: overrides.title || "Test Announcement",
-      description: overrides.description || "Test announcement description",
-      sentAt: overrides.sentAt ?? null,
-      scheduledSendAt: overrides.scheduledSendAt ?? null,
-      createdById: overrides.createdById,
-    },
+  // Use transaction to verify RFP and user exist before creating announcement
+  const announcement = await db.$transaction(async (tx) => {
+    // Verify RFP exists
+    const rfp = await tx.rFP.findUnique({
+      where: { id: overrides.rfpId },
+    });
+    if (!rfp) {
+      throw new Error(`RFP with id ${overrides.rfpId} does not exist`);
+    }
+
+    // Verify user exists
+    const user = await tx.user.findUnique({
+      where: { id: overrides.createdById },
+    });
+    if (!user) {
+      throw new Error(`User with id ${overrides.createdById} does not exist`);
+    }
+
+    // Create announcement in the same transaction - parent entities are guaranteed to exist
+    return await tx.rFPAnnouncement.create({
+      data: {
+        id: overrides.id || `test-rfp-announcement-${randomUUID()}`,
+        rfpId: overrides.rfpId,
+        title: overrides.title || "Test Announcement",
+        description: overrides.description || "Test announcement description",
+        sentAt: overrides.sentAt ?? null,
+        scheduledSendAt: overrides.scheduledSendAt ?? null,
+        createdById: overrides.createdById,
+      },
+    });
   });
 
   return announcement;

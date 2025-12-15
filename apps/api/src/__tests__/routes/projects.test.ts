@@ -70,7 +70,7 @@ describe("Project Routes", () => {
       });
 
       const project1 = await createTestProject({ name: "Project 1", tenantId: tenant.id });
-      const project2 = await createTestProject({ name: "Project 2", tenantId: tenant.id });
+      await createTestProject({ name: "Project 2", tenantId: tenant.id });
 
       // Only add user to project1
       await createTestProjectMember({ projectId: project1.id, userId: user.id });

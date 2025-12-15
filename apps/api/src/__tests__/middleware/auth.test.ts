@@ -3,7 +3,7 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import { authenticate, requireRole, requireTenant, getUser } from "../../middleware/auth";
 import { buildTestApp, generateTestToken } from "../utils/test-helpers";
 import { createTestUser, createTestTenant } from "../utils/db-helpers";
-import { JWTPayload, Role } from "@dp/lib";
+import { Role } from "@dp/lib";
 import type { FastifyInstance } from "fastify";
 
 describe("Auth Middleware", () => {
@@ -43,7 +43,7 @@ describe("Auth Middleware", () => {
         role: Role.User,
       });
 
-      const token = generateTestToken(app, {
+      generateTestToken(app, {
         userId: user.id,
         email: user.email,
         tenantId: user.tenantId,

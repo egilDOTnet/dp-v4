@@ -22,7 +22,7 @@ describe('Project Setup Workflow Integration Tests', () => {
 
   describe('Project Creation', () => {
     it('should create project with basic information', async () => {
-      const { user, token } = await createAuthenticatedUser();
+      await createAuthenticatedUser();
       // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
 
       const project = await api.projects.create({
@@ -40,8 +40,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should create project with phases', async () => {
-      const { token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create project with phases
       const project = await api.projects.create({
@@ -63,8 +63,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should update project information', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       const updatedProject = await api.projects.update(project.id, {
         name: 'Updated Project Name',
@@ -80,7 +80,8 @@ describe('Project Setup Workflow Integration Tests', () => {
 
   describe('Project Member Management', () => {
     it('should add and remove project members', async () => {
-      const { project, user: user1, token: token1 } = await createProjectWithMember();
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create another user
       const { user: user2 } = await createAuthenticatedUser({
@@ -102,8 +103,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should handle multiple members', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create multiple users
       const { user: user1 } = await createAuthenticatedUser({
@@ -130,8 +131,8 @@ describe('Project Setup Workflow Integration Tests', () => {
 
   describe('Phase and Task Management', () => {
     it('should list phases for a project', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create project with phases
       const projectWithPhases = await api.projects.create({
@@ -151,8 +152,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should create, update, and delete tasks', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create project with a phase
       const projectWithPhase = await api.projects.create({
@@ -210,8 +211,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should assign task owner', async () => {
-      const { project, user, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { user } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create project with phase
       const projectWithPhase = await api.projects.create({
@@ -241,8 +242,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should mark task as completed', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create project with phase
       const projectWithPhase = await api.projects.create({
@@ -275,8 +276,8 @@ describe('Project Setup Workflow Integration Tests', () => {
 
   describe('Task Comments', () => {
     it('should create and list task comments', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create project with phase
       const projectWithPhase = await api.projects.create({
@@ -319,8 +320,8 @@ describe('Project Setup Workflow Integration Tests', () => {
 
   describe('Vendor Management', () => {
     it('should add vendor to project', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // List vendors (should be empty initially)
       const initialVendors = await api.projects.vendors.list(project.id);
@@ -344,8 +345,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should update vendor status', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create vendor
       const vendor = await api.projects.vendors.create(project.id, {
@@ -362,8 +363,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should add contact person to vendor', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create vendor
       const vendor = await api.projects.vendors.create(project.id, {
@@ -385,8 +386,8 @@ describe('Project Setup Workflow Integration Tests', () => {
     });
 
     it('should delete vendor from project', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       // Create vendor
       const vendor = await api.projects.vendors.create(project.id, {
@@ -409,8 +410,8 @@ describe('Project Setup Workflow Integration Tests', () => {
 
   describe('Dashboard Statistics', () => {
     it('should get dashboard statistics', async () => {
-      const { project, token } = await createProjectWithMember();
-      // Token is automatically set by createAuthenticatedUser/createProjectWithMember via setToken
+      const { project } = await createProjectWithMember();
+      // Token is automatically set by createProjectWithMember via setToken
 
       const stats = await api.projects.dashboard.getStats(project.id);
 
@@ -425,7 +426,8 @@ describe('Project Setup Workflow Integration Tests', () => {
   describe('Complete Project Setup Workflow', () => {
     it('should complete full project setup workflow', async () => {
       // 1. Create project with phases
-      const { user: user1, token: token1 } = await createAuthenticatedUser();
+      const { user: user1 } = await createAuthenticatedUser();
+      // Token is automatically set by createAuthenticatedUser via setToken
 
       const project = await api.projects.create({
         name: 'Complete Workflow Project',
@@ -456,7 +458,7 @@ describe('Project Setup Workflow Integration Tests', () => {
         ownerId: user1.id,
       });
 
-      const task2 = await api.projects.phases.createTask(project.id, executionPhase.id, {
+      await api.projects.phases.createTask(project.id, executionPhase.id, {
         name: 'Implement Features',
         description: 'Implement core features',
         ownerId: user2.id,

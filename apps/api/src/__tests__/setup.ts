@@ -33,7 +33,7 @@ let dbName: string;
 try {
   const url = new URL(testDbUrl);
   dbName = url.pathname.replace('/', '');
-} catch (error) {
+} catch {
   throw new Error(
     `Invalid TEST_DATABASE_URL format: ${testDbUrl}. ` +
     `Expected format: postgresql://user:password@host:port/database`

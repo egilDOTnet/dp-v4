@@ -33,9 +33,10 @@ describe('Integration Test Example', () => {
   
   it('should create a project and retrieve it', async () => {
     // Create project with authenticated user
-    const { project, user, token } = await createProjectWithMember({
+    const { project } = await createProjectWithMember({
       projectName: 'Integration Test Project',
     });
+    // Token is automatically set by createProjectWithMember via setToken
     
     expect(project.id).toBeTruthy();
     expect(project.name).toBe('Integration Test Project');

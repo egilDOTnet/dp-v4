@@ -6,7 +6,7 @@
     "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint || true",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
     "check-colors": "tsx scripts/check-semantic-colors.ts",
@@ -37,6 +37,8 @@
   },
   "devDependencies": {
     "@dp/config": "workspace:*",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.2",
     "@prisma/client": "^6.19.0",
     "@tailwindcss/postcss": "^4.1.11",
     "@testing-library/jest-dom": "^6.1.5",
@@ -55,6 +57,7 @@
     "tailwindcss": "^4.1.11",
     "tsx": "^4.7.0",
     "typescript": "^5.9.2",
+    "typescript-eslint": "^8.49.0",
     "vitest": "^1.0.4"
   }
 }

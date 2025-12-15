@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FastifyRequest, FastifyReply } from "fastify";
 import { verifyProjectAccess } from "../../middleware/project-access";
-import { buildTestApp, generateTestToken } from "../utils/test-helpers";
+import { buildTestApp } from "../utils/test-helpers";
 import {
   createTestUser,
   createTestTenant,
@@ -9,13 +9,10 @@ import {
   createTestProjectMember,
 } from "../utils/db-helpers";
 import { Role } from "@dp/lib";
-import type { FastifyInstance } from "fastify";
 
 describe("Project Access Middleware", () => {
-  let app: FastifyInstance;
-
   beforeEach(async () => {
-    app = await buildTestApp();
+    await buildTestApp();
   });
 
   describe("verifyProjectAccess", () => {

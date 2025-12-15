@@ -1,22 +1,9 @@
 import { api, setToken, clearToken, getToken } from './api-client';
 import type { User, Project, RFI, RFP, RequirementHierarchy, Requirement } from './api-client';
-import { generateTestToken, createAuthHeader } from '../utils/test-helpers';
 import { getTestApiUrl } from './setup';
 import {
   createTestUser,
   createTestTenant,
-  createTestProject,
-  createTestProjectMember,
-  createTestVendor,
-  createTestProjectVendor,
-  createTestVendorContactPerson,
-  createTestRFI,
-  createTestRFIQuestion,
-  createTestRFIVendorResponse,
-  createTestRFP,
-  createTestRFPQuestion,
-  createTestRequirementHierarchy,
-  createTestRequirement,
 } from '../utils/db-helpers';
 
 /**
@@ -50,17 +37,18 @@ export async function createAuthenticatedUser(overrides?: {
   tenantId?: string;
 }): Promise<{ user: User; token: string; email: string; password: string }> {
   const password = overrides?.password || 'password123';
-  const email = overrides?.email || `test-${Date.now()}@example.com`;
+  const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  const email = overrides?.email || `test-${uniqueSuffix}@example.com`;
   
   // Create tenant if tenantId is provided
-  let tenantId = overrides?.tenantId;
+  const tenantId = overrides?.tenantId;
   if (tenantId) {
     await createTestTenant({ id: tenantId, name: 'Test Company' });
   }
   
   // Create user in database
   // Default to CompanyAdministrator role to allow project creation in tests
-  const dbUser = await createTestUser({
+  await createTestUser({
     email,
     firstName: overrides?.firstName || 'Test',
     lastName: overrides?.lastName || 'User',
@@ -270,7 +258,7 @@ export async function createVendorWithContact(options?: {
     {
       firstName: 'John',
       lastName: 'Doe',
-      email: `contact-${Date.now()}@example.com`,
+      email: `contact-${Date.now()}-${Math.random().toString(36).substring(2, 9)}@example.com`,
       isMainContact: true,
     }
   );

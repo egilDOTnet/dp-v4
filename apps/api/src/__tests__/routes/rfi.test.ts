@@ -196,7 +196,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({
+      await createTestRFI({
         projectId: project.id,
         emailSubject: "Original Subject",
         emailText: "Original Text",
@@ -273,7 +273,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({ projectId: project.id });
+      await createTestRFI({ projectId: project.id });
 
       const token = generateTestToken(app, {
         userId: user.id,
@@ -312,7 +312,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({ projectId: project.id });
+      await createTestRFI({ projectId: project.id });
 
       const token = generateTestToken(app, {
         userId: user.id,
@@ -375,7 +375,7 @@ describe("RFI Routes", () => {
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
       const deadline = new Date("2025-12-31");
-      const rfi = await createTestRFI({
+      await createTestRFI({
         projectId: project.id,
         deadline,
       });
@@ -458,7 +458,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({
+      await createTestRFI({
         projectId: project.id,
         deadline: null,
       });
@@ -736,7 +736,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({ projectId: project.id });
+      await createTestRFI({ projectId: project.id });
 
       const token = generateTestToken(app, {
         userId: user.id,
@@ -1134,7 +1134,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({ projectId: project.id });
+      await createTestRFI({ projectId: project.id });
 
       const token = generateTestToken(app, {
         userId: user.id,
@@ -1661,7 +1661,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({
+      await createTestRFI({
         projectId: project.id,
         isPublished: false,
       });
@@ -1720,7 +1720,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({
+      await createTestRFI({
         projectId: project.id,
         isPublished: true,
       });
@@ -1755,7 +1755,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({
+      await createTestRFI({
         projectId: project.id,
         isPublished: false,
       });
@@ -1793,7 +1793,7 @@ describe("RFI Routes", () => {
       const project = await createTestProject({ tenantId: tenant.id });
       await createTestProjectMember({ projectId: project.id, userId: user.id });
 
-      const rfi = await createTestRFI({
+      await createTestRFI({
         projectId: project.id,
         isPublished: true,
       });
@@ -1832,7 +1832,7 @@ describe("RFI Routes", () => {
         emailText: "Preview Text",
         rfiInformation: "Preview Information",
       });
-      const question = await createTestRFIQuestion({
+      await createTestRFIQuestion({
         rfiId: rfi.id,
         title: "Preview Question",
         type: "SingleText",

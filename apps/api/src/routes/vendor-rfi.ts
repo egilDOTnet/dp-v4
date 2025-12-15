@@ -200,7 +200,7 @@ async function validateMagicLinkToken(
       project,
       vendor: vendorResponse.projectVendor.vendor,
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 }
