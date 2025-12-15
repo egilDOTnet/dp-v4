@@ -29,8 +29,6 @@ export function ImageCropper({ imageSrc, onCrop, onCancel, type }: ImageCropperP
   const isLogo = type === "logo";
   const targetWidth = isLogo ? 500 : 1200;
   const targetHeight = isLogo ? 500 : 300;
-  const maxImageWidth = isLogo ? 500 : 2000;
-  const maxImageHeight = isLogo ? 500 : 2000;
 
   // Load image and initialize crop area
   useEffect(() => {

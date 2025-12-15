@@ -94,9 +94,9 @@ export default async function userRoutes(fastify: FastifyInstance) {
         authenticate,
         requireTenant,
         async (request, reply) => {
-          if (!request.user) return;
+          const currentUser = getUser(request);
           const user = await db.user.findUnique({
-            where: { id: request.user.userId },
+            where: { id: currentUser.userId },
             include: { tenant: true },
           });
           if (!user) {

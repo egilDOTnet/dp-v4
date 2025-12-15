@@ -13,7 +13,6 @@ import { SearchBar, HeroBanner } from "@/components/ui";
 export default function TasksPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
   const projectId = params.id as string;
   const phaseParam = searchParams.get("phase");
   

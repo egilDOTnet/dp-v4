@@ -91,7 +91,6 @@ describe('RFP Workflow Integration Tests', () => {
 
     it('should create, update, and delete custom schedule items', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       // Get RFP (initializes defaults)
       await api.rfp.get(project.id);
@@ -129,7 +128,6 @@ describe('RFP Workflow Integration Tests', () => {
 
     it('should handle date range schedule items', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -153,7 +151,6 @@ describe('RFP Workflow Integration Tests', () => {
   describe('Document Management', () => {
     it('should create, update, delete, and reorder documents', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -219,7 +216,6 @@ describe('RFP Workflow Integration Tests', () => {
   describe('Changelog Management', () => {
     it('should automatically create changelog entries when schedule items are added', async () => {
       const { project, token, user } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -243,7 +239,6 @@ describe('RFP Workflow Integration Tests', () => {
 
     it('should update and delete changelog entries', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -277,7 +272,6 @@ describe('RFP Workflow Integration Tests', () => {
   describe('Question Management', () => {
     it('should create, list, answer, and delete questions', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       // Create vendor with contact using API helper
       const vendorResult = await createVendorWithContact({
@@ -338,7 +332,6 @@ describe('RFP Workflow Integration Tests', () => {
 
     it('should split a question into multiple questions', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       // Create vendor with contact using API helper
       const vendorResult = await createVendorWithContact({
@@ -376,7 +369,6 @@ describe('RFP Workflow Integration Tests', () => {
   describe('Announcement Management', () => {
     it('should create, list, update, send, and delete announcements', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -429,7 +421,6 @@ describe('RFP Workflow Integration Tests', () => {
 
     it('should create announcement with scheduled send date', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -451,7 +442,6 @@ describe('RFP Workflow Integration Tests', () => {
   describe('Publishing RFP', () => {
     it('should not allow publishing without required schedule dates', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -465,7 +455,6 @@ describe('RFP Workflow Integration Tests', () => {
 
     it('should publish RFP when all required schedule dates are set', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       await api.rfp.get(project.id);
 
@@ -518,7 +507,6 @@ describe('RFP Workflow Integration Tests', () => {
 
     it('should send RFP to vendors after publishing', async () => {
       const { project, token } = await createProjectWithMember();
-      }
 
       // Create vendor with contact
       await createVendorWithContact({
@@ -561,7 +549,6 @@ describe('RFP Workflow Integration Tests', () => {
       const { project, token } = await createProjectWithMember({
         projectName: 'Complete RFP Workflow Project',
       });
-      }
 
       // 1. Create RFP (auto-created on first access)
       let rfp = await api.rfp.get(project.id);

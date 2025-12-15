@@ -258,7 +258,7 @@ Checkbox.displayName = "Checkbox";
    Button Component
    ================================================================= */
 
-type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "danger" | "destructive" | "ghost";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -279,6 +279,8 @@ const buttonVariantClasses: Record<ButtonVariant, string> = {
   secondary:
     "bg-background-secondary text-text-primary hover:bg-background-tertiary focus:ring-primary-500 border-border-primary",
   danger:
+    "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 border-transparent",
+  destructive:
     "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 border-transparent",
   ghost:
     "bg-transparent text-text-primary hover:bg-background-tertiary focus:ring-primary-500 border-transparent",

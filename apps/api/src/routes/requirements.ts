@@ -1354,7 +1354,7 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
 
       const result = updatedRequirement || requirement;
       if (!result) {
-        request.log.error({ requirementId: requirement.id }, "Failed to reload requirement after creation");
+        request.log.error("Failed to reload requirement after creation");
         return reply.status(500).send({ error: "Failed to create requirement" });
       }
 
@@ -2212,7 +2212,6 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         status: entry.status,
         modifiedById: entry.modifiedById,
         createdAt: entry.createdAt,
-        updatedAt: entry.updatedAt,
         modifiedBy: entry.modifiedBy ? {
           id: entry.modifiedBy.id,
           email: entry.modifiedBy.email,

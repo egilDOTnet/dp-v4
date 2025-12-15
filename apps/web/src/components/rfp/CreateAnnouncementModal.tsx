@@ -143,7 +143,7 @@ export default function CreateAnnouncementModal({
     }
   };
 
-  const isFormDisabled = isEditMode && announcement?.sentAt;
+  const isFormDisabled = !!(isEditMode && announcement?.sentAt);
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

@@ -28,7 +28,7 @@ export default function RequirementsPage() {
   const [filterType, setFilterType] = useState<"Information" | "Mandatory" | "Important" | "Wish" | null>(null);
 
   // Search functionality
-  const { searchTerm, setSearchTerm, filteredItems: filteredRequirements, clearSearch, isSearching } =
+  const { searchTerm, setSearchTerm, filteredItems, clearSearch, isSearching } =
     useSearch(requirements, {
       searchKeys: ["description"],
     });

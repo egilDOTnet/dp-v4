@@ -1,5 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 
+// Re-export commonly used Prisma types and enums
+export { RequirementStatus, RequirementType, Role, VendorStatus, Prisma } from "@prisma/client";
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };

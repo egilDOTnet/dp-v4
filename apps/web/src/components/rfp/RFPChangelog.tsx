@@ -10,7 +10,7 @@ interface RFPChangelogProps {
   rfp: RFP;
 }
 
-export default function RFPChangelog({ projectId, rfp }: RFPChangelogProps) {
+export default function RFPChangelog({ projectId, rfp: _rfp }: RFPChangelogProps) {
   const [entries, setEntries] = useState<RFPChangelogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingFields, setEditingFields] = useState<Set<string>>(new Set());
@@ -133,7 +133,7 @@ export default function RFPChangelog({ projectId, rfp }: RFPChangelogProps) {
     });
   };
 
-  const handleFieldBlur = (entryId: string, e: React.FocusEvent) => {
+  const handleFieldBlur = (entryId: string, _e: React.FocusEvent) => {
     const entry = entries.find((e) => e.id === entryId);
     const data = formData[entryId];
     

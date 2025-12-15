@@ -88,7 +88,6 @@ async function validateMagicLinkToken(
       return null;
     }
 
-    const dbAny = db as any;
     const RFIVendorResponse = getRFIModel("RFIVendorResponse");
     
     // Get vendor response with token check
@@ -342,7 +341,6 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             });
           }
 
-          const dbAny = db as any;
           const RFIVendorResponse = getRFIModel("RFIVendorResponse");
           const RFIResponse = getRFIModel("RFIResponse");
 
@@ -441,7 +439,6 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             return reply.status(400).send({ error: "Invalid email format" });
           }
 
-          const dbAny = db as any;
           const RFIVendorResponse = getRFIModel("RFIVendorResponse");
           const RFIResponse = getRFIModel("RFIResponse");
 

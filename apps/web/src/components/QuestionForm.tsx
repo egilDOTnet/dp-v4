@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { RFIQuestion, RFIQuestionType } from "@/lib/api";
 import QuestionOptionManager from "./QuestionOptionManager";
 import ScaleConfigurator from "./ScaleConfigurator";

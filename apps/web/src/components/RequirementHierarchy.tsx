@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { api, RequirementHierarchy as RequirementHierarchyType, Requirement } from "@/lib/api";
 import RequirementList from "@/components/RequirementList";
 import {

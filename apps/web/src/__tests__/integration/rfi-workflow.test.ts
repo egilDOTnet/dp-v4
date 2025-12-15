@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import './setup'; // Import setup to ensure test server is running
-import { api } from './api-client';
+import { api } from '@/lib/api';
 import {
   createProjectWithMember,
   createVendorWithContact,
@@ -23,7 +23,10 @@ describe('RFI Workflow Integration Tests', () => {
         projectName: 'RFI Test Project',
       });
 
-      // Token is automatically set by createProjectWithMember via setToken
+      // Set token in localStorage for API client
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Access RFI endpoint - should auto-create RFI
       const rfi = await api.rfi.get(project.id);
@@ -41,6 +44,9 @@ describe('RFI Workflow Integration Tests', () => {
 
     it('should update RFI settings', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Get RFI (auto-creates if needed)
       const rfi = await api.rfi.get(project.id);
@@ -63,6 +69,9 @@ describe('RFI Workflow Integration Tests', () => {
   describe('Question Management', () => {
     it('should create, update, and delete questions', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Get RFI
       await api.rfi.get(project.id);
@@ -114,6 +123,9 @@ describe('RFI Workflow Integration Tests', () => {
 
     it('should reorder questions', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       await api.rfi.get(project.id);
 
@@ -151,6 +163,9 @@ describe('RFI Workflow Integration Tests', () => {
 
     it('should manage question options for Dropdown and MultipleChoice questions', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       await api.rfi.get(project.id);
 
@@ -204,6 +219,9 @@ describe('RFI Workflow Integration Tests', () => {
   describe('Publishing RFI', () => {
     it('should publish and unpublish RFI', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Get RFI
       let rfi = await api.rfi.get(project.id);
@@ -230,6 +248,9 @@ describe('RFI Workflow Integration Tests', () => {
 
     it('should not allow sending RFI when not published', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       await api.rfi.get(project.id);
       // RFI is not published
@@ -242,6 +263,9 @@ describe('RFI Workflow Integration Tests', () => {
   describe('Vendor Setup and Sending RFI', () => {
     it('should send RFI to vendors with main contacts', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Create vendor with main contact using API
       const vendorResult = await createVendorWithContact({
@@ -261,11 +285,14 @@ describe('RFI Workflow Integration Tests', () => {
       const vendorResponses = await api.rfi.vendorResponses.list(project.id);
       expect(vendorResponses.length).toBe(1);
       expect(vendorResponses[0].status).toBe('Sent');
-      expect(vendorResponses[0].vendorId).toBe(vendorResult.vendor.vendorId);
+      expect(vendorResponses[0].vendor.id).toBe(vendorResult.vendor.vendorId);
     });
 
     it('should not send RFI to vendors without main contacts', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Create vendor via API (without main contact)
       const vendor = await api.projects.vendors.create(project.id, {
@@ -294,6 +321,9 @@ describe('RFI Workflow Integration Tests', () => {
 
     it('should resend RFI to a specific vendor', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Create vendor with contact using API
       const vendorResult = await createVendorWithContact({
@@ -321,6 +351,9 @@ describe('RFI Workflow Integration Tests', () => {
   describe('Vendor Response Workflow', () => {
     it('should create vendor response when RFI is sent', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Setup vendor with contact using API
       const vendorResult = await createVendorWithContact({
@@ -365,6 +398,9 @@ describe('RFI Workflow Integration Tests', () => {
 
     it('should list vendor responses with correct status', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Setup vendor with contact using API
       await createVendorWithContact({
@@ -394,6 +430,9 @@ describe('RFI Workflow Integration Tests', () => {
 
     it('should retrieve vendor response details with questions and answers', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Setup vendor with contact using API
       await createVendorWithContact({
@@ -437,6 +476,9 @@ describe('RFI Workflow Integration Tests', () => {
   describe('RFI Preview', () => {
     it('should generate RFI preview with questions', async () => {
       const { project, token } = await createProjectWithMember();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', token);
+      }
 
       // Setup RFI with content and questions
       await api.rfi.update(project.id, {

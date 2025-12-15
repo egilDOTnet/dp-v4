@@ -55,7 +55,7 @@ function SortableDocumentItem({
   );
 }
 
-export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
+export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps) {
   const [documents, setDocuments] = useState<RFPDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingFields, setEditingFields] = useState<Record<string, Set<string>>>({});
@@ -69,7 +69,7 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
     url: "",
     file: null as File | null,
   });
-  const [saving, setSaving] = useState(false);
+  const [, setSaving] = useState(false);
   const [removedFiles, setRemovedFiles] = useState<Set<string>>(new Set());
   const newDocInputRef = useRef<HTMLInputElement | null>(null);
   const newDocUrlInputRef = useRef<HTMLInputElement | null>(null);
@@ -231,7 +231,7 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
     });
   };
 
-  const handleFieldBlur = (docId: string, field: string, e: React.FocusEvent) => {
+  const handleFieldBlur = (docId: string, field: string, _e: React.FocusEvent) => {
     const doc = documents.find((d) => d.id === docId);
     const data = formData[docId];
     
@@ -371,16 +371,22 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
         }, 300);
       } else {
         // Convert file to base64
+        // File is guaranteed to exist here due to validation check above
+        const file = newDocData.file;
+        if (!file) {
+          handleCancelNew();
+          return;
+        }
         const reader = new FileReader();
         reader.onload = async () => {
           const base64 = (reader.result as string).split(",")[1];
           await api.rfp.documents.create(projectId, {
             type: "Document",
-            description: newDocData.description.trim() || newDocData.file!.name,
-            fileName: newDocData.file!.name,
-            fileType: newDocData.file!.type,
+            description: newDocData.description.trim() || file.name,
+            fileName: file.name,
+            fileType: file.type,
             fileData: base64,
-            fileSize: newDocData.file!.size,
+            fileSize: file.size,
           });
           setIsNewDocAnimating(false);
           setTimeout(async () => {
@@ -389,7 +395,7 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
             await loadDocuments();
           }, 300);
         };
-        reader.readAsDataURL(newDocData.file);
+        reader.readAsDataURL(file);
         return;
       }
     } catch (err: any) {
@@ -807,7 +813,7 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
                     </div>
                 ) : (
                   <div>
-                    {isEditing && (removedFiles.has(doc?.id || "") || !doc?.fileData) ? (
+                    {isEditing && doc && (removedFiles.has(doc.id) || !doc.fileData) ? (
                       <div
                         className="relative border-2 border-dashed border-border-primary rounded-lg p-6 text-center hover:border-primary-500 transition-colors cursor-pointer"
                         onDragOver={(e) => {
@@ -822,7 +828,7 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
                           e.preventDefault();
                           e.stopPropagation();
                           const droppedFile = e.dataTransfer.files[0];
-                          if (droppedFile && (droppedFile.type === "application/pdf" || droppedFile.name.endsWith(".zip"))) {
+                          if (droppedFile && doc && (droppedFile.type === "application/pdf" || droppedFile.name.endsWith(".zip"))) {
                             // TODO: File replacement requires API support for updating fileData
                             // For now, update description only
                             handleFieldSave(doc.id, "description", stripFileExtension(droppedFile.name));
@@ -833,16 +839,18 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
                           e.preventDefault();
                         }}
                         onClick={() => {
-                          editFileInputRefs.current[doc.id]?.click();
+                          if (doc) {
+                            editFileInputRefs.current[doc.id]?.click();
+                          }
                         }}
                       >
                         <input
-                          ref={(el) => { editFileInputRefs.current[doc.id] = el; }}
+                          ref={(el) => { if (doc) { editFileInputRefs.current[doc.id] = el; } }}
                           type="file"
                           accept=".pdf,.zip"
                           onChange={(e) => {
                             const file = e.target.files?.[0] || null;
-                            if (file) {
+                            if (file && doc) {
                               // TODO: File replacement requires API support for updating fileData
                               // For now, update description only
                               handleFieldSave(doc.id, "description", stripFileExtension(file.name));
@@ -892,11 +900,13 @@ export default function RFPDocuments({ projectId, rfp }: RFPDocumentsProps) {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setRemovedFiles((prev) => {
-                                  const newSet = new Set(prev);
-                                  newSet.add(doc.id);
-                                  return newSet;
-                                });
+                                if (doc) {
+                                  setRemovedFiles((prev) => {
+                                    const newSet = new Set(prev);
+                                    newSet.add(doc.id);
+                                    return newSet;
+                                  });
+                                }
                               }}
                               className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                             >

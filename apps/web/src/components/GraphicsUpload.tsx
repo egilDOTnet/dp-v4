@@ -18,7 +18,7 @@ export function GraphicsUpload({
   currentFileName,
   onUpload,
   onDelete,
-  projectId,
+  projectId: _projectId,
 }: GraphicsUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);

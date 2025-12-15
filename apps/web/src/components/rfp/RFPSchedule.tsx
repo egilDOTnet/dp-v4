@@ -184,7 +184,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
     });
 
     // Exit edit mode for all other items and enter edit mode for this item
-    setEditingFields((prev) => {
+    setEditingFields(() => {
       const newFields: Record<string, Set<string>> = {};
       newFields[item.id] = new Set();
       // If a specific field is provided, only edit that field
@@ -203,7 +203,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
     });
   };
 
-  const handleFieldBlur = (itemId: string, field: string, e: React.FocusEvent) => {
+  const handleFieldBlur = (itemId: string, field: string, _e: React.FocusEvent) => {
     const item = items.find((i) => i.id === itemId);
     const data = formData[itemId];
     
@@ -384,23 +384,23 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
       };
 
       // Build the payload, only including date fields if they have values
+      const convertedDate = convertToISO(newItemData.date, newItemDisregardTimestamp);
+      // Date ranges always strip time (date-only)
+      const convertedFromDate = convertToISO(newItemData.fromDate, newItemData.type === "CustomDateRange");
+      const convertedToDate = convertToISO(newItemData.toDate, newItemData.type === "CustomDateRange");
+
       const payload: {
-        type: string;
+        type: RFPScheduleItem["type"];
         description: string;
-        date?: string | null;
-        fromDate?: string | null;
-        toDate?: string | null;
-        isRequired: boolean;
+        date?: string;
+        fromDate?: string;
+        toDate?: string;
+        isRequired?: boolean;
       } = {
         type: newItemData.type,
         description: newItemData.description.trim(),
         isRequired: false,
       };
-
-      const convertedDate = convertToISO(newItemData.date, newItemDisregardTimestamp);
-      // Date ranges always strip time (date-only)
-      const convertedFromDate = convertToISO(newItemData.fromDate, newItemData.type === "CustomDateRange");
-      const convertedToDate = convertToISO(newItemData.toDate, newItemData.type === "CustomDateRange");
 
       if (convertedDate !== null) {
         payload.date = convertedDate;
@@ -425,7 +425,6 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
       await loadSchedule();
     } catch (err: any) {
       console.error("Error adding schedule item:", err);
-      console.error("Payload sent:", payload);
       // Re-throw to show error to user
       throw err;
     }

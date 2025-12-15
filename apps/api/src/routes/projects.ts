@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { db } from "@dp/db";
-import { RequirementStatus } from "@prisma/client";
+import { db, RequirementStatus } from "@dp/db";
 import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
@@ -5216,7 +5215,6 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       const phaseId = request.body.phaseId;
 
       await verifyProjectAccess(request, reply);
-      const project = (request as any).project;
 
       // Verify phase belongs to project
       const phase = await db.phase.findUnique({

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, User } from "@/lib/api";
-import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, LoadingSpinner, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button } from "@/components/ui";
+import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button } from "@/components/ui";
 import { ImportWizard } from "@/components/ImportWizard";
 import { GraphicsUpload } from "@/components/GraphicsUpload";
 import { useSearch } from "@/hooks/useSearch";

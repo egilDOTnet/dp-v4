@@ -46,7 +46,6 @@ export default function PhaseTimeline({
           const isSelected = phase.id === selectedPhaseId;
           const isHovered = phase.id === hoveredPhaseId;
           const statusColor = statusColors[phase.status];
-          const borderColor = statusBorders[phase.status];
 
           return (
             <div key={phase.id} className="relative group flex-1">

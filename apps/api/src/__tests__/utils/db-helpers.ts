@@ -1,4 +1,4 @@
-import { db } from "@dp/db";
+import { db, Role, VendorStatus, Prisma } from "@dp/db";
 import bcrypt from "bcrypt";
 
 /**
@@ -178,6 +178,7 @@ export async function seedTestData() {
     data: {
       id: "test-tenant-id",
       name: "Test Company",
+      updatedAt: new Date(),
     },
   });
 
@@ -235,7 +236,7 @@ export async function createTestUser(overrides?: {
       firstName: overrides?.firstName || "Test",
       lastName: overrides?.lastName || "User",
       name: `${overrides?.firstName || "Test"} ${overrides?.lastName || "User"}`,
-      role: overrides?.role || "User",
+      role: (overrides?.role || "User") as Role,
       tenantId,
       passwordHash: overrides?.passwordHash !== undefined 
         ? overrides.passwordHash 
@@ -404,10 +405,10 @@ export async function createTestVendor(overrides?: {
 
   const vendor = await db.vendor.create({
     data: {
-      id: overrides.id || `test-vendor-${Date.now()}`,
-      name: overrides.name || "Test Vendor",
-      organizationNumber: overrides.organizationNumber ?? null,
-      emailDomain: overrides.emailDomain ?? null,
+      id: overrides?.id || `test-vendor-${Date.now()}`,
+      name: overrides?.name || "Test Vendor",
+      organizationNumber: overrides?.organizationNumber ?? null,
+      emailDomain: overrides?.emailDomain ?? null,
       tenantId,
     },
   });
@@ -430,10 +431,10 @@ export async function createTestProjectVendor(overrides?: {
 
   const projectVendor = await db.projectVendor.create({
     data: {
-      id: overrides.id || `test-project-vendor-${Date.now()}`,
+      id: overrides?.id || `test-project-vendor-${Date.now()}`,
       projectId: overrides.projectId,
       vendorId: overrides.vendorId,
-      status: overrides.status || "Pending",
+      status: (overrides?.status || "Pending") as VendorStatus,
     },
   });
 
@@ -569,7 +570,7 @@ export async function createTestRFIQuestion(overrides?: {
       type: (overrides.type || "SingleText") as any,
       order: overrides.order ?? 1,
       required: overrides.required ?? false,
-      scaleLabels: overrides.scaleLabels ?? null,
+      scaleLabels: overrides.scaleLabels ?? Prisma.JsonNull,
     },
   });
 
