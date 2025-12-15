@@ -269,6 +269,14 @@ export default function VendorForm({
                 setShowResults(true);
               }
             }}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+                return;
+              }
+            }}
             required
             placeholder="Type company name (searches Norwegian companies automatically)"
             className="w-full px-3 py-2 border border-border-primary bg-background-tertiary text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-text-tertiary"
@@ -326,6 +334,14 @@ export default function VendorForm({
               setBrregName(null);
               setError("");
             }}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+                return;
+              }
+            }}
             onBlur={(e) => {
               const cleaned = e.target.value.replace(/\D/g, "");
               if (cleaned.length > 0 && cleaned.length !== 9) {
@@ -381,6 +397,14 @@ export default function VendorForm({
           onChange={(e) =>
             setFormData({ ...formData, emailDomain: e.target.value })
           }
+          onKeyDown={(e) => {
+            // Handle Ctrl-A/Command-A to select all text
+            if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+              e.preventDefault();
+              e.currentTarget.select();
+              return;
+            }
+          }}
           placeholder="company.com"
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />

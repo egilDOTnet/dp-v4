@@ -69,6 +69,14 @@ export default function SplitQuestionModal({
             <textarea
               value={splitText}
               onChange={(e) => setSplitText(e.target.value)}
+              onKeyDown={(e) => {
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
+                  return;
+                }
+              }}
               rows={10}
               className="w-full px-3 py-2 border border-border-primary rounded-md bg-background-tertiary text-text-primary font-mono text-sm"
               placeholder="Question 1 text&#10;---&#10;Question 2 text&#10;---&#10;Question 3 text"

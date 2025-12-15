@@ -284,6 +284,12 @@ export default function QuestionOptionManager({
                             onChange={(e) => setEditingLabel(e.target.value)}
                             onBlur={() => saveEditing(option.id)}
                             onKeyDown={(e) => {
+                              // Handle Ctrl-A/Command-A to select all text
+                              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                e.preventDefault();
+                                e.currentTarget.select();
+                                return;
+                              }
                               if (e.key === "Enter") {
                                 saveEditing(option.id);
                               } else if (e.key === "Escape") {
@@ -295,6 +301,10 @@ export default function QuestionOptionManager({
                           />
                         ) : (
                           <span
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               startEditing(option.id);
@@ -306,6 +316,10 @@ export default function QuestionOptionManager({
                         )}
                       </div>
                       <button
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteOption(option.id);
@@ -352,6 +366,12 @@ export default function QuestionOptionManager({
                       }}
                       onKeyDown={(e) => {
                         e.stopPropagation();
+                        // Handle Ctrl-A/Command-A to select all text
+                        if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                          e.preventDefault();
+                          e.currentTarget.select();
+                          return;
+                        }
                         if (e.key === "Enter") {
                           e.preventDefault();
                           handleAddRow();
@@ -372,6 +392,10 @@ export default function QuestionOptionManager({
                       {(isDropdown ? dropdownOptions : yAxisOptions).length + 1}.
                     </span>
                     <button
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowAddRow(true);
@@ -416,6 +440,12 @@ export default function QuestionOptionManager({
                           onChange={(e) => setEditingLabel(e.target.value)}
                           onBlur={() => saveEditing(option.id)}
                           onKeyDown={(e) => {
+                            // Handle Ctrl-A/Command-A to select all text
+                            if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                              e.preventDefault();
+                              e.currentTarget.select();
+                              return;
+                            }
                             if (e.key === "Enter") {
                               saveEditing(option.id);
                             } else if (e.key === "Escape") {
@@ -428,6 +458,10 @@ export default function QuestionOptionManager({
                       ) : (
                         <>
                           <span
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               startEditing(option.id);
@@ -437,6 +471,10 @@ export default function QuestionOptionManager({
                             {option.label}
                           </span>
                           <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteOption(option.id);
@@ -486,6 +524,12 @@ export default function QuestionOptionManager({
                       }}
                       onKeyDown={(e) => {
                         e.stopPropagation();
+                        // Handle Ctrl-A/Command-A to select all text
+                        if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                          e.preventDefault();
+                          e.currentTarget.select();
+                          return;
+                        }
                         if (e.key === "Enter" && newOptionLabel.trim()) {
                           e.preventDefault();
                           handleAddColumn();
@@ -502,6 +546,10 @@ export default function QuestionOptionManager({
                   </div>
                 ) : (
                   <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowAddColumn(true);

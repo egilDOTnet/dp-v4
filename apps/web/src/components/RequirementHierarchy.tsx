@@ -749,6 +749,12 @@ export default function RequirementHierarchyComponent({
                         value={formData.title}
                         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         onKeyDown={(e) => {
+                          // Handle Ctrl-A/Command-A to select all text
+                          if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                            e.preventDefault();
+                            e.currentTarget.select();
+                            return;
+                          }
                           if (e.key === "Escape") {
                             cancelEdit();
                           } else if (e.key === "Enter") {
@@ -774,6 +780,14 @@ export default function RequirementHierarchyComponent({
                       <textarea
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        onKeyDown={(e) => {
+                          // Handle Ctrl-A/Command-A to select all text
+                          if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                            e.preventDefault();
+                            e.currentTarget.select();
+                            return;
+                          }
+                        }}
                         onBlur={() => {
                           // Auto-save on blur
                           if (formData.title.trim()) {
@@ -804,7 +818,7 @@ export default function RequirementHierarchyComponent({
               ) : (
                 <div 
                   className="rounded-lg bg-primary-600 flex items-stretch overflow-hidden cursor-pointer"
-                  onClick={(e) => {
+                  onClick={() => {
                     // Allow click to toggle if not dragging
                     if (!isDragging) {
                       toggleHierarchyExpansion(h1.id);
@@ -1007,7 +1021,7 @@ export default function RequirementHierarchyComponent({
                             <div 
                               className="group relative rounded-lg bg-primary-500 flex items-stretch overflow-visible cursor-pointer" 
                               style={{ marginLeft: '3.5rem' }}
-                              onClick={(e) => {
+                              onClick={() => {
                                 // Allow click to toggle if not dragging
                                 if (!isDragging) {
                                   toggleHierarchyExpansion(h2.id);
@@ -1454,6 +1468,14 @@ export default function RequirementHierarchyComponent({
                       type="text"
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      onKeyDown={(e) => {
+                        // Handle Ctrl-A/Command-A to select all text
+                        if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                          e.preventDefault();
+                          e.currentTarget.select();
+                          return;
+                        }
+                      }}
                       placeholder="Title"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
@@ -1462,6 +1484,14 @@ export default function RequirementHierarchyComponent({
                       onChange={(e) =>
                         setFormData({ ...formData, description: e.target.value })
                       }
+                      onKeyDown={(e) => {
+                        // Handle Ctrl-A/Command-A to select all text
+                        if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                          e.preventDefault();
+                          e.currentTarget.select();
+                          return;
+                        }
+                      }}
                       placeholder="Description (optional)"
                       rows={2}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -1555,6 +1585,14 @@ export default function RequirementHierarchyComponent({
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+                return;
+              }
+            }}
             placeholder="Title"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />

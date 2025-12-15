@@ -160,6 +160,14 @@ export default function CreateAnnouncementModal({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
+                  return;
+                }
+              }}
               disabled={isFormDisabled}
               className="w-full px-3 py-2 border border-border-primary rounded-md bg-background-tertiary text-text-primary disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="Enter a clear, concise title for this announcement..."

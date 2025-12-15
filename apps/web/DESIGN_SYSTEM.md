@@ -13,6 +13,36 @@ This document describes the comprehensive design system implemented for Dynamic 
 
 ## Keyboard Shortcuts
 
+### Text Selection (Select All)
+
+**All text input fields and textareas must support Ctrl-A/Command-A to select all text.**
+
+This is a standard browser behavior that users expect. All `<input>` and `<textarea>` elements should include this handler:
+
+```tsx
+onKeyDown={(e) => {
+  // Handle Ctrl-A/Command-A to select all text
+  if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+    e.preventDefault();
+    e.currentTarget.select();
+    return;
+  }
+  // ... other key handlers
+}}
+```
+
+**Important Notes:**
+- This must be implemented for **all** text inputs, including:
+  - `<input type="text">`
+  - `<input type="email">`
+  - `<input type="tel">`
+  - `<input type="url">`
+  - `<input type="number">`
+  - `<textarea>`
+- The UI components (`Input` and `Textarea` from `FormField.tsx` and `input.tsx`) already include this functionality
+- When using native HTML inputs, always add this handler
+- Place the Ctrl-A check **before** other key handlers to ensure it takes precedence
+
 ### Form Submission
 
 All input forms throughout the application support the following keyboard shortcut for submission:
@@ -33,6 +63,13 @@ The shortcut should only trigger when:
 Implementation example:
 ```tsx
 const handleKeyDown = (e: React.KeyboardEvent) => {
+  // Handle Ctrl-A/Command-A first
+  if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+    e.preventDefault();
+    e.currentTarget.select();
+    return;
+  }
+  // Then handle other shortcuts
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
     if (onSubmit && !isDropdownOpen) {
       e.preventDefault();

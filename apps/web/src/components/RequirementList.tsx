@@ -745,6 +745,12 @@ export default function RequirementList({
                             onFocus={() => handleFieldFocus(requirement.id, "description")}
                             onBlur={(e) => handleFieldBlur(requirement.id, "description", e)}
                             onKeyDown={(e) => {
+                              // Handle Ctrl-A/Command-A to select all text
+                              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                e.preventDefault();
+                                e.currentTarget.select();
+                                return;
+                              }
                               if (e.key === "Escape") {
                                 e.currentTarget.blur();
                               }

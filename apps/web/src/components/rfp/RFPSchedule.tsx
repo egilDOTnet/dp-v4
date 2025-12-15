@@ -717,12 +717,18 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                         });
                       }
                     }}
-                    onBlur={isNew ? handleNewItemBlur : (e) => handleFieldBlur(item!.id, "description", e)}
                     onKeyDown={(e) => {
+                      // Handle Ctrl-A/Command-A to select all text
+                      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                        e.preventDefault();
+                        e.currentTarget.select();
+                        return;
+                      }
                       if (e.key === "Escape") {
                         e.currentTarget.blur();
                       }
                     }}
+                    onBlur={isNew ? handleNewItemBlur : (e) => handleFieldBlur(item!.id, "description", e)}
                     className="flex-1 px-2 py-1 text-sm font-semibold border border-gray-300 rounded-md bg-background-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="Enter description"
                     autoFocus

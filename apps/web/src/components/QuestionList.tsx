@@ -321,10 +321,11 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
         onQuestionsChange();
       }
       
-      // Check if the new type needs options (for Dropdown/MultipleChoice)
+      // Check if the new type needs options (for Dropdown/MultipleChoice) or scale config
       const currentFormData = formData[questionId];
       const newType = field === "type" ? (value as RFIQuestionType) : (currentFormData?.type || question.type);
       const needsOptions = newType === "Dropdown" || newType === "MultipleChoice";
+      const needsScaleConfig = newType === "Scale";
       
       setEditingFields((prev) => {
         const newFields = { ...prev };
@@ -332,12 +333,13 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
           const fields = new Set(newFields[questionId]);
           fields.delete(field);
           
-          // If changing type to Dropdown/MultipleChoice, keep form open to allow options editing
-          if (fields.size === 0 && !needsOptions) {
-            // Only close if no other fields are being edited AND it's not an options type
+          // If changing type to Dropdown/MultipleChoice/Scale, keep form open to allow options/scale editing
+          // Also keep form open if it's already one of these types (for editing options/scale)
+          if (fields.size === 0 && !needsOptions && !needsScaleConfig) {
+            // Only close if no other fields are being edited AND it's not an options/scale type
             delete newFields[questionId];
           } else {
-            // Keep form open - either other fields are being edited or it's an options type
+            // Keep form open - either other fields are being edited or it's an options/scale type
             newFields[questionId] = fields;
           }
         }
@@ -448,27 +450,32 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
       if (hasChanged) {
         handleFieldSave(questionId, field, data[field]);
       } else {
-      // Get the question to check the new type
-      const updatedQuestion = questions.find((q) => q.id === questionId);
-      const newType = field === "type" ? (value as RFIQuestionType) : (updatedQuestion?.type || "SingleText");
-      const needsOptions = newType === "Dropdown" || newType === "MultipleChoice";
-      
-      setEditingFields((prev) => {
-        const newFields = { ...prev };
-        if (newFields[questionId]) {
-          const fields = new Set(newFields[questionId]);
-          fields.delete(field);
-          
-          // If changing type to Dropdown/MultipleChoice, keep form open to allow options editing
-          if (fields.size === 0 && !needsOptions) {
-            // Only close if no other fields are being edited AND it's not an options type
-            delete newFields[questionId];
-          } else {
-            newFields[questionId] = fields;
+        // Get the question to check the new type
+        const updatedQuestion = questions.find((q) => q.id === questionId);
+        // Use formData type (current selection) to determine if options are needed
+        const currentFormData = formData[questionId];
+        const newType = field === "type" ? (data.type as RFIQuestionType) : (currentFormData?.type || updatedQuestion?.type || "SingleText");
+        const needsOptions = newType === "Dropdown" || newType === "MultipleChoice";
+        const needsScaleConfig = newType === "Scale";
+        
+        setEditingFields((prev) => {
+          const newFields = { ...prev };
+          if (newFields[questionId]) {
+            const fields = new Set(newFields[questionId]);
+            fields.delete(field);
+            
+            // If changing type to Dropdown/MultipleChoice/Scale, keep form open to allow options/scale editing
+            // Also keep form open if it's already one of these types (for editing options/scale)
+            if (fields.size === 0 && !needsOptions && !needsScaleConfig) {
+              // Only close if no other fields are being edited AND it's not an options/scale type
+              delete newFields[questionId];
+            } else {
+              // Keep form open - either other fields are being edited or it's an options/scale type
+              newFields[questionId] = fields;
+            }
           }
-        }
-        return newFields;
-      });
+          return newFields;
+        });
       }
     }, 200);
 
@@ -822,12 +829,10 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onKeyDown={async (e) => {
-                    // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
-                    // Check for Ctrl-A/Cmd-A (select all) using both key and code
-                    const isSelectAll = (e.ctrlKey || e.metaKey) && 
-                                      (e.key.toLowerCase() === "a" || e.code === "KeyA");
-                    if (isSelectAll) {
-                      // Let browser handle select all - don't prevent default, don't stop propagation
+                    // Handle Ctrl-A/Command-A to select all text
+                    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                      e.preventDefault();
+                      e.currentTarget.select();
                       return;
                     }
                     // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)
@@ -904,12 +909,10 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                 });
               }}
               onKeyDown={(e) => {
-                // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
-                // Check for Ctrl-A/Cmd-A (select all) using both key and code
-                const isSelectAll = (e.ctrlKey || e.metaKey) && 
-                                  (e.key.toLowerCase() === "a" || e.code === "KeyA");
-                if (isSelectAll) {
-                  // Let browser handle select all - don't prevent default, don't stop propagation
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
                   return;
                 }
                 // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)
@@ -1151,12 +1154,10 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                                       onFocus={() => handleFieldFocus(question.id, "title")}
                                       onBlur={(e) => handleFieldBlur(question.id, "title", e)}
                                       onKeyDown={(e) => {
-                                        // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
-                                        // Check for Ctrl-A/Cmd-A (select all) using both key and code
-                                        const isSelectAll = (e.ctrlKey || e.metaKey) && 
-                                                          (e.key.toLowerCase() === "a" || e.code === "KeyA");
-                                        if (isSelectAll) {
-                                          // Let browser handle select all - don't prevent default, don't stop propagation
+                                        // Handle Ctrl-A/Command-A to select all text
+                                        if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                          e.preventDefault();
+                                          e.currentTarget.select();
                                           return;
                                         }
                                         // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)
@@ -1285,12 +1286,10 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                                     handleFieldBlur(question.id, "description", e);
                                   }}
                                   onKeyDown={(e) => {
-                                    // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
-                                    // Check for Ctrl-A/Cmd-A (select all) using both key and code
-                                    const isSelectAll = (e.ctrlKey || e.metaKey) && 
-                                                      (e.key.toLowerCase() === "a" || e.code === "KeyA");
-                                    if (isSelectAll) {
-                                      // Let browser handle select all - don't prevent default, don't stop propagation
+                                    // Handle Ctrl-A/Command-A to select all text
+                                    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                      e.preventDefault();
+                                      e.currentTarget.select();
                                       return;
                                     }
                                     // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)

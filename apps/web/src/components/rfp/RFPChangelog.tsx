@@ -255,6 +255,12 @@ export default function RFPChangelog({ projectId, rfp: _rfp }: RFPChangelogProps
                             }}
                             onBlur={(e) => handleFieldBlur(entry.id, e)}
                             onKeyDown={(e) => {
+                              // Handle Ctrl-A/Command-A to select all text
+                              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                e.preventDefault();
+                                e.currentTarget.select();
+                                return;
+                              }
                               if (e.key === "Escape") {
                                 e.currentTarget.blur();
                               }

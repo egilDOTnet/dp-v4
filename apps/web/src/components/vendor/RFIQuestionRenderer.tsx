@@ -255,6 +255,13 @@ export function RFIQuestionRenderer({
             type="text"
             value={localValue || ""}
             onChange={(e) => handleChange(e.target.value || null)}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+              }
+            }}
             className="w-full px-3 py-2 border border-border-primary rounded-md bg-background-tertiary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         );
@@ -264,6 +271,13 @@ export function RFIQuestionRenderer({
           <textarea
             value={localValue || ""}
             onChange={(e) => handleChange(e.target.value || null)}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+              }
+            }}
             rows={4}
             className="w-full px-3 py-2 border border-border-primary rounded-md bg-background-tertiary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
           />

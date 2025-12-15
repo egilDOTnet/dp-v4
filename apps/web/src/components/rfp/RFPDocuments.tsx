@@ -428,6 +428,12 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
   };
 
   const handleNewDocKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle Ctrl-A/Command-A to select all text
+    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+      e.preventDefault();
+      e.currentTarget.select();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       const hasContent = newDocData.description.trim() || 
@@ -562,6 +568,12 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                     }}
                     onBlur={isNew ? handleNewDocBlur : (e) => handleFieldBlur(doc!.id, "description", e)}
                     onKeyDown={isNew ? handleNewDocKeyDown : (e) => {
+                      // Handle Ctrl-A/Command-A to select all text
+                      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                        e.preventDefault();
+                        e.currentTarget.select();
+                        return;
+                      }
                       if (e.key === "Escape") {
                         e.currentTarget.blur();
                       }
@@ -676,6 +688,12 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                     }}
                     onBlur={isNew ? handleNewDocBlur : (e) => handleFieldBlur(doc!.id, "url", e)}
                     onKeyDown={isNew ? handleNewDocKeyDown : (e) => {
+                      // Handle Ctrl-A/Command-A to select all text
+                      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                        e.preventDefault();
+                        e.currentTarget.select();
+                        return;
+                      }
                       if (e.key === "Escape") {
                         e.currentTarget.blur();
                       }

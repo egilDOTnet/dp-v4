@@ -76,6 +76,14 @@ export default function QuestionForm({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            // Handle Ctrl-A/Command-A to select all text
+            if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+              e.preventDefault();
+              e.currentTarget.select();
+              return;
+            }
+          }}
           required
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
@@ -92,6 +100,14 @@ export default function QuestionForm({
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => {
+            // Handle Ctrl-A/Command-A to select all text
+            if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+              e.preventDefault();
+              e.currentTarget.select();
+              return;
+            }
+          }}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
         />

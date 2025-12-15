@@ -105,6 +105,14 @@ export default function ContactPersonForm({
             type="text"
             value={formData.firstName}
             onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+                return;
+              }
+            }}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
@@ -119,6 +127,14 @@ export default function ContactPersonForm({
             type="text"
             value={formData.lastName}
             onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+                return;
+              }
+            }}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
@@ -133,6 +149,14 @@ export default function ContactPersonForm({
             type="email"
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onKeyDown={(e) => {
+              // Handle Ctrl-A/Command-A to select all text
+              if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                e.preventDefault();
+                e.currentTarget.select();
+                return;
+              }
+            }}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />

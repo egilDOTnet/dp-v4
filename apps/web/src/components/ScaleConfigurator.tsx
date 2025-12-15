@@ -76,6 +76,14 @@ export default function ScaleConfigurator({
                 type="text"
                 value={labels[point.toString()] || ""}
                 onChange={(e) => handleLabelChange(point.toString(), e.target.value)}
+                onKeyDown={(e) => {
+                  // Handle Ctrl-A/Command-A to select all text
+                  if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                    e.preventDefault();
+                    e.currentTarget.select();
+                    return;
+                  }
+                }}
                 placeholder={`Label for ${point} (e.g., Poor, Fair, Good, Excellent)`}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />

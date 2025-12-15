@@ -473,6 +473,12 @@ export default function TaskList({
   };
 
   const handleNewTaskKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle Ctrl-A/Command-A to select all text
+    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+      e.preventDefault();
+      e.currentTarget.select();
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       if (newTaskName.trim()) {
@@ -714,18 +720,6 @@ export default function TaskList({
       }
       return newSet;
     });
-  };
-
-  const handleDescriptionClick = (task: Task) => {
-    ensureFormData(task);
-    if (!task.description) {
-      // No description, go directly to edit mode
-      setEditingDescriptions((prev) => new Set(prev).add(task.id));
-      setExpandedDescriptions((prev) => new Set(prev).add(task.id));
-    } else {
-      // Has description, toggle show/hide
-      toggleDescription(task.id);
-    }
   };
 
   const handleDescriptionBlur = (taskId: string, _e: React.FocusEvent<HTMLTextAreaElement>) => {
@@ -1330,8 +1324,6 @@ export default function TaskList({
                 const isDelayed = isTaskDelayed(task);
                 const isCompleted = task.actualCompletionDate !== null;
                 const owner = getOwnerDisplay(task);
-                const isDescriptionExpanded = expandedDescriptions.has(task.id);
-                const isDescriptionEditing = editingDescriptions.has(task.id);
                 
                 // Get form data or use task data as fallback
                 const taskFormData = formData[task.id] || {
@@ -1503,6 +1495,12 @@ export default function TaskList({
                                     });
                                   }}
                                   onKeyDown={(e) => {
+                                    // Handle Ctrl-A/Command-A to select all text
+                                    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                      e.preventDefault();
+                                      e.currentTarget.select();
+                                      return;
+                                    }
                                     if (e.key === "Escape") {
                                       e.currentTarget.blur();
                                     }
@@ -1814,6 +1812,12 @@ export default function TaskList({
                                       });
                                     }}
                                     onKeyDown={(e) => {
+                                      // Handle Ctrl-A/Command-A to select all text
+                                      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                        e.preventDefault();
+                                        e.currentTarget.select();
+                                        return;
+                                      }
                                       if (e.key === "Escape") {
                                         e.currentTarget.blur();
                                       }
@@ -1936,8 +1940,6 @@ export default function TaskList({
                 const isDelayed = isTaskDelayed(task);
                 const isCompleted = task.actualCompletionDate !== null;
                 const owner = getOwnerDisplay(task);
-                const isDescriptionExpanded = expandedDescriptions.has(task.id);
-                const isDescriptionEditing = editingDescriptions.has(task.id);
                 
                 const taskFormData = formData[task.id] || {
                   name: task.name || "",
@@ -2060,6 +2062,12 @@ export default function TaskList({
                                     });
                                   }}
                                   onKeyDown={(e) => {
+                                    // Handle Ctrl-A/Command-A to select all text
+                                    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                      e.preventDefault();
+                                      e.currentTarget.select();
+                                      return;
+                                    }
                                     if (e.key === "Escape") {
                                       e.currentTarget.blur();
                                     }
@@ -2212,6 +2220,12 @@ export default function TaskList({
                                       });
                                     }}
                                     onKeyDown={(e) => {
+                                      // Handle Ctrl-A/Command-A to select all text
+                                      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                                        e.preventDefault();
+                                        e.currentTarget.select();
+                                        return;
+                                      }
                                       if (e.key === "Escape") {
                                         e.currentTarget.blur();
                                       }

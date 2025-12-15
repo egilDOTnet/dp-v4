@@ -107,27 +107,6 @@ export function VendorContactForm({
     }
   };
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "First name is required";
-    }
-    
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "Last name is required";
-    }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Invalid email format";
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleFieldChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -189,6 +168,14 @@ export function VendorContactForm({
               type="text"
               value={formData.firstName}
               onChange={(e) => handleFieldChange("firstName", e.target.value)}
+              onKeyDown={(e) => {
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
+                  return;
+                }
+              }}
               className={`w-full px-3 py-2 border rounded-md bg-background-tertiary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                 errors.firstName ? "border-red-600" : "border-border-primary"
               }`}
@@ -206,6 +193,14 @@ export function VendorContactForm({
               type="text"
               value={formData.lastName}
               onChange={(e) => handleFieldChange("lastName", e.target.value)}
+              onKeyDown={(e) => {
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
+                  return;
+                }
+              }}
               className={`w-full px-3 py-2 border rounded-md bg-background-tertiary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                 errors.lastName ? "border-red-600" : "border-border-primary"
               }`}
@@ -223,6 +218,14 @@ export function VendorContactForm({
               type="email"
               value={formData.email}
               onChange={(e) => handleFieldChange("email", e.target.value)}
+              onKeyDown={(e) => {
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
+                  return;
+                }
+              }}
               className={`w-full px-3 py-2 border rounded-md bg-background-tertiary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                 errors.email ? "border-red-600" : "border-border-primary"
               }`}
@@ -243,6 +246,14 @@ export function VendorContactForm({
               type="tel"
               value={formData.phone}
               onChange={(e) => handleFieldChange("phone", e.target.value)}
+              onKeyDown={(e) => {
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
+                  return;
+                }
+              }}
               className="w-full px-3 py-2 border border-border-primary rounded-md bg-background-tertiary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -251,3 +262,4 @@ export function VendorContactForm({
     </div>
   );
 }
+
