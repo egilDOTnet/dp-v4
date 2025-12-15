@@ -208,6 +208,13 @@ describe('RFI Workflow Integration Tests', () => {
       expect(rfi.isPublished).toBe(false);
       expect(rfi.publishedAt).toBeNull();
 
+      // Create at least 1 question (required for publishing)
+      await api.rfi.questions.create(project.id, {
+        title: 'Test Question',
+        type: 'SingleText',
+        required: true,
+      });
+
       // Set deadline before publishing
       await api.rfi.update(project.id, {
         deadline: new Date('2025-12-31').toISOString(),
@@ -254,6 +261,12 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Get and publish RFI
       await api.rfi.get(project.id);
+      // Create at least 1 question (required for publishing)
+      await api.rfi.questions.create(project.id, {
+        title: 'Test Question',
+        type: 'SingleText',
+        required: true,
+      });
       await api.rfi.update(project.id, {
         deadline: new Date('2025-12-31').toISOString(),
       });
@@ -284,6 +297,12 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Get and publish RFI
       await api.rfi.get(project.id);
+      // Create at least 1 question (required for publishing)
+      await api.rfi.questions.create(project.id, {
+        title: 'Test Question',
+        type: 'SingleText',
+        required: true,
+      });
       await api.rfi.update(project.id, {
         deadline: new Date('2025-12-31').toISOString(),
       });
@@ -312,6 +331,12 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Get and publish RFI
       await api.rfi.get(project.id);
+      // Create at least 1 question (required for publishing)
+      await api.rfi.questions.create(project.id, {
+        title: 'Test Question',
+        type: 'SingleText',
+        required: true,
+      });
       await api.rfi.update(project.id, {
         deadline: new Date('2025-12-31').toISOString(),
       });
@@ -391,6 +416,12 @@ describe('RFI Workflow Integration Tests', () => {
 
       // Setup and send RFI
       await api.rfi.get(project.id);
+      // Create at least 1 question (required for publishing)
+      await api.rfi.questions.create(project.id, {
+        title: 'Test Question',
+        type: 'SingleText',
+        required: true,
+      });
       await api.rfi.update(project.id, {
         deadline: new Date('2025-12-31').toISOString(),
       });

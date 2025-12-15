@@ -3,8 +3,25 @@ import { render, screen, waitFor } from '../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import QuestionList from '@/components/QuestionList';
 import { createMockRFIQuestion } from '../utils/mock-data';
-import { mockApi, setupApiMocks } from '../utils/api-mocks';
+import { setupApiMocks } from '../utils/api-mocks';
 import * as apiModule from '@/lib/api';
+
+// Mock child components
+vi.mock('@/components/QuestionOptionManager', () => ({
+  default: () => (
+    <div data-testid="question-option-manager">
+      Options manager
+    </div>
+  ),
+}));
+
+vi.mock('@/components/ScaleConfigurator', () => ({
+  default: () => (
+    <div data-testid="scale-configurator">
+      Scale configurator
+    </div>
+  ),
+}));
 
 // Mock the api module
 vi.mock('@/lib/api', async () => {
@@ -19,6 +36,12 @@ vi.mock('@/lib/api', async () => {
           update: vi.fn(),
           delete: vi.fn(),
           reorder: vi.fn(),
+          options: {
+            create: vi.fn(),
+            update: vi.fn(),
+            delete: vi.fn(),
+            reorder: vi.fn(),
+          },
         },
       },
     },
@@ -228,21 +251,19 @@ describe('QuestionList', () => {
         await user.tab();
       }
 
+      // For MultipleChoice type, the form should stay open and options manager should appear
+      // The type is saved on blur, but form stays open for options editing
       await waitFor(() => {
         expect(apiModule.api.rfi.questions.update).toHaveBeenCalledWith(projectId, 'q1', {
           type: 'MultipleChoice',
         });
       }, { timeout: 5000 });
 
-      // Wait for reload to complete - the question should still be visible with updated type
-      // After reload, the component might show the question in a different state
-      // Just verify the update was called - the question text might not be immediately visible
-      // if the component is still loading or in a different state
+      // Verify that options manager appears when type is MultipleChoice
+      // (form should stay open, so we should see the options manager)
       await waitFor(() => {
-        // The question might be visible, or the component might be in loading state
-        // Just verify the API was called successfully
-        expect(apiModule.api.rfi.questions.update).toHaveBeenCalled();
-      }, { timeout: 5000 });
+        expect(screen.getByTestId('question-option-manager')).toBeInTheDocument();
+      }, { timeout: 3000 });
     });
   });
 
@@ -341,3 +362,4 @@ describe('QuestionList', () => {
     });
   });
 });
+

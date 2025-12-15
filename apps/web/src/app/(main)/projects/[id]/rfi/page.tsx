@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { api, Project, RFI } from "@/lib/api";
 import QuestionList from "@/components/QuestionList";
 import RFIStatusTable from "@/components/RFIStatusTable";
@@ -14,7 +14,6 @@ type TabType = "email" | "rfi-info" | "questionnaire" | "status";
 
 export default function RFIPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [rfi, setRfi] = useState<RFI | null>(null);
@@ -197,8 +196,20 @@ export default function RFIPage() {
     }
   };
 
-  const handlePreview = () => {
-    router.push(`/projects/${projectId}/rfi/preview`);
+  const handlePreview = async () => {
+    if (!rfi?.questions || rfi.questions.length === 0) {
+      setError("At least 1 question must be added before preview");
+      return;
+    }
+    try {
+      setError("");
+      const { token } = await api.rfi.getPreviewToken(projectId);
+      // Open vendor portal in new window
+      const previewUrl = `/rfi/${token}`;
+      window.open(previewUrl, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      setError(err.message || "Failed to generate preview token");
+    }
   };
 
   if (loading) {
@@ -364,7 +375,8 @@ export default function RFIPage() {
             </div>
             <button
               onClick={handlePreview}
-              className="px-4 py-1.5 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              disabled={!rfi?.questions || rfi.questions.length === 0}
+              className="px-4 py-1.5 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
             >
               Preview
             </button>
@@ -379,7 +391,7 @@ export default function RFIPage() {
             ) : (
               <button
                 onClick={handlePublish}
-                disabled={isPublishing || !deadline}
+                disabled={isPublishing || !deadline || !rfi?.questions || rfi.questions.length === 0}
                 className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
               >
                 {isPublishing ? "Publishing..." : "Publish"}
@@ -486,7 +498,11 @@ export default function RFIPage() {
             {rfi && rfi.id ? (
               <div>
                 <h2 className="text-xl font-semibold mb-4">Questionnaire</h2>
-                <QuestionList projectId={projectId} rfiId={rfi.id} />
+                <QuestionList 
+                  projectId={projectId} 
+                  rfiId={rfi.id} 
+                  onQuestionsChange={loadRFI}
+                />
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">

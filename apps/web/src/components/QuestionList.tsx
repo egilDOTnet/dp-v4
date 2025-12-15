@@ -25,6 +25,7 @@ import ScaleConfigurator from "./ScaleConfigurator";
 interface QuestionListProps {
   projectId: string;
   rfiId: string;
+  onQuestionsChange?: () => void;
 }
 
 interface SortableQuestionItemProps {
@@ -60,7 +61,7 @@ function SortableQuestionItem({
   );
 }
 
-export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
+export default function QuestionList({ projectId, rfiId, onQuestionsChange }: QuestionListProps) {
   const [questions, setQuestions] = useState<RFIQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -95,6 +96,11 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
+      
+      // Don't close if clicking on a delete button
+      if (target.closest('button') && target.textContent?.trim() === 'Delete') {
+        return;
+      }
       
       // Check each question that's being edited
       Object.keys(editingFields).forEach((questionId) => {
@@ -200,11 +206,16 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       required?: boolean;
       scaleLabels?: Record<string, string> | null;
     },
-    insertAfter?: number
-  ) => {
+    insertAfter?: number,
+    skipReload?: boolean
+  ): Promise<RFIQuestion> => {
     try {
       // Create the question (it will be added at the end)
       const newQuestion = await api.rfi.questions.create(projectId, data);
+      
+      // Don't close the form if this is a Dropdown or MultipleChoice question
+      // (options need to be managed)
+      const needsOptions = data.type === "Dropdown" || data.type === "MultipleChoice";
       
       // If we need to insert at a specific position, reorder
       if (insertAfter !== undefined && insertAfter !== null) {
@@ -235,9 +246,27 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
         }
       }
       
-      // Reload questions to get updated order numbers from the backend
-      await loadQuestions(true);
-      setInsertAfterIndex(null);
+      // Only reload questions if not skipping (skip reload for auto-create to preserve focus)
+      if (!skipReload) {
+        await loadQuestions(true);
+        // Only close form for non-options types
+        if (!needsOptions) {
+          setInsertAfterIndex(null);
+        }
+      } else {
+        // For auto-create, DON'T update the questions state at all
+        // This prevents any re-renders that could affect the form
+        // The question exists in the backend, but we don't add it to local state yet
+        // It will be added when the form is actually saved/closed
+      }
+      
+      // Return the created question so the form can use its ID
+      return newQuestion;
+      
+      // Notify parent component that questions have changed
+      if (onQuestionsChange) {
+        onQuestionsChange();
+      }
     } catch (err: any) {
       throw err;
     }
@@ -287,14 +316,28 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       await api.rfi.questions.update(projectId, questionId, updatePayload);
       await loadQuestions(true);
       
+      // Notify parent component that questions have changed
+      if (onQuestionsChange) {
+        onQuestionsChange();
+      }
+      
+      // Check if the new type needs options (for Dropdown/MultipleChoice)
+      const currentFormData = formData[questionId];
+      const newType = field === "type" ? (value as RFIQuestionType) : (currentFormData?.type || question.type);
+      const needsOptions = newType === "Dropdown" || newType === "MultipleChoice";
+      
       setEditingFields((prev) => {
         const newFields = { ...prev };
         if (newFields[questionId]) {
           const fields = new Set(newFields[questionId]);
           fields.delete(field);
-          if (fields.size === 0) {
+          
+          // If changing type to Dropdown/MultipleChoice, keep form open to allow options editing
+          if (fields.size === 0 && !needsOptions) {
+            // Only close if no other fields are being edited AND it's not an options type
             delete newFields[questionId];
           } else {
+            // Keep form open - either other fields are being edited or it's an options type
             newFields[questionId] = fields;
           }
         }
@@ -405,19 +448,27 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       if (hasChanged) {
         handleFieldSave(questionId, field, data[field]);
       } else {
-        setEditingFields((prev) => {
-          const newFields = { ...prev };
-          if (newFields[questionId]) {
-            const fields = new Set(newFields[questionId]);
-            fields.delete(field);
-            if (fields.size === 0) {
-              delete newFields[questionId];
-            } else {
-              newFields[questionId] = fields;
-            }
+      // Get the question to check the new type
+      const updatedQuestion = questions.find((q) => q.id === questionId);
+      const newType = field === "type" ? (value as RFIQuestionType) : (updatedQuestion?.type || "SingleText");
+      const needsOptions = newType === "Dropdown" || newType === "MultipleChoice";
+      
+      setEditingFields((prev) => {
+        const newFields = { ...prev };
+        if (newFields[questionId]) {
+          const fields = new Set(newFields[questionId]);
+          fields.delete(field);
+          
+          // If changing type to Dropdown/MultipleChoice, keep form open to allow options editing
+          if (fields.size === 0 && !needsOptions) {
+            // Only close if no other fields are being edited AND it's not an options type
+            delete newFields[questionId];
+          } else {
+            newFields[questionId] = fields;
           }
-          return newFields;
-        });
+        }
+        return newFields;
+      });
       }
     }, 200);
 
@@ -448,6 +499,13 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
     if (!confirm("Are you sure you want to delete this question?")) {
       return;
     }
+    
+    // Close any editing state for this question after confirmation
+    setEditingFields((prev) => {
+      const newFields = { ...prev };
+      delete newFields[questionId];
+      return newFields;
+    });
     try {
       await api.rfi.questions.delete(projectId, questionId);
       
@@ -463,6 +521,11 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       
       // Reload to get the updated order
       await loadQuestions(true);
+      
+      // Notify parent component that questions have changed
+      if (onQuestionsChange) {
+        onQuestionsChange();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to delete question");
     }
@@ -492,6 +555,11 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       
       // Reload questions from backend to get correct order numbers (1, 2, 3, ...)
       await loadQuestions(true);
+      
+      // Notify parent component that questions have changed
+      if (onQuestionsChange) {
+        onQuestionsChange();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to reorder questions");
       // Reload on error to restore correct order
@@ -539,6 +607,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
     onSubmit,
     onCancel,
     questions,
+    onReload,
   }: {
     insertAfterIndex: number;
     onSubmit: (data: {
@@ -547,9 +616,10 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       type: RFIQuestionType;
       required?: boolean;
       scaleLabels?: Record<string, string> | null;
-    }) => Promise<void>;
+    }) => Promise<RFIQuestion | void>;
     onCancel: () => void;
     questions: RFIQuestion[];
+    onReload?: () => Promise<void>;
   }) => {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -558,9 +628,71 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
     const [scaleLabels, setScaleLabels] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [createdQuestionId, setCreatedQuestionId] = useState<string | null>(null);
     const formRef = React.useRef<HTMLDivElement>(null);
+    const typeSelectRef = React.useRef<HTMLSelectElement>(null);
 
     const needsScaleConfig = type === "Scale";
+    const needsOptions = type === "Dropdown" || type === "MultipleChoice";
+    const previousTypeRef = React.useRef<RFIQuestionType>(type);
+
+    // Silently create question in background when type changes to Dropdown/MultipleChoice
+    // This allows the options manager to appear without interrupting the user's editing
+    // Create even without a title (use placeholder title)
+    React.useEffect(() => {
+      const typeJustChanged = previousTypeRef.current !== type;
+      previousTypeRef.current = type;
+
+      if (needsOptions && !createdQuestionId && !isSubmitting) {
+        // Only create when type just changed, not on every title change
+        if (typeJustChanged) {
+          const createQuestionSilently = async () => {
+            // Don't set isSubmitting to avoid showing loading state
+            try {
+              // Use title if available, otherwise use placeholder
+              const questionTitle = title.trim() || "New Question";
+              const newQuestion = await onSubmit({
+                title: questionTitle,
+                description: description.trim() || null,
+                type,
+                required,
+                scaleLabels: type === "Scale" ? scaleLabels : null,
+              });
+              
+              // Set the question ID silently without any UI changes
+              if (newQuestion && newQuestion.id) {
+                setCreatedQuestionId(newQuestion.id);
+                // If we used a placeholder title and user hasn't entered one yet, update the local title
+                // so it matches what was created
+                if (!title.trim()) {
+                  setTitle(questionTitle);
+                }
+              }
+            } catch (err: any) {
+              // Silently handle error - don't show error state that interrupts editing
+              console.error("Failed to create question for options:", err);
+            }
+          };
+          
+          // Small delay to ensure type change is processed first
+          const timeoutId = setTimeout(createQuestionSilently, 100);
+          return () => clearTimeout(timeoutId);
+        }
+      }
+    }, [type, needsOptions, createdQuestionId, isSubmitting, title, description, required, scaleLabels, onSubmit]);
+
+    // Watch for the newly created question in the questions list
+    React.useEffect(() => {
+      if (needsOptions && title.trim() && !createdQuestionId) {
+        const newQuestion = questions.find(
+          (q) => q.title === title.trim() && q.type === type
+        );
+        if (newQuestion) {
+          setCreatedQuestionId(newQuestion.id);
+          setIsSubmitting(false);
+        }
+      }
+    }, [questions, needsOptions, title, type, createdQuestionId]);
 
     const handleSubmit = React.useCallback(async () => {
       setError("");
@@ -572,19 +704,44 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
 
       setIsSubmitting(true);
       try {
-        await onSubmit({
-          title: title.trim(),
-          description: description.trim() || null,
-          type,
-          required,
-          scaleLabels: type === "Scale" ? scaleLabels : null,
-        });
-        // Form will close via onCancel after successful submission
+        // If question was already created silently for options, update it
+        if (createdQuestionId) {
+          await api.rfi.questions.update(projectId, createdQuestionId, {
+            title: title.trim(),
+            description: description.trim() || null,
+            type,
+            required,
+            scaleLabels: type === "Scale" ? scaleLabels : null,
+          });
+          setIsSubmitting(false);
+          
+          // Return the updated question so parent can reload properly
+          const updatedQuestions = await api.rfi.questions.list(projectId);
+          const updatedQuestion = updatedQuestions.find(q => q.id === createdQuestionId);
+          return updatedQuestion;
+        } else {
+          // Question doesn't exist yet, create it normally
+          const newQuestion = await onSubmit({
+            title: title.trim(),
+            description: description.trim() || null,
+            type,
+            required,
+            scaleLabels: type === "Scale" ? scaleLabels : null,
+          });
+          
+          // Form will close via parent component for non-options types
+          if (!needsOptions) {
+            setIsSubmitting(false);
+          }
+          
+          return newQuestion;
+        }
       } catch (err: any) {
         setError(err.message || "Failed to save question");
         setIsSubmitting(false);
+        throw err;
       }
-    }, [title, description, type, required, scaleLabels, onSubmit]);
+    }, [title, description, type, required, scaleLabels, needsOptions, createdQuestionId, onSubmit, projectId]);
 
     // Handle click outside - save and close if there's content, otherwise just close
     React.useEffect(() => {
@@ -593,9 +750,30 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
         if (formRef.current && !formRef.current.contains(target)) {
           if (title.trim()) {
             // Has content, save before closing
-            await handleSubmit();
+            try {
+              await handleSubmit();
+              
+              // If question was created silently (for options), we need to reload questions
+              // to make it appear in the list
+              if (createdQuestionId && onReload) {
+                await onReload();
+              }
+            } catch (err) {
+              // If save fails, don't close the form
+              return;
+            }
+            // Close the form after saving
+            onCancel();
           } else {
             // No content, just close
+            // If question was created silently, delete it
+            if (createdQuestionId) {
+              try {
+                await api.rfi.questions.delete(projectId, createdQuestionId);
+              } catch (err) {
+                // Ignore delete errors
+              }
+            }
             onCancel();
           }
         }
@@ -605,7 +783,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       return () => {
         document.removeEventListener("mousedown", handleClickOutside);
       };
-    }, [title, handleSubmit, onCancel]);
+    }, [title, handleSubmit, onCancel, createdQuestionId, projectId, onReload]);
 
     // Calculate the next order number based on insertAfterIndex
     // The order should always be the position in the array (1-indexed)
@@ -644,6 +822,18 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onKeyDown={async (e) => {
+                    // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
+                    // Check for Ctrl-A/Cmd-A (select all) using both key and code
+                    const isSelectAll = (e.ctrlKey || e.metaKey) && 
+                                      (e.key.toLowerCase() === "a" || e.code === "KeyA");
+                    if (isSelectAll) {
+                      // Let browser handle select all - don't prevent default, don't stop propagation
+                      return;
+                    }
+                    // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)
+                    if (e.ctrlKey || e.metaKey) {
+                      return; // Let browser handle these
+                    }
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       if (title.trim()) {
@@ -658,22 +848,42 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                   autoFocus
                 />
               </div>
-              <select
-                value={type}
-                onChange={(e) => {
-                  const newType = e.target.value as RFIQuestionType;
-                  setType(newType);
-                }}
-                className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="YesNo">Yes/No</option>
-                <option value="Dropdown">Dropdown</option>
-                <option value="MultipleChoice">Multiple Choice</option>
-                <option value="Scale">Scale</option>
-                <option value="ContactDetails">Contact Details</option>
-                <option value="SingleText">Single Text</option>
-                <option value="MultilineText">Multiline Text</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-700 font-medium">Type:</label>
+                <select
+                  ref={typeSelectRef}
+                  value={type}
+                  onChange={async (e) => {
+                    const newType = e.target.value as RFIQuestionType;
+                    setType(newType);
+                    
+                    // If question is already created, update it in the backend
+                    if (createdQuestionId) {
+                      try {
+                        await api.rfi.questions.update(projectId, createdQuestionId, {
+                          type: newType,
+                        });
+                        // Parent component will reload questions automatically
+                      } catch (err: any) {
+                        setError(err.message || "Failed to update question type");
+                      }
+                    }
+                    
+                    // Reset created question ID if type changes away from options types
+                    if (newType !== "Dropdown" && newType !== "MultipleChoice") {
+                      setCreatedQuestionId(null);
+                    }
+                  }}
+                  className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="YesNo">Yes/No</option>
+                  <option value="Dropdown">Dropdown</option>
+                  <option value="MultipleChoice">Multiple Choice</option>
+                  <option value="Scale">Scale</option>
+                  <option value="SingleText">Single Text</option>
+                  <option value="MultilineText">Multiline Text</option>
+                </select>
+              </div>
             </div>
             <textarea
               value={description}
@@ -685,13 +895,27 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                 e.currentTarget.style.height = `${newHeight}px`;
               }}
               onFocus={(e) => {
+                const textarea = e.currentTarget;
                 requestAnimationFrame(() => {
-                  e.currentTarget.style.height = "auto";
-                  const targetHeight = Math.min(e.currentTarget.scrollHeight || 4.5 * 1.5 * 16, 4.5 * 1.5 * 16);
-                  e.currentTarget.style.height = `${targetHeight}px`;
+                  if (!textarea) return;
+                  textarea.style.height = "auto";
+                  const targetHeight = Math.min(textarea.scrollHeight || 4.5 * 1.5 * 16, 4.5 * 1.5 * 16);
+                  textarea.style.height = `${targetHeight}px`;
                 });
               }}
               onKeyDown={(e) => {
+                // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
+                // Check for Ctrl-A/Cmd-A (select all) using both key and code
+                const isSelectAll = (e.ctrlKey || e.metaKey) && 
+                                  (e.key.toLowerCase() === "a" || e.code === "KeyA");
+                if (isSelectAll) {
+                  // Let browser handle select all - don't prevent default, don't stop propagation
+                  return;
+                }
+                // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)
+                if (e.ctrlKey || e.metaKey) {
+                  return; // Let browser handle these
+                }
                 if (e.key === "Escape") {
                   e.currentTarget.blur();
                 }
@@ -745,8 +969,14 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                 </button>
               </div>
 
-              {/* Options manager for MultipleChoice and Dropdown - shown after question is created */}
-              {/* Note: Options can only be managed after the question is created, so this will be handled after submission */}
+              {/* Options manager for MultipleChoice and Dropdown - shown when type is selected */}
+              {needsOptions && createdQuestionId && (
+                <QuestionOptionManager
+                  questionId={createdQuestionId}
+                  questionType={type}
+                  projectId={projectId}
+                />
+              )}
 
               {/* Scale configurator */}
               {needsScaleConfig && (
@@ -756,15 +986,6 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                 />
               )}
 
-              {type === "ContactDetails" && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-800">
-                    Contact Details questions will display vendor information and allow
-                    editing of contact person fields (first name, last name, email,
-                    phone).
-                  </p>
-                </div>
-              )}
 
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-md">
@@ -787,13 +1008,20 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
       )}
 
       {questions.length === 0 && insertAfterIndex === null ? (
-        <div className="space-y-2 text-center py-2">
-          <button
-            onClick={() => setInsertAfterIndex(-1)}
-            className="text-sm text-primary-600 hover:text-primary-700 transition-colors inline-block"
-          >
-            + Add question here
-          </button>
+        <div className="space-y-2">
+          <div className="text-center py-4">
+            <p className="text-sm text-gray-500 mb-2">
+              Create questions for your RFI questionnaire. You need at least 1 question before you can preview or publish the RFI.
+            </p>
+          </div>
+          <div className="text-center py-2">
+            <button
+              onClick={() => setInsertAfterIndex(-1)}
+              className="text-sm text-primary-600 hover:text-primary-700 transition-colors inline-block"
+            >
+              + Add question here
+            </button>
+          </div>
         </div>
       ) : (
         <DndContext
@@ -811,10 +1039,12 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                 <NewQuestionForm
                   insertAfterIndex={insertAfterIndex}
                   onSubmit={async (data) => {
-                    await handleCreateQuestion(data, insertAfterIndex);
+                    // Skip reload for auto-create to preserve focus
+                    return await handleCreateQuestion(data, insertAfterIndex, true);
                   }}
                   onCancel={() => setInsertAfterIndex(null)}
                   questions={questions}
+                  onReload={() => loadQuestions(true)}
                 />
               )}
 
@@ -841,6 +1071,7 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                       }}
                       onCancel={() => setInsertAfterIndex(null)}
                       questions={questions}
+                      onReload={() => loadQuestions(true)}
                     />
                   )}
 
@@ -920,6 +1151,18 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                       onFocus={() => handleFieldFocus(question.id, "title")}
                                       onBlur={(e) => handleFieldBlur(question.id, "title", e)}
                                       onKeyDown={(e) => {
+                                        // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
+                                        // Check for Ctrl-A/Cmd-A (select all) using both key and code
+                                        const isSelectAll = (e.ctrlKey || e.metaKey) && 
+                                                          (e.key.toLowerCase() === "a" || e.code === "KeyA");
+                                        if (isSelectAll) {
+                                          // Let browser handle select all - don't prevent default, don't stop propagation
+                                          return;
+                                        }
+                                        // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)
+                                        if (e.ctrlKey || e.metaKey) {
+                                          return; // Let browser handle these
+                                        }
                                         if (e.key === "Escape") {
                                           e.currentTarget.blur();
                                         }
@@ -974,26 +1217,42 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                   )}
                                 </div>
                                 {isEditingType ? (
-                                  <select
-                                    value={questionFormData.type}
-                                    onChange={(e) => {
-                                      const newType = e.target.value as RFIQuestionType;
-                                      updateFormField(question.id, "type", newType);
-                                      handleFieldSave(question.id, "type", newType);
-                                    }}
-                                    onFocus={() => handleFieldFocus(question.id, "type")}
-                                    onBlur={(e) => handleFieldBlur(question.id, "type", e)}
-                                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                    autoFocus={lastFocusedField === "type"}
-                                  >
-                                    <option value="YesNo">Yes/No</option>
-                                    <option value="Dropdown">Dropdown</option>
-                                    <option value="MultipleChoice">Multiple Choice</option>
-                                    <option value="Scale">Scale</option>
-                                    <option value="ContactDetails">Contact Details</option>
-                                    <option value="SingleText">Single Text</option>
-                                    <option value="MultilineText">Multiline Text</option>
-                                  </select>
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-xs text-gray-700 font-medium">Type:</label>
+                                    <select
+                                      value={questionFormData.type}
+                                      onChange={(e) => {
+                                        const newType = e.target.value as RFIQuestionType;
+                                        updateFormField(question.id, "type", newType);
+                                        // Don't auto-save when changing type - keep form open for editing
+                                        // User can continue editing and options manager will appear if needed
+                                        // The type will be saved when user clicks outside or blurs
+                                      }}
+                                      onFocus={() => handleFieldFocus(question.id, "type")}
+                                      onBlur={(e) => {
+                                        // Save type change when blurring, but keep form open if it's Dropdown/MultipleChoice
+                                        const newType = questionFormData.type;
+                                        const needsOptions = newType === "Dropdown" || newType === "MultipleChoice";
+                                        if (!needsOptions) {
+                                          // For non-options types, save and close as before
+                                          handleFieldBlur(question.id, "type", e);
+                                        } else {
+                                          // For options types, save but keep form open
+                                          handleFieldSave(question.id, "type", newType);
+                                          // Don't close the form - keep editing mode open
+                                        }
+                                      }}
+                                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                      autoFocus={lastFocusedField === "type"}
+                                    >
+                                      <option value="YesNo">Yes/No</option>
+                                      <option value="Dropdown">Dropdown</option>
+                                      <option value="MultipleChoice">Multiple Choice</option>
+                                      <option value="Scale">Scale</option>
+                                      <option value="SingleText">Single Text</option>
+                                      <option value="MultilineText">Multiline Text</option>
+                                    </select>
+                                  </div>
                                 ) : (
                                   <span
                                     onClick={handleTypeClick}
@@ -1026,6 +1285,18 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                     handleFieldBlur(question.id, "description", e);
                                   }}
                                   onKeyDown={(e) => {
+                                    // Allow standard keyboard shortcuts (Ctrl-A, Ctrl-C, Ctrl-V, etc.)
+                                    // Check for Ctrl-A/Cmd-A (select all) using both key and code
+                                    const isSelectAll = (e.ctrlKey || e.metaKey) && 
+                                                      (e.key.toLowerCase() === "a" || e.code === "KeyA");
+                                    if (isSelectAll) {
+                                      // Let browser handle select all - don't prevent default, don't stop propagation
+                                      return;
+                                    }
+                                    // Allow other Ctrl/Cmd combinations (copy, paste, cut, etc.)
+                                    if (e.ctrlKey || e.metaKey) {
+                                      return; // Let browser handle these
+                                    }
                                     if (e.key === "Escape") {
                                       e.currentTarget.blur();
                                     }
@@ -1084,10 +1355,20 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                         </button>
                                       </div>
                                     </div>
-                                    {/* Delete button - shown when editing title or description, on same line as toggle */}
-                                    {(isEditingTitle || isEditingDescription) && (
+                                    {/* Delete button - shown when editing any field, on same line as toggle */}
+                                    {isEditing && (
                                       <button
-                                        onClick={() => handleDeleteQuestion(question.id)}
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                          // Use onMouseDown to catch before click outside handler
+                                          e.stopPropagation(); // Prevent event from bubbling
+                                          e.preventDefault(); // Prevent any default behavior
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Prevent click from bubbling to parent handlers
+                                          e.preventDefault(); // Prevent any default behavior
+                                          handleDeleteQuestion(question.id);
+                                        }}
                                         className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                                       >
                                         Delete
@@ -1096,12 +1377,34 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                                   </div>
 
                                   {/* Options manager for MultipleChoice and Dropdown */}
-                                  {(question.type === "MultipleChoice" || question.type === "Dropdown") && (
+                                  {/* Show based on form data type (current selection) not saved type */}
+                                  {((questionFormData.type === "MultipleChoice" || questionFormData.type === "Dropdown") || 
+                                    (question.type === "MultipleChoice" || question.type === "Dropdown")) && (
                                     <QuestionOptionManager
                                       questionId={question.id}
-                                      questionType={question.type}
+                                      questionType={questionFormData.type === "MultipleChoice" || questionFormData.type === "Dropdown" 
+                                        ? questionFormData.type 
+                                        : question.type}
                                       projectId={projectId}
                                     />
+                                  )}
+
+                                  {/* Scale configurator for Scale type */}
+                                  {/* Show based on form data type (current selection) not saved type */}
+                                  {((questionFormData.type === "Scale") || (question.type === "Scale")) && (
+                                    <div className="border-t pt-4 mt-4">
+                                      <ScaleConfigurator
+                                        scaleLabels={(question.scaleLabels as Record<string, string>) || {}}
+                                        onChange={async (newScaleLabels) => {
+                                          // Update scale labels in the backend
+                                          await api.rfi.questions.update(projectId, question.id, {
+                                            scaleLabels: newScaleLabels,
+                                          });
+                                          // Reload questions to get updated data
+                                          await loadQuestions(true);
+                                        }}
+                                      />
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -1126,15 +1429,17 @@ export default function QuestionList({ projectId, rfiId }: QuestionListProps) {
                 </div>
               )}
 
-              {/* Show form at the end if insertAfterIndex is the last index */}
-              {insertAfterIndex === questions.length - 1 && (
+              {/* Show form at the end if insertAfterIndex is the last index (but not -1, which is handled above) */}
+              {insertAfterIndex === questions.length - 1 && insertAfterIndex !== -1 && (
                 <NewQuestionForm
                   insertAfterIndex={insertAfterIndex}
                   onSubmit={async (data) => {
-                    await handleCreateQuestion(data, insertAfterIndex);
+                    // Skip reload for auto-create to preserve focus
+                    return await handleCreateQuestion(data, insertAfterIndex, true);
                   }}
                   onCancel={() => setInsertAfterIndex(null)}
                   questions={questions}
+                  onReload={() => loadQuestions(true)}
                 />
               )}
             </div>

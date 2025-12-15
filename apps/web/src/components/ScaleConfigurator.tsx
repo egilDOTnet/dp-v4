@@ -64,7 +64,7 @@ export default function ScaleConfigurator({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Scale Labels
+          Scale Labels (Optional)
         </label>
         <div className="space-y-2">
           {Array.from({ length: numPoints }, (_, i) => i + 1).map((point) => (

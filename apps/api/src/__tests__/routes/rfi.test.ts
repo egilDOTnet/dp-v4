@@ -406,7 +406,7 @@ describe("RFI Routes", () => {
   });
 
   describe("POST /api/projects/:id/rfi/publish", () => {
-    it("should publish RFI when deadline is set", async () => {
+    it("should publish RFI when deadline is set and at least 1 question exists", async () => {
       const tenant = await createTestTenant();
       const user = await createTestUser({
         email: "user@example.com",
@@ -421,6 +421,14 @@ describe("RFI Routes", () => {
         projectId: project.id,
         deadline,
         isPublished: false,
+      });
+
+      // Create at least 1 question (required for publishing)
+      await createTestRFIQuestion({
+        rfiId: rfi.id,
+        title: "Test Question",
+        type: "SingleText",
+        order: 1,
       });
 
       const token = generateTestToken(app, {
@@ -446,6 +454,41 @@ describe("RFI Routes", () => {
       });
       expect(updatedRfi?.isPublished).toBe(true);
       expect(updatedRfi?.publishedAt).toBeDefined();
+    });
+
+    it("should return 400 if no questions exist", async () => {
+      const tenant = await createTestTenant();
+      const user = await createTestUser({
+        email: "user@example.com",
+        tenantId: tenant.id,
+        role: "User",
+      });
+      const project = await createTestProject({ tenantId: tenant.id });
+      await createTestProjectMember({ projectId: project.id, userId: user.id });
+
+      const deadline = new Date("2025-12-31");
+      await createTestRFI({
+        projectId: project.id,
+        deadline,
+        isPublished: false,
+      });
+
+      const token = generateTestToken(app, {
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/projects/${project.id}/rfi/publish`,
+        headers: createAuthHeader(token),
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error).toContain("question");
     });
 
     it("should return 400 if deadline is not set", async () => {
@@ -1911,4 +1954,151 @@ describe("RFI Routes", () => {
       expect(response.statusCode).toBe(403);
     });
   });
+
+  describe("POST /api/projects/:id/rfi/preview-token", () => {
+    it("should generate preview token when at least 1 question exists", async () => {
+      const tenant = await createTestTenant();
+      const user = await createTestUser({
+        email: "user@example.com",
+        tenantId: tenant.id,
+        role: "User",
+      });
+      const project = await createTestProject({ tenantId: tenant.id });
+      await createTestProjectMember({ projectId: project.id, userId: user.id });
+
+      const rfi = await createTestRFI({ projectId: project.id });
+      await createTestRFIQuestion({
+        rfiId: rfi.id,
+        title: "Test Question",
+        type: "SingleText",
+        order: 1,
+      });
+
+      // Create vendor with contact for preview token generation
+      const vendor = await createTestVendor({
+        tenantId: tenant.id,
+        name: "Test Vendor",
+      });
+      await createTestProjectVendor({
+        projectId: project.id,
+        vendorId: vendor.id,
+      });
+      await db.vendorContactPerson.create({
+        data: {
+          vendorId: vendor.id,
+          firstName: "Test",
+          lastName: "Contact",
+          email: "contact@test.com",
+          isMainContact: true,
+        },
+      });
+
+      const token = generateTestToken(app, {
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/projects/${project.id}/rfi/preview-token`,
+        headers: createAuthHeader(token),
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.token).toBeDefined();
+      expect(typeof body.token).toBe("string");
+    });
+
+    it("should return 400 if no questions exist", async () => {
+      const tenant = await createTestTenant();
+      const user = await createTestUser({
+        email: "user@example.com",
+        tenantId: tenant.id,
+        role: "User",
+      });
+      const project = await createTestProject({ tenantId: tenant.id });
+      await createTestProjectMember({ projectId: project.id, userId: user.id });
+
+      await createTestRFI({ projectId: project.id });
+
+      const token = generateTestToken(app, {
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/projects/${project.id}/rfi/preview-token`,
+        headers: createAuthHeader(token),
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error).toContain("question");
+    });
+
+    it("should return 404 if RFI doesn't exist", async () => {
+      const tenant = await createTestTenant();
+      const user = await createTestUser({
+        email: "user@example.com",
+        tenantId: tenant.id,
+        role: "User",
+      });
+      const project = await createTestProject({ tenantId: tenant.id });
+      await createTestProjectMember({ projectId: project.id, userId: user.id });
+
+      const token = generateTestToken(app, {
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/projects/${project.id}/rfi/preview-token`,
+        headers: createAuthHeader(token),
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("should return 403 for non-project member", async () => {
+      const tenant = await createTestTenant();
+      const user = await createTestUser({
+        email: "user@example.com",
+        tenantId: tenant.id,
+        role: "User",
+      });
+      const project = await createTestProject({ tenantId: tenant.id });
+      const rfi = await createTestRFI({ projectId: project.id });
+      await createTestRFIQuestion({
+        rfiId: rfi.id,
+        title: "Test Question",
+        type: "SingleText",
+        order: 1,
+      });
+
+      const token = generateTestToken(app, {
+        userId: user.id,
+        email: user.email,
+        tenantId: tenant.id,
+        role: "User",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/projects/${project.id}/rfi/preview-token`,
+        headers: createAuthHeader(token),
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+  });
 });
+

@@ -111,7 +111,6 @@ export default function QuestionForm({
           <option value="Dropdown">Dropdown</option>
           <option value="MultipleChoice">Multiple Choice</option>
           <option value="Scale">Scale</option>
-          <option value="ContactDetails">Contact Details</option>
           <option value="SingleText">Single Text</option>
           <option value="MultilineText">Multiline Text</option>
         </select>

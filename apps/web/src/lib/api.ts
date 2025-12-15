@@ -710,6 +710,10 @@ export const api = {
       ),
     preview: (projectId: string) =>
       apiRequest<RFI>(`/api/projects/${projectId}/rfi/preview`),
+    getPreviewToken: (projectId: string) =>
+      apiRequest<{ token: string }>(`/api/projects/${projectId}/rfi/preview-token`, {
+        method: "POST",
+      }),
   },
   rfp: {
     get: (projectId: string) =>

@@ -692,6 +692,18 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         });
       }
 
+      // Validate at least 1 question exists
+      const dbAny = db as any;
+      const questionCount = await dbAny.rFIQuestion.count({
+        where: { rfiId: rfi.id },
+      });
+
+      if (questionCount === 0) {
+        return reply.status(400).send({
+          error: "At least 1 question must be added before publishing",
+        });
+      }
+
       // Publish RFI
       await db.rFI.update({
         where: { projectId },
@@ -3033,6 +3045,233 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.send({ success: true });
       } catch (error: any) {
         request.log.error({ err: error }, "Error in POST /:id/rfi/resend/:vendorId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Generate preview token for RFI
+   * User must be a project member or company admin
+   * Creates a temporary vendor response and returns a magic link token for preview
+   * Requires at least 1 question to be created
+   */
+  fastify.post<{
+    Params: { id: string };
+  }>(
+    "/:id/rfi/preview-token",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Generate a preview token for the RFI vendor portal. User must be a project member or company administrator. Requires at least 1 question to be created.",
+        tags: ["rfi"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              token: { type: "string" },
+            },
+            description: "Preview token generated successfully",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "RFI has no questions",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project or RFI not found",
+          },
+          500: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+              message: { type: "string" },
+            },
+            description: "Internal server error or RFI model not available",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        if (!request.user) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Get RFI
+        const RFI = getRFIModel("RFI");
+        const RFIVendorResponse = getRFIModel("RFIVendorResponse");
+        const dbAny = db as any;
+        const rfi = await RFI.findUnique({
+          where: { projectId },
+        });
+
+        if (!rfi) {
+          return reply.status(404).send({ error: "RFI not found" });
+        }
+
+        // Validate at least 1 question exists
+        const questionCount = await dbAny.rFIQuestion.count({
+          where: { rfiId: rfi.id },
+        });
+
+        if (questionCount === 0) {
+          return reply.status(400).send({
+            error: "At least 1 question must be added before preview",
+          });
+        }
+
+        // Get or create a temporary project vendor for preview
+        // Use the first project vendor if available, or create a dummy one
+        let projectVendor = await db.projectVendor.findFirst({
+          where: { projectId },
+          include: {
+            vendor: {
+              include: {
+                VendorContactPerson: {
+                  where: { isMainContact: true },
+                  take: 1,
+                },
+              },
+            },
+          },
+        });
+
+        // If no project vendor exists, we need to handle this differently
+        // For preview, we can create a minimal vendor response without a real vendor
+        // But the schema requires projectVendorId and contactPersonId
+        // Let's check if we can find any vendor in the system to use as a placeholder
+        if (!projectVendor) {
+          // Try to find any vendor with a contact person
+          const anyVendor = await db.vendor.findFirst({
+            include: {
+              VendorContactPerson: {
+                where: { isMainContact: true },
+                take: 1,
+              },
+            },
+          });
+
+          if (!anyVendor || anyVendor.VendorContactPerson.length === 0) {
+            return reply.status(400).send({
+              error: "No vendors available for preview. Please add a vendor to the project first.",
+            });
+          }
+
+          // Create a temporary project vendor for preview
+          projectVendor = await db.projectVendor.create({
+            data: {
+              projectId,
+              vendorId: anyVendor.id,
+              status: "Pending",
+            },
+            include: {
+              vendor: {
+                include: {
+                  VendorContactPerson: {
+                    where: { isMainContact: true },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          });
+        }
+
+        const mainContact = projectVendor.vendor.VendorContactPerson.find((c) => c.isMainContact);
+        if (!mainContact) {
+          return reply.status(400).send({
+            error: "No main contact found for preview vendor",
+          });
+        }
+
+        // Check if a preview vendor response already exists for this RFI
+        // Use a special identifier or find by checking if it's a preview response
+        // For now, we'll create a new one each time or reuse if exists
+        const existingPreviewResponse = await RFIVendorResponse.findFirst({
+          where: {
+            rfiId: rfi.id,
+            projectVendorId: projectVendor.id,
+          },
+        });
+
+        let vendorResponse;
+        if (existingPreviewResponse) {
+          vendorResponse = existingPreviewResponse;
+        } else {
+          // Create a new vendor response for preview
+          const tokenExpiresAt = new Date();
+          tokenExpiresAt.setDate(tokenExpiresAt.getDate() + 30); // 30 days from now
+
+          vendorResponse = await RFIVendorResponse.create({
+            data: {
+              rfiId: rfi.id,
+              projectVendorId: projectVendor.id,
+              contactPersonId: mainContact.id,
+              status: "Started",
+              sentAt: new Date(),
+              tokenExpiresAt,
+            },
+          });
+        }
+
+        // Generate or regenerate magic link token
+        const magicLinkToken = fastify.jwt.sign(
+          {
+            vendorResponseId: vendorResponse.id,
+            type: "rfi-vendor",
+          } as any,
+          { expiresIn: "30d" }
+        );
+
+        // Update with token
+        await RFIVendorResponse.update({
+          where: { id: vendorResponse.id },
+          data: { magicLinkToken },
+        });
+
+        return reply.send({ token: magicLinkToken });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in POST /:id/rfi/preview-token");
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "An unexpected error occurred",

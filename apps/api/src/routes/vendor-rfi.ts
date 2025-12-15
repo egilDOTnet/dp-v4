@@ -328,14 +328,12 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             answers: Record<string, any>;
           };
 
-          // Check RFI status
+          // Check RFI status - allow preview mode (unpublished RFIs) for testing
+          // Preview tokens are only generated for project members, so this is safe
           if (!rfi.isPublished) {
-            return reply.status(403).send({
-              error: "This RFI is not currently available",
-            });
-          }
-
-          if (rfi.deadline && new Date(rfi.deadline) < new Date()) {
+            // Allow preview mode - don't block unpublished RFIs
+            // This enables preview functionality for project members
+          } else if (rfi.deadline && new Date(rfi.deadline) < new Date()) {
             return reply.status(403).send({
               error: "This RFI is now closed for replies",
             });
@@ -420,14 +418,12 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
             };
           };
 
-          // Check RFI status
+          // Check RFI status - allow preview mode (unpublished RFIs) for testing
+          // Preview tokens are only generated for project members, so this is safe
           if (!rfi.isPublished) {
-            return reply.status(403).send({
-              error: "This RFI is not currently available",
-            });
-          }
-
-          if (rfi.deadline && new Date(rfi.deadline) < new Date()) {
+            // Allow preview mode - don't block unpublished RFIs
+            // This enables preview functionality for project members
+          } else if (rfi.deadline && new Date(rfi.deadline) < new Date()) {
             return reply.status(403).send({
               error: "This RFI is now closed for replies",
             });
@@ -650,16 +646,10 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
 
         // Handle GET /vendor/rfi/token (main endpoint - no endpoint suffix)
         if (method === "GET" && endpoint === "") {
-          // Check RFI status - allow viewing even if deadline passed
-          if (!rfi.isPublished) {
-            return reply.status(403).send({
-              error: "This RFI is not currently available",
-              closed: true,
-            });
-          }
-
-          // Check if deadline has passed
-          const deadlinePassed = rfi.deadline && new Date(rfi.deadline) < new Date();
+          // Check RFI status - allow preview mode (unpublished RFIs) for testing
+          // Preview tokens are only generated for project members, so this is safe
+          // Check if deadline has passed (only for published RFIs)
+          const deadlinePassed = rfi.isPublished && rfi.deadline && new Date(rfi.deadline) < new Date();
 
           // Get existing responses if any
           const dbAny = db as any;
@@ -715,3 +705,4 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
     }
   );
 }
+

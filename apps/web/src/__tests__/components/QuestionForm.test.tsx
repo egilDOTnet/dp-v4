@@ -100,7 +100,6 @@ describe('QuestionForm', () => {
 
   describe('Question Type Selection', () => {
     it('should show option manager for Dropdown type', async () => {
-      const user = userEvent.setup();
       const existingQuestion = createMockRFIQuestion({
         type: 'Dropdown',
       });
@@ -118,7 +117,6 @@ describe('QuestionForm', () => {
     });
 
     it('should show option manager for MultipleChoice type', async () => {
-      const user = userEvent.setup();
       const existingQuestion = createMockRFIQuestion({
         type: 'MultipleChoice',
       });
@@ -151,21 +149,6 @@ describe('QuestionForm', () => {
       expect(screen.getByTestId('scale-configurator')).toBeInTheDocument();
     });
 
-    it('should show info message for ContactDetails type', async () => {
-      const user = userEvent.setup();
-      render(
-        <QuestionForm
-          projectId="project-1"
-          onSubmit={mockOnSubmit}
-          onCancel={mockOnCancel}
-        />
-      );
-
-      const typeSelect = screen.getByLabelText(/type/i);
-      await user.selectOptions(typeSelect, 'ContactDetails');
-
-      expect(screen.getByText(/contact details questions will display/i)).toBeInTheDocument();
-    });
   });
 
   describe('Form Validation', () => {
@@ -457,3 +440,4 @@ describe('QuestionForm', () => {
     });
   });
 });
+

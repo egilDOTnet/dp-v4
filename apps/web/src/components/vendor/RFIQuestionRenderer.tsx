@@ -200,6 +200,35 @@ export function RFIQuestionRenderer({
       case "Scale":
         const scaleLabels = question.scaleLabels || {};
         const scalePoints = Object.keys(scaleLabels).sort((a, b) => parseInt(a) - parseInt(b));
+        
+        // Check if all labels are empty (no labels provided)
+        const hasLabels = scalePoints.some((point) => {
+          const label = scaleLabels[point];
+          return label && label.trim() !== "";
+        });
+        
+        // If no labels, render horizontally
+        if (!hasLabels) {
+          return (
+            <div className="flex flex-wrap gap-4">
+              {scalePoints.map((point) => (
+                <label key={point} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`question-${question.id}`}
+                    value={point}
+                    checked={localValue === point}
+                    onChange={() => handleChange(point)}
+                    className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-text-primary">{point}</span>
+                </label>
+              ))}
+            </div>
+          );
+        }
+        
+        // If labels exist, render vertically with labels
         return (
           <div className="space-y-2">
             {scalePoints.map((point) => (
@@ -275,3 +304,4 @@ export function RFIQuestionRenderer({
     </div>
   );
 }
+
