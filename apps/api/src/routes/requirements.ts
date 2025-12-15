@@ -2659,6 +2659,300 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
       return reply.status(204).send();
     }
   );
+
+  /**
+   * Export requirements to Excel or CSV
+   * User must be a project member or company admin
+   */
+  fastify.get(
+    "/:projectId/requirements/export",
+    {
+      preHandler: [authenticate, verifyProjectAccess],
+      schema: {
+        description: "Export requirements and hierarchy to Excel or CSV",
+        tags: ["requirements"],
+        params: {
+          type: "object",
+          properties: {
+            projectId: { type: "string" },
+          },
+          required: ["projectId"],
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            format: { type: "string", enum: ["xlsx", "csv"], default: "xlsx" },
+          },
+        },
+        // For file downloads, we don't define a response schema
+        // Fastify will handle the binary response
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
+        const { format = "xlsx" } = request.query as { format?: "xlsx" | "csv" };
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        request.log.info({ projectId, format }, "Exporting requirements");
+
+        // Fetch hierarchies and requirements
+        const hierarchies = await db.requirementHierarchy.findMany({
+          where: { projectId },
+          select: {
+            id: true,
+            projectId: true,
+            parentId: true,
+            number: true,
+            title: true,
+            description: true,
+            order: true,
+          },
+          orderBy: [
+            { parentId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchyId: { in: hierarchies.map((h) => h.id) },
+          },
+          select: {
+            id: true,
+            hierarchyId: true,
+            number: true,
+            description: true,
+            type: true,
+            status: true,
+            order: true,
+          },
+          orderBy: { order: "asc" },
+        });
+
+        // Flatten data for export
+        const rows: Array<{
+          level1Number: string;
+          level1Name: string;
+          level1Description: string;
+          level2Number: string;
+          level2Name: string;
+          level2Description: string;
+          requirementId: string;
+          requirementDescription: string;
+          requirementType: string;
+          requirementStatus: string;
+        }> = [];
+
+        // Create maps for quick lookup
+        const requirementsByHierarchy = new Map<string, typeof requirements>();
+        requirements.forEach((req) => {
+          if (!requirementsByHierarchy.has(req.hierarchyId)) {
+            requirementsByHierarchy.set(req.hierarchyId, []);
+          }
+          requirementsByHierarchy.get(req.hierarchyId)!.push(req);
+        });
+
+        // Process level 1 hierarchies
+        const level1Hierarchies = hierarchies.filter((h) => h.parentId === null);
+        level1Hierarchies.sort((a, b) => a.order - b.order);
+
+        for (const level1 of level1Hierarchies) {
+          const level1Number = level1.number || "";
+          const level1Name = level1.title || "";
+          const level1Description = level1.description || "";
+
+          // Get level 2 hierarchies
+          const level2Hierarchies = hierarchies
+            .filter((h) => h.parentId === level1.id)
+            .sort((a, b) => a.order - b.order);
+
+          const level1Requirements = requirementsByHierarchy.get(level1.id) || [];
+          level1Requirements.sort((a, b) => a.order - b.order);
+
+          if (level2Hierarchies.length > 0) {
+            for (const level2 of level2Hierarchies) {
+              const level2Number = level2.number || "";
+              const level2Name = level2.title || "";
+              const level2Description = level2.description || "";
+
+              const level2Requirements = requirementsByHierarchy.get(level2.id) || [];
+              level2Requirements.sort((a, b) => a.order - b.order);
+
+              for (const req of level2Requirements) {
+                rows.push({
+                  level1Number,
+                  level1Name,
+                  level1Description,
+                  level2Number,
+                  level2Name,
+                  level2Description,
+                  requirementId: req.number || req.id,
+                  requirementDescription: req.description || "",
+                  requirementType: req.type || "",
+                  requirementStatus: req.status || "",
+                });
+              }
+            }
+
+            // Add level 1 requirements
+            for (const req of level1Requirements) {
+              rows.push({
+                level1Number,
+                level1Name,
+                level1Description,
+                level2Number: "",
+                level2Name: "",
+                level2Description: "",
+                requirementId: req.number || req.id,
+                requirementDescription: req.description || "",
+                requirementType: req.type || "",
+                requirementStatus: req.status || "",
+              });
+            }
+          } else {
+            // No level 2 hierarchies
+            for (const req of level1Requirements) {
+              rows.push({
+                level1Number,
+                level1Name,
+                level1Description,
+                level2Number: "",
+                level2Name: "",
+                level2Description: "",
+                requirementId: req.number || req.id,
+                requirementDescription: req.description || "",
+                requirementType: req.type || "",
+                requirementStatus: req.status || "",
+              });
+            }
+          }
+        }
+
+        // Generate filename
+        const project = await db.project.findUnique({
+          where: { id: projectId },
+          select: { name: true },
+        });
+        const dateStr = new Date().toISOString().split("T")[0];
+        const projectName = (project?.name || "project").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const filename = `${projectName}-requirements-${dateStr}.${format}`;
+
+        if (format === "xlsx") {
+          // Export to Excel
+          const XLSX = await import("xlsx");
+          const headers = [
+            "Level 1 Number ID",
+            "Level 1 Name",
+            "Level 1 Description",
+            "Level 2 Number ID",
+            "Level 2 Name",
+            "Level 2 Description",
+            "Requirement ID",
+            "Requirement Description",
+            "Requirement Type",
+            "Requirement Status",
+          ];
+
+          const data = rows.map((row) => [
+            row.level1Number,
+            row.level1Name,
+            row.level1Description,
+            row.level2Number,
+            row.level2Name,
+            row.level2Description,
+            row.requirementId,
+            row.requirementDescription,
+            row.requirementType,
+            row.requirementStatus,
+          ]);
+
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+          ws["!cols"] = [
+            { wch: 15 },
+            { wch: 30 },
+            { wch: 40 },
+            { wch: 15 },
+            { wch: 30 },
+            { wch: 40 },
+            { wch: 15 },
+            { wch: 50 },
+            { wch: 20 },
+            { wch: 20 },
+          ];
+
+          XLSX.utils.book_append_sheet(wb, ws, "Requirements");
+
+          // Generate buffer
+          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+          reply
+            .type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            .header("Content-Disposition", `attachment; filename="${filename}"`)
+            .send(buffer);
+        } else {
+          // Export to CSV
+          const headers = [
+            "Level 1 Number ID",
+            "Level 1 Name",
+            "Level 1 Description",
+            "Level 2 Number ID",
+            "Level 2 Name",
+            "Level 2 Description",
+            "Requirement ID",
+            "Requirement Description",
+            "Requirement Type",
+            "Requirement Status",
+          ];
+
+          const escapeCSV = (value: string): string => {
+            if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          };
+
+          const csvRows = [
+            headers.map(escapeCSV).join(","),
+            ...rows.map((row) =>
+              [
+                row.level1Number,
+                row.level1Name,
+                row.level1Description,
+                row.level2Number,
+                row.level2Name,
+                row.level2Description,
+                row.requirementId,
+                row.requirementDescription,
+                row.requirementType,
+                row.requirementStatus,
+              ]
+                .map((val) => escapeCSV(String(val || "")))
+                .join(",")
+            ),
+          ];
+
+          const csvContent = csvRows.join("\n");
+
+          reply
+            .type("text/csv")
+            .header("Content-Disposition", `attachment; filename="${filename}"`)
+            .send(csvContent);
+        }
+      } catch (err: any) {
+        request.log.error({ err }, "Failed to export requirements");
+        reply.status(500).send({
+          error: "Failed to export requirements",
+          message: err.message,
+        });
+      }
+    }
+  );
 }
 
 

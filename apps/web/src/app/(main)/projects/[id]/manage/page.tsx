@@ -31,6 +31,7 @@ export default function ManageProjectPage() {
   });
   const [addingMember, setAddingMember] = useState(false);
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const isAdmin =
     user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
@@ -139,6 +140,63 @@ export default function ManageProjectPage() {
       setAvailableUsers(updatedUsers);
     } catch (err: any) {
       setFormError(err.message || "Failed to remove member");
+    }
+  };
+
+  const handleExportRequirements = async (format: "excel" | "csv") => {
+    if (!project) {
+      setFormError("Project not loaded");
+      return;
+    }
+    
+    setExporting(true);
+    setFormError("");
+    try {
+      // Call the API endpoint to generate and download the file
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const apiUrl = typeof window !== "undefined" 
+        ? `${window.location.protocol}//${window.location.hostname}:3001`
+        : "http://localhost:3001";
+      
+      const response = await fetch(
+        `${apiUrl}/api/projects/${projectId}/requirements/export?format=${format === "excel" ? "xlsx" : "csv"}`,
+        {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Failed to export requirements" }));
+        throw new Error(errorData.message || errorData.error || "Failed to export requirements");
+      }
+
+      // Get the filename from Content-Disposition header or generate one
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-requirements-${new Date().toISOString().split("T")[0]}.${format === "excel" ? "xlsx" : "csv"}`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setFormError(err.message || "Failed to export requirements");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -739,17 +797,93 @@ export default function ManageProjectPage() {
               </p>
               <button
                 onClick={() => setShowImportWizard(true)}
-                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 flex items-center justify-center gap-2"
               >
-                Start Import
+                <svg
+                  className="w-5 h-5 flex-shrink-0 self-center"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"
+                  />
+                </svg>
+                <span className="self-center">Start Import</span>
               </button>
             </div>
 
             <div className="bg-background-secondary rounded-lg shadow-md p-6">
               <h2 className="text-2xl font-semibold mb-4">Export Data</h2>
-              <p className="text-text-secondary">
-                Export functionality coming soon.
+              <p className="text-text-secondary mb-4">
+                Export Requirements and Hierarchy data to Excel (xlsx) or CSV format. The export includes all hierarchy levels and requirements with their details.
               </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleExportRequirements("excel")}
+                  disabled={exporting}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {exporting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      <span>Export to Excel</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleExportRequirements("csv")}
+                  disabled={exporting}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {exporting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      <span>Export to CSV</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              {formError && (
+                <p className="text-sm text-red-600 mt-2">{formError}</p>
+              )}
             </div>
           </div>
         </TabsContent>
