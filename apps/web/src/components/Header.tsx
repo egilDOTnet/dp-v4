@@ -295,7 +295,7 @@ export function Header() {
                     <button
                       onClick={() => {
                         setShowMenu(false);
-                        router.push("/dashboard");
+                        router.push("/dashboard?noAutoRedirect=true");
                       }}
                       className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-primary hover:bg-background-primary transition-colors cursor-pointer"
                     >
@@ -312,7 +312,7 @@ export function Header() {
                           d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                         />
                       </svg>
-                      Company Dashboard
+                      Company Home
                     </button>
 
                     <button

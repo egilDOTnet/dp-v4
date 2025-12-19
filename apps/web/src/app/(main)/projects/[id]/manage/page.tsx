@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, User } from "@/lib/api";
-import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button, ContactPersonSelector, ContactPerson } from "@/components/ui";
+import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button, ContactPersonSelector, ContactPerson, Breadcrumbs } from "@/components/ui";
 import { ImportWizard } from "@/components/ImportWizard";
 import { GraphicsUpload } from "@/components/GraphicsUpload";
 import { useSearch } from "@/hooks/useSearch";
@@ -218,24 +218,16 @@ export default function ManageProjectPage() {
     );
   }
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project.name, href: `/projects/${projectId}` },
+    { label: "Manage" },
+  ];
+
   return (
     <div className="max-w-4xl">
-      {/* Breadcrumb Navigation */}
-      <nav className="mb-4 text-sm text-gray-600">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          {project.name}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">Manage</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       <h1 className="text-3xl font-bold mb-6">Manage Project</h1>
 

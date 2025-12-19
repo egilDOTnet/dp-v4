@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api, Project, RFP } from "@/lib/api";
-import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner } from "@/components/ui";
+import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner, Breadcrumbs } from "@/components/ui";
 import RFPOverview from "@/components/rfp/RFPOverview";
 import RFPSchedule from "@/components/rfp/RFPSchedule";
 import RFPDocuments from "@/components/rfp/RFPDocuments";
@@ -109,24 +109,17 @@ export default function RFPPage() {
     }
   };
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project?.name || "Project", href: `/projects/${projectId}` },
+    { label: "RFP" },
+  ];
+
   if (loading) {
     return (
       <div>
-        <nav className="mb-4 text-sm text-text-secondary">
-          <Link href="/dashboard" className="hover:text-primary-600">
-            Dashboard
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href="/projects" className="hover:text-primary-600">
-            Projects
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-            {project?.name || "Project"}
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-text-primary">RFP</span>
-        </nav>
+        <Breadcrumbs items={breadcrumbItems} />
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-text-secondary">Loading RFP...</p>
@@ -137,21 +130,7 @@ export default function RFPPage() {
 
   return (
     <div>
-      <nav className="mb-4 text-sm text-text-secondary">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          {project?.name || "Project"}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-text-primary">RFP</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-4">Request for Proposal (RFP)</h1>

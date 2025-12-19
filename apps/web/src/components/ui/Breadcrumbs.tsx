@@ -18,48 +18,25 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   className = "",
 }) => {
   return (
-    <nav className={`flex ${className}`} aria-label="Breadcrumb">
-      <ol className="flex items-center space-x-2 text-sm">
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
+    <nav className={`mb-4 text-sm text-text-secondary ${className}`} aria-label="Breadcrumb">
+      {items.map((item, index) => {
+        const isLast = index === items.length - 1;
 
-          return (
-            <li key={index} className="flex items-center">
-              {index > 0 && (
-                <svg
-                  className="w-4 h-4 text-text-tertiary mx-2"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              )}
-              {!isLast && item.href ? (
-                <Link
-                  href={item.href}
-                  className="text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  {item.label}
-                </Link>
-              ) : (
-                <span
-                  className={
-                    isLast
-                      ? "text-text-primary font-medium"
-                      : "text-text-secondary"
-                  }
-                >
-                  {item.label}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+        return (
+          <React.Fragment key={index}>
+            {item.href && !isLast ? (
+              <Link href={item.href} className="hover:text-primary-600">
+                {item.label}
+              </Link>
+            ) : (
+              <span className={isLast ? "text-text-primary" : ""}>
+                {item.label}
+              </span>
+            )}
+            {!isLast && <span className="mx-2">/</span>}
+          </React.Fragment>
+        );
+      })}
     </nav>
   );
 };

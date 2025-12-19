@@ -8,7 +8,7 @@ import QuestionList from "@/components/QuestionList";
 import RFIStatusTable from "@/components/RFIStatusTable";
 import QuestionResponseSummary from "@/components/QuestionResponseSummary";
 import WysiwygEditor from "@/components/WysiwygEditor";
-import { HeroBanner } from "@/components/ui";
+import { HeroBanner, Breadcrumbs } from "@/components/ui";
 
 type TabType = "email" | "rfi-info" | "questionnaire" | "status";
 
@@ -212,24 +212,17 @@ export default function RFIPage() {
     }
   };
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project?.name || "Project", href: `/projects/${projectId}` },
+    { label: "RFI" },
+  ];
+
   if (loading) {
     return (
       <div>
-        <nav className="mb-4 text-sm text-text-secondary">
-          <Link href="/dashboard" className="hover:text-primary-600">
-            Dashboard
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href="/projects" className="hover:text-primary-600">
-            Projects
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-            {project?.name || "Project"}
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-text-primary">RFI</span>
-        </nav>
+        <Breadcrumbs items={breadcrumbItems} />
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading RFI...</p>
@@ -240,21 +233,7 @@ export default function RFIPage() {
 
   return (
     <div>
-      <nav className="mb-4 text-sm text-gray-600">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          {project?.name || "Project"}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">RFI</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-4">Request for Information (RFI)</h1>

@@ -5,7 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, User, Project } from "@/lib/api";
-import { HeroBanner } from "@/components/ui";
+import { HeroBanner, Breadcrumbs } from "@/components/ui";
 
 export default function ProjectMembersPage() {
   const { user: _user } = useAuth();
@@ -170,24 +170,16 @@ export default function ProjectMembersPage() {
   const allAvailableUsers = [...availableUsers, ...newMembers];
   const selectedMembers = allAvailableUsers.filter((u) => selectedMemberIds.includes(u.id));
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project.name, href: `/projects/${projectId}` },
+    { label: "Members" },
+  ];
+
   return (
     <div className="max-w-4xl">
-      {/* Breadcrumb Navigation */}
-      <nav className="mb-4 text-sm text-gray-600">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          {project.name}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">Members</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       <h1 className="text-3xl font-bold mb-2">
         {isEditMode ? "Edit Members" : "Add Members"} to {project.name}

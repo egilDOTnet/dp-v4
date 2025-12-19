@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Project } from "@/lib/api";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import {
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +30,9 @@ export default function DashboardPage() {
       .then((data) => {
         setProjects(data);
         // If user has only one project, redirect to it
-        if (data.length === 1) {
+        // But only if the user didn't explicitly click a Home link (noAutoRedirect param)
+        const noAutoRedirect = searchParams?.get("noAutoRedirect") === "true";
+        if (data.length === 1 && !noAutoRedirect) {
           router.push(`/projects/${data[0].id}`);
         }
       })
@@ -39,7 +42,7 @@ export default function DashboardPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [user, router]);
+  }, [user, router, searchParams]);
 
   const isAdmin =
     user?.role === "CompanyAdministrator" ||
@@ -59,7 +62,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Company Dashboard"
+        title="Company Home"
         description={`Welcome back${user?.firstName ? `, ${user.firstName}` : ""}!`}
         actions={
           isAdmin ? (

@@ -164,7 +164,7 @@ export default function VendorsPage() {
   };
 
   const breadcrumbItems = [
-    { label: "Dashboard", href: "/dashboard" },
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
     { label: "Projects", href: "/projects" },
     { label: project?.name || "Project", href: `/projects/${projectId}` },
     { label: "Vendors" },

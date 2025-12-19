@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api, Project } from "@/lib/api";
-import { HeroBanner } from "@/components/ui";
+import { HeroBanner, Breadcrumbs } from "@/components/ui";
 
 export default function EvaluationPage() {
   const params = useParams();
@@ -19,23 +19,16 @@ export default function EvaluationPage() {
     }
   }, [projectId]);
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project?.name || "Project", href: `/projects/${projectId}` },
+    { label: "Evaluation" },
+  ];
+
   return (
     <div>
-      <nav className="mb-4 text-sm text-text-secondary">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          {project?.name || "Project"}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-text-primary">Evaluation</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       {/* Hero Banner */}
       <HeroBanner

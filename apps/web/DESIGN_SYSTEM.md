@@ -349,10 +349,84 @@ When creating new searchable selector components, follow the ContactPersonSelect
 - **EmptyState**: Empty state messages with actions
 - **Container**: Responsive page container
 - **PageHeader**: Standard page header with title, description, actions
-- **Breadcrumbs**: Navigation breadcrumbs
+- **Breadcrumbs**: Navigation breadcrumbs (see Breadcrumbs section below)
 - **Select**: Styled select dropdowns (use only for simple, short lists; prefer searchable dropdowns for longer lists)
 - **Textarea**: Auto-growing text areas
 - **FormField**: Wrapper for form inputs with labels and errors
+
+#### Breadcrumbs
+
+**⚠️ IMPORTANT**: All pages must use the `Breadcrumbs` component from `@/components/ui`. Do not create manual breadcrumb navigation with raw HTML/JSX.
+
+The `Breadcrumbs` component provides consistent navigation breadcrumbs across all pages with standardized styling and separator formatting.
+
+**Component**:
+```tsx
+import { Breadcrumbs } from '@/components/ui';
+
+const breadcrumbItems = [
+  { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+  { label: "Projects", href: "/projects" },
+  { label: project?.name || "Project", href: `/projects/${projectId}` },
+  { label: "Current Page" }, // Last item has no href (current page)
+];
+
+<Breadcrumbs items={breadcrumbItems} />
+```
+
+**Features**:
+- Consistent "/" separator between items
+- Automatic styling: links use `hover:text-primary-600`, current page uses `text-text-primary`
+- Standard spacing: `mb-4 text-sm text-text-secondary` for the container
+- Accessible: Includes `aria-label="Breadcrumb"` for screen readers
+
+**Usage Pattern**:
+1. Create a `breadcrumbItems` array at the top of your component (after state declarations)
+2. Include all navigation levels from Home → Section → Subsection → Current Page
+3. The last item (current page) should **not** have an `href` property
+4. Use `?noAutoRedirect=true` for Home links to prevent auto-redirect when there's only one project
+5. Place the `<Breadcrumbs>` component at the top of your return statement, before other content
+
+**Example for Project Pages**:
+```tsx
+export default function TasksPage() {
+  const params = useParams();
+  const projectId = params.id as string;
+  const [project, setProject] = useState<Project | null>(null);
+  
+  // ... other state and effects ...
+
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project?.name || "Project", href: `/projects/${projectId}` },
+    { label: "Tasks" }, // Current page - no href
+  ];
+
+  if (loading) {
+    return (
+      <div>
+        <Breadcrumbs items={breadcrumbItems} />
+        {/* Loading state */}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Breadcrumbs items={breadcrumbItems} />
+      {/* Page content */}
+    </div>
+  );
+}
+```
+
+**Important Notes**:
+- **Always use the component**: Never create manual breadcrumb navigation with `<nav>`, `<Link>`, and `<span>` elements
+- **Consistent structure**: All project pages follow: Home → Projects → Project Name → Current Section
+- **Home link parameter**: Always include `?noAutoRedirect=true` in Home links to prevent unwanted redirects when users explicitly navigate to Home
+- **Reuse in all states**: Include breadcrumbs in loading, error, and main render states for consistency
+- **Last item**: The current page should always be the last item and should not have an `href` property
 
 #### File Input (Drag-and-Drop)
 For file uploads, use a drag-and-drop container instead of a standard file input:

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
 import { useSearch } from "@/hooks/useSearch";
-import { SearchBar, HeroBanner } from "@/components/ui";
+import { SearchBar, HeroBanner, Breadcrumbs } from "@/components/ui";
 import MultiEditRequirementModal from "@/components/MultiEditRequirementModal";
 import MultiDeleteRequirementModal from "@/components/MultiDeleteRequirementModal";
 
@@ -276,24 +276,17 @@ export default function RequirementsPage() {
     }
   };
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project?.name || "Project", href: `/projects/${projectId}` },
+    { label: "Requirements" },
+  ];
+
   if (loading) {
     return (
       <div>
-        <nav className="mb-4 text-sm text-gray-600">
-          <Link href="/dashboard" className="hover:text-primary-600">
-            Dashboard
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href="/projects" className="hover:text-primary-600">
-            Projects
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-            {project?.name || "Project"}
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-gray-900">Requirements</span>
-        </nav>
+        <Breadcrumbs items={breadcrumbItems} />
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading requirements...</p>
@@ -305,21 +298,7 @@ export default function RequirementsPage() {
   if (error) {
     return (
       <div>
-        <nav className="mb-4 text-sm text-gray-600">
-          <Link href="/dashboard" className="hover:text-primary-600">
-            Dashboard
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href="/projects" className="hover:text-primary-600">
-            Projects
-          </Link>
-          <span className="mx-2">/</span>
-          <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-            {project?.name || "Project"}
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-gray-900">Requirements</span>
-        </nav>
+        <Breadcrumbs items={breadcrumbItems} />
         <div className="text-center">
           <p className="text-red-600">{error}</p>
         </div>
@@ -330,21 +309,7 @@ export default function RequirementsPage() {
 
   return (
     <div>
-      <nav className="mb-4 text-sm text-gray-600">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          {project?.name || "Project"}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">Requirements</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Requirements</h1>

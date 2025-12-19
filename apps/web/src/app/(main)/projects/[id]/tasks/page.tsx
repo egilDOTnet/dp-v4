@@ -7,7 +7,7 @@ import { api, Project, Phase, Task } from "@/lib/api";
 import PhaseTimeline from "@/components/PhaseTimeline";
 import TaskList from "@/components/TaskList";
 import { useSearch } from "@/hooks/useSearch";
-import { SearchBar, HeroBanner } from "@/components/ui";
+import { SearchBar, HeroBanner, Breadcrumbs } from "@/components/ui";
 
 export default function TasksPage() {
   const params = useParams();
@@ -122,24 +122,16 @@ export default function TasksPage() {
 
   const selectedPhase = phases.find((p) => p.id === selectedPhaseId);
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project.name, href: `/projects/${projectId}` },
+    { label: "Tasks" },
+  ];
+
   return (
     <div>
-      {/* Breadcrumb Navigation */}
-      <nav className="mb-4 text-sm text-gray-600">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href={`/projects/${projectId}`} className="hover:text-primary-600">
-          {project.name}
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">Tasks</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Tasks</h1>

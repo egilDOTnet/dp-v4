@@ -8,7 +8,7 @@ import PhaseTimeline from "@/components/PhaseTimeline";
 import VendorWidget from "@/components/VendorWidget";
 import RFIWidget from "@/components/RFIWidget";
 import RequirementsWidget from "@/components/RequirementsWidget";
-import { HeroBanner } from "@/components/ui";
+import { HeroBanner, Breadcrumbs } from "@/components/ui";
 
 export default function ProjectDashboardPage() {
   const params = useParams();
@@ -62,20 +62,15 @@ export default function ProjectDashboardPage() {
     );
   }
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/dashboard?noAutoRedirect=true" },
+    { label: "Projects", href: "/projects" },
+    { label: project.name },
+  ];
+
   return (
     <div>
-      {/* Breadcrumb Navigation */}
-      <nav className="mb-4 text-sm text-text-secondary">
-        <Link href="/dashboard" className="hover:text-primary-600">
-          Dashboard
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/projects" className="hover:text-primary-600">
-          Projects
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-text-primary">{project.name}</span>
-      </nav>
+      <Breadcrumbs items={breadcrumbItems} />
 
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Project Dashboard</h1>

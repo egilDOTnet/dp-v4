@@ -123,6 +123,7 @@ Route groups `(groupName)` organize routes without affecting the URL:
 3. **Use route groups** for organization without affecting URLs
 4. **Test routes immediately** after creation to catch routing errors early
 5. **Keep route structure flat** when possible - avoid deep nesting
+6. **Use the Breadcrumbs component** for all page navigation (see `DESIGN_SYSTEM.md` for details)
 
 ## Examples
 
