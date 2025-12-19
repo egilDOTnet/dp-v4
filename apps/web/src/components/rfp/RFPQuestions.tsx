@@ -101,7 +101,7 @@ export default function RFPQuestions({ projectId, rfp: _rfp }: RFPQuestionsProps
         <div className="flex-1 max-w-md">
           <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search questions..." />
         </div>
-        <Button onClick={() => setCreateModalOpen(true)} variant="primary">
+        <Button onClick={() => setCreateModalOpen(true)} variant="primary" className="ml-auto">
           Add Question
         </Button>
       </div>
