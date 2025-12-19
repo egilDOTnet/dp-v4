@@ -1859,6 +1859,7 @@ export interface RFPDetail extends RFPListItem {
     description: string;
     fileName: string | null;
     fileType: string | null;
+    fileData: string | null;
     fileSize: number | null;
     url: string | null;
     order: number;

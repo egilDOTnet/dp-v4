@@ -10,6 +10,10 @@ This PR introduces comprehensive vendor portal functionality for the Dynamic Pur
 - **Authentication System**: Magic link and password-based authentication for vendor contacts
 - **RFP Listing**: Vendors can view all RFPs they're invited to participate in
 - **RFP Details**: Comprehensive RFP viewing with information, schedule, documents, and questions
+- **Document Download**: "Get all" button to download all RFP documents and links as a single zip file
+  - Automatically detects user's operating system (Windows, macOS, iOS)
+  - Creates platform-specific link files (.url for Windows, .webloc for macOS/iOS)
+  - Uses project name as the zip filename
 - **Participation Management**: Vendors can participate in RFPs, submit proposals, and track their status
 - **Question & Answer**: Vendors can ask questions and view answers from project administrators
 - **Proposal Submission**: File upload and management for RFP proposals
@@ -81,6 +85,7 @@ This PR introduces comprehensive vendor portal functionality for the Dynamic Pur
 - Question submission interface
 - Proposal file upload and management
 - Vendor authentication flow
+- Document bulk download with OS-specific link file generation
 
 ### Middleware
 - Vendor authentication middleware
@@ -149,6 +154,9 @@ None. This is a feature addition that doesn't break existing functionality.
 - `apps/api/src/routes/rfp.ts` - Enhanced RFP publishing and management
 - `packages/db/prisma/schema.prisma` - Database schema updates
 - `apps/web/src/components/rfp/` - RFP component improvements
+- `apps/web/src/components/portal/RFPInformation.tsx` - Added "Get all" document download feature
+- `apps/web/src/lib/api.ts` - Updated RFPDetail interface to include fileData in documents
+- `apps/web/package.json` - Added JSZip dependency for zip file creation
 - Various UI components for design system integration
 
 ## Documentation

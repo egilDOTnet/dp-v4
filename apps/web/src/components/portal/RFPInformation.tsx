@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { RFPDetail } from "@/lib/api";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
+import { Button } from "@/components/ui/FormField";
 import { formatISODate, formatISODateTime } from "@/lib/utils";
 
 interface RFPInformationProps {
@@ -10,6 +12,8 @@ interface RFPInformationProps {
 }
 
 export function RFPInformation({ rfp }: RFPInformationProps) {
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
   const handleDocumentDownload = (doc: RFPDetail["documents"][0]) => {
     if (!doc.fileData || !doc.fileName || !doc.fileType) return;
     
@@ -21,6 +25,123 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Detect user's operating system
+  const detectOS = (): "windows" | "macos" | "ios" | "other" => {
+    if (typeof window === "undefined") return "other";
+    
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const platform = window.navigator.platform.toLowerCase();
+    
+    if (userAgent.includes("win") || platform.includes("win")) {
+      return "windows";
+    }
+    if (userAgent.includes("mac") || platform.includes("mac")) {
+      return "macos";
+    }
+    if (userAgent.includes("iphone") || userAgent.includes("ipad")) {
+      return "ios";
+    }
+    return "other";
+  };
+
+  // Generate Windows .url file content
+  const generateUrlFile = (url: string, description: string): string => {
+    return `[InternetShortcut]\r\nURL=${url}\r\n`;
+  };
+
+  // Generate macOS/iOS .webloc file content (XML plist format)
+  const generateWeblocFile = (url: string): string => {
+    // Escape XML special characters in URL
+    const escapedUrl = url
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+    
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>URL</key>
+    <string>${escapedUrl}</string>
+</dict>
+</plist>`;
+  };
+
+  // Sanitize filename to remove invalid characters
+  const sanitizeFileName = (name: string): string => {
+    return name.replace(/[<>:"/\\|?*]/g, "_").trim();
+  };
+
+  // Handle downloading all documents as a zip
+  const handleDownloadAll = async () => {
+    if (rfp.documents.length === 0) return;
+    if (typeof window === "undefined") return; // Only run on client
+    
+    setDownloadingAll(true);
+    try {
+      // Dynamic import JSZip - use browser build for better compatibility
+      const JSZipModule = await import("jszip/dist/jszip.min.js");
+      const JSZip = JSZipModule.default || JSZipModule;
+      
+      if (!JSZip) {
+        throw new Error("JSZip not available");
+      }
+      
+      const zip = new JSZip();
+      const os = detectOS();
+      const isWindows = os === "windows";
+      const isMacOrIOS = os === "macos" || os === "ios";
+
+      // Process each document
+      for (const doc of rfp.documents) {
+        if (doc.type === "Document" && doc.fileName && doc.fileData) {
+          // Add document file to zip
+          const fileData = Uint8Array.from(atob(doc.fileData), (c) => c.charCodeAt(0));
+          zip.file(sanitizeFileName(doc.fileName), fileData);
+        } else if (doc.type === "Link" && doc.url) {
+          // Create link file based on OS
+          const linkFileName = sanitizeFileName(doc.description || "link");
+          
+          if (isWindows) {
+            // Create .url file for Windows
+            const urlContent = generateUrlFile(doc.url, doc.description || "");
+            zip.file(`${linkFileName}.url`, urlContent);
+          } else if (isMacOrIOS) {
+            // Create .webloc file for macOS/iOS
+            const weblocContent = generateWeblocFile(doc.url);
+            zip.file(`${linkFileName}.webloc`, weblocContent);
+          } else {
+            // For other OS, create a simple text file with the URL
+            zip.file(`${linkFileName}.txt`, `URL: ${doc.url}\nDescription: ${doc.description || ""}`);
+          }
+        }
+      }
+
+      // Generate zip file
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      
+      // Create download link
+      const projectName = sanitizeFileName(rfp.project.name);
+      const zipFileName = `${projectName}.zip`;
+      
+      const url = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = zipFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error creating zip file:", error);
+      alert("Failed to create zip file. Please try again.");
+    } finally {
+      setDownloadingAll(false);
+    }
   };
 
   return (
@@ -74,7 +195,20 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
         {/* Column 3: Documents/Links */}
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-text-primary">Documents</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-text-primary">Documents</h2>
+              {rfp.documents.length > 0 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDownloadAll}
+                  disabled={downloadingAll}
+                  loading={downloadingAll}
+                >
+                  Get all
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardBody>
             <div className="space-y-3">
