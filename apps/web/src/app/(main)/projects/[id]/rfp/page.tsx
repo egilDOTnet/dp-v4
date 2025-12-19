@@ -212,11 +212,11 @@ export default function RFPPage() {
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="about">About</TabsTrigger>
-              <TabsTrigger value="schedule">Schedule</TabsTrigger>
-              <TabsTrigger value="documents">Documents/Links</TabsTrigger>
-              <TabsTrigger value="changelog">Changelog</TabsTrigger>
-              <TabsTrigger value="qa">Q&A</TabsTrigger>
               <TabsTrigger value="announcements">Announcements</TabsTrigger>
+              <TabsTrigger value="changelog">Changelog</TabsTrigger>
+              <TabsTrigger value="documents">Documents/Links</TabsTrigger>
+              <TabsTrigger value="schedule">Schedule</TabsTrigger>
+              <TabsTrigger value="qa">Q&A</TabsTrigger>
             </TabsList>
 
             {/* Action buttons on the right */}
@@ -240,7 +240,7 @@ export default function RFPPage() {
           </div>
 
           <TabsContent value="overview">
-            <RFPOverview projectId={projectId} rfp={rfp} />
+            <RFPOverview projectId={projectId} rfp={rfp} project={project} onTabChange={(tab) => setActiveTab(tab as TabType)} onRfpUpdate={loadRFP} />
           </TabsContent>
 
           <TabsContent value="about">

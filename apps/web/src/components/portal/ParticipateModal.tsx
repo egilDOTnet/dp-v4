@@ -19,7 +19,7 @@ export function ParticipateModal({ rfp, onConfirm, onCancel }: ParticipateModalP
         <DialogHeader>
           <DialogTitle>Confirm Participation</DialogTitle>
           <DialogDescription>
-            By clicking OK, you agree to return with an offer before {deliveryDate ? formatISODate(deliveryDate) : "the delivery date"}.
+            By clicking OK, you agree to return with an offer before {deliveryDate ? formatISODate(deliveryDate) : "the deadline for delivery"}.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

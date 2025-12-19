@@ -293,7 +293,7 @@ describe("RFP Routes", () => {
       await createTestRFPScheduleItem({
         rfpId: rfp.id,
         type: "StartDate",
-        description: "RFP Start Date/Time",
+        description: "Publish date",
         date: new Date("2025-12-01"),
         isRequired: true,
         order: 0,
@@ -301,7 +301,7 @@ describe("RFP Routes", () => {
       await createTestRFPScheduleItem({
         rfpId: rfp.id,
         type: "AcceptanceDate",
-        description: "Acceptance Date/Time",
+        description: "Deadline for Acceptance",
         date: new Date("2025-12-15"),
         isRequired: true,
         order: 1,
@@ -309,7 +309,7 @@ describe("RFP Routes", () => {
       await createTestRFPScheduleItem({
         rfpId: rfp.id,
         type: "QuestionsDate",
-        description: "Questions Date/Time",
+        description: "Deadline for Questions",
         date: new Date("2025-12-10"),
         isRequired: true,
         order: 2,
@@ -317,7 +317,7 @@ describe("RFP Routes", () => {
       await createTestRFPScheduleItem({
         rfpId: rfp.id,
         type: "DeliveryDate",
-        description: "Delivery Date/Time",
+        description: "Deadline for Delivery",
         date: new Date("2025-12-20"),
         isRequired: true,
         order: 3,
@@ -367,7 +367,7 @@ describe("RFP Routes", () => {
       await createTestRFPScheduleItem({
         rfpId: rfp.id,
         type: "StartDate",
-        description: "RFP Start Date/Time",
+        description: "Publish date",
         date: null,
         isRequired: true,
         order: 0,

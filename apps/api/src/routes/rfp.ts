@@ -18,10 +18,10 @@ async function initializeDefaultScheduleItems(rfpId: string) {
 
   // Create default schedule items (only if they don't exist)
   const defaultItems = [
-    { type: "StartDate" as const, description: "RFP Start Date/Time", date: null, isRequired: true, order: 0 },
-    { type: "AcceptanceDate" as const, description: "Acceptance Date/Time", date: null, isRequired: true, order: 1 },
-    { type: "QuestionsDate" as const, description: "Questions Date/Time", date: null, isRequired: true, order: 2 },
-    { type: "DeliveryDate" as const, description: "Delivery Date/Time", date: null, isRequired: true, order: 3 },
+    { type: "StartDate" as const, description: "Publish date", date: null, isRequired: true, order: 0 },
+    { type: "AcceptanceDate" as const, description: "Deadline for Acceptance", date: null, isRequired: true, order: 1 },
+    { type: "QuestionsDate" as const, description: "Deadline for Questions", date: null, isRequired: true, order: 2 },
+    { type: "DeliveryDate" as const, description: "Deadline for Delivery", date: null, isRequired: true, order: 3 },
   ];
 
   for (const itemData of defaultItems) {

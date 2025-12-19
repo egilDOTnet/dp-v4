@@ -286,6 +286,62 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
 - Accessible ARIA attributes
 - Smooth transitions between states
 
+#### Searchable Dropdown/Selector
+For dropdowns that allow users to select from a list of options, use searchable dropdown components instead of native `<select>` elements. These provide a better user experience with search functionality and visual display of options.
+
+**ContactPersonSelector** (example implementation):
+```tsx
+import { ContactPersonSelector, ContactPerson } from '@/components/ui';
+
+const options: ContactPerson[] = [
+  {
+    id: "1",
+    email: "john@example.com",
+    firstName: "John",
+    lastName: "Doe",
+    name: "John Doe",
+  },
+  // ... more options
+];
+
+<ContactPersonSelector
+  value={selectedPerson}
+  options={options}
+  onChange={(person) => setSelectedPerson(person)}
+  placeholder="Select contact person"
+  label="Contact Person"
+/>
+```
+
+**Features**:
+- Search field at the top for filtering options
+- Displays avatars/initials and names in the dropdown
+- Keyboard navigation (Escape to close, Ctrl-A/Command-A to select all in search)
+- Auto-focuses search input when dropdown opens
+- Clear selection option
+- Visual indication of selected item
+- Accessible ARIA attributes
+
+**When to Use**:
+- Selecting users, contacts, or people (use ContactPersonSelector or similar)
+- Selecting from lists with 5+ items
+- When search/filtering would improve usability
+- When displaying additional information (avatars, descriptions) is helpful
+
+**When NOT to Use**:
+- Simple binary choices (use toggle/checkbox instead)
+- Very short lists (2-4 items) where a native select is sufficient
+- When space is extremely constrained
+
+**Creating Custom Searchable Selectors**:
+When creating new searchable selector components, follow the ContactPersonSelector pattern:
+1. Use Radix UI DropdownMenu for accessibility
+2. Include a search input at the top of the dropdown
+3. Filter options based on search query
+4. Display options with relevant visual information (avatars, icons, etc.)
+5. Support keyboard navigation
+6. Show selected state clearly
+
 #### Other Components
 - **Badge**: Status indicators with color variants
 - **Avatar**: User avatars with initials
@@ -294,7 +350,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
 - **Container**: Responsive page container
 - **PageHeader**: Standard page header with title, description, actions
 - **Breadcrumbs**: Navigation breadcrumbs
-- **Select**: Styled select dropdowns
+- **Select**: Styled select dropdowns (use only for simple, short lists; prefer searchable dropdowns for longer lists)
 - **Textarea**: Auto-growing text areas
 - **FormField**: Wrapper for form inputs with labels and errors
 
@@ -454,6 +510,8 @@ import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcuts';
 useKeyboardShortcut('s', handleSave, { ctrlOrMeta: true });
 ```
 
+**Note**: The hook is exported as `useKeyboardShortcut` (singular) from the file `useKeyboardShortcuts.ts` (plural).
+
 ## Patterns
 
 ### Inline Editing
@@ -525,39 +583,40 @@ All list views include instant search:
 - Clear button to reset
 
 ### Filtering Pattern
-When filtering is needed in addition to search, use a filter component with dropdowns:
+When filtering is needed in addition to search, use a filter component with searchable dropdowns:
 
 - **Placement**: Right-aligned next to action buttons (e.g., "Check all")
 - **Default State**: Gray background (`bg-background-secondary`) with border
 - **Active State**: Blue background (`bg-accent-600`) when any filter is selected
-- **Structure**: Filter icon, "Filter by" text, and dropdown selects
+- **Structure**: Filter icon, "Filter by" text, and searchable dropdown selectors
 - **Sizing**: 
   - Container padding: `px-3 py-1` (compact to match button height)
-  - Select dropdowns: `h-7` (28px height) with `px-1.5 py-0.5` padding
+  - Dropdown selectors: Match height of adjacent buttons
   - This ensures the filter bar matches the height of adjacent buttons
 - **Behavior**: 
   - Filters combine with search (both apply simultaneously)
   - Filtered results expand hierarchies to show matching items
   - "Check all" button changes to "Check result" when filtering is active
   - Shows "X of Y items" count when filtering
+- **Dropdown Type**: Use searchable dropdown components (like ContactPersonSelector pattern) for filter dropdowns with 5+ options. For very short lists (2-4 items), native `<select>` may be acceptable.
 
-**Implementation Example**:
+**Implementation Example** (with searchable dropdown):
 ```tsx
 <div className={`flex items-center gap-2 px-3 py-1 rounded-md border border-border-primary ${
   isFiltering ? 'bg-accent-600' : 'bg-background-secondary'
 }`}>
   <FilterIcon className="h-4 w-4" />
   <span className="text-sm">Filter by</span>
-  <select 
-    value={filterStatus || ""} 
-    onChange={...}
-    className="text-sm rounded px-1.5 py-0.5 border border-border-primary h-7 bg-background-tertiary text-text-primary"
-  >
-    <option value="">Status</option>
-    {/* options */}
-  </select>
+  <StatusSelector
+    value={filterStatus}
+    options={statusOptions}
+    onChange={setFilterStatus}
+    placeholder="Status"
+  />
 </div>
 ```
+
+**Note**: For filter dropdowns with many options, prefer searchable dropdown components over native `<select>` elements to improve usability.
 
 ### List Element Backgrounds
 List items should use the lightest background shade (`background-tertiary`) to create visual separation from their container:
@@ -839,6 +898,17 @@ Modals use the Dialog component from `@/components/ui/Dialog.tsx` which automati
 
 When editing multiple items, use "Don't change" as the default option for all fields. This allows users to selectively update only the fields they want to change:
 
+**For dropdowns with 5+ options**, use searchable dropdown components:
+```tsx
+<ContactPersonSelector
+  value={selectedPerson}
+  options={personOptions}
+  onChange={setSelectedPerson}
+  placeholder="Don't change"
+/>
+```
+
+**For very short lists (2-4 options)**, native select may be acceptable:
 ```tsx
 <Select value={type} onChange={(e) => setType(e.target.value)}>
   <option value="">Don't change</option>
@@ -847,7 +917,7 @@ When editing multiple items, use "Don't change" as the default option for all fi
 </Select>
 ```
 
-Only fields that are not "Don't change" (empty string) should be included in the update payload.
+Only fields that are not "Don't change" (empty string or null) should be included in the update payload.
 
 ### Description Icon/Symbol Pattern
 
@@ -974,7 +1044,7 @@ All hero banners use **blue (accent) colors** to distinguish them from primary g
 
 ### Component
 
-Use the `HeroBanner` component from `@/components/ui`:
+Use the `HeroBanner` component from `@/components/ui` (exported from `@/components/HeroBanner.tsx`):
 
 ```tsx
 import { HeroBanner } from "@/components/ui";
@@ -1060,18 +1130,34 @@ All dates displayed in the application follow these standards:
 - Format: `YYYY-MM-DD HH:MM`
 - Example: `2024-12-10 14:30`
 - Used for: Comments, activity logs, timestamps with time information
-- Implementation: Use `formatDateTimeISO(dateString)` utility function
+- Implementation: Use `formatDateTimeISO(dateString)` from `@/lib/date-utils`
 
 **Without Timestamp (Date Only)**:
 - Format: `YYYY-MM-DD`
 - Example: `2024-12-10`
 - Used for: Date inputs, date-only displays, calendar views
-- Implementation: Use `formatDate(dateString)` utility function
+- Implementation: Use `formatDate(dateString)` from `@/lib/date-utils`
 
 **Short Display Format** (for compact views):
 - Format: `MMM DD` (e.g., "Dec 10")
 - Used for: Task lists, compact cards, when space is limited
-- Implementation: Use `formatDateDisplay(dateString)` utility function
+- Implementation: Use `formatDateDisplay(dateString)` from `@/lib/date-utils`
+
+**Usage Example**:
+```tsx
+import { formatDate, formatDateDisplay, formatDateTimeISO } from '@/lib/date-utils';
+
+// For date inputs
+<input type="date" value={formatDate(task.startDate)} />
+
+// For compact displays
+<span>{formatDateDisplay(task.startDate)}</span>
+
+// For timestamps
+<span>{formatDateTimeISO(comment.createdAt)}</span>
+```
+
+**Note**: These utility functions are available in `apps/web/src/lib/date-utils.ts`. Components should use these shared utilities instead of defining inline formatting functions.
 
 ### Comment Date Display
 
@@ -1112,7 +1198,7 @@ The application supports importing data from CSV files for Tasks, RFI Questionna
 
 ### Import Wizard
 
-The `ImportWizard` component provides a multi-step process for importing data:
+The `ImportWizard` component (located at `apps/web/src/components/ImportWizard.tsx`) provides a multi-step process for importing data:
 
 1. **Data Type Selection**: Choose what type of data to import
 2. **File Selection**: Upload and validate CSV file

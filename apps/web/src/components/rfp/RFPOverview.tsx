@@ -1,19 +1,54 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, RFP, ProjectVendor } from "@/lib/api";
-import { Card, CardBody, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui";
+import { api, RFP, ProjectVendor, Project } from "@/lib/api";
+import { Card, CardBody, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, ContactPersonSelector, ContactPerson } from "@/components/ui";
 import { formatISODateTime } from "@/lib/utils";
 
 interface RFPOverviewProps {
   projectId: string;
   rfp: RFP;
+  project?: Project | null;
+  onTabChange?: (tab: string) => void;
+  onRfpUpdate?: () => void;
 }
 
-export default function RFPOverview({ projectId, rfp }: RFPOverviewProps) {
+export default function RFPOverview({ projectId, rfp, project, onTabChange, onRfpUpdate }: RFPOverviewProps) {
   const [vendors, setVendors] = useState<ProjectVendor[]>([]);
   const [unansweredCount, setUnansweredCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [isSavingAlternativeContact, setIsSavingAlternativeContact] = useState(false);
+
+  // Convert project members to ContactPerson format
+  const contactOptions: ContactPerson[] = (project?.members || []).map((member) => ({
+    id: member.id,
+    email: member.email,
+    firstName: member.firstName,
+    lastName: member.lastName,
+    name: member.name,
+  }));
+
+  // Convert RFP contact person to ContactPerson format
+  const contactPersonValue: ContactPerson | null = rfp.contactPerson
+    ? {
+        id: rfp.contactPerson.id,
+        email: rfp.contactPerson.email,
+        firstName: rfp.contactPerson.firstName,
+        lastName: rfp.contactPerson.lastName,
+        name: rfp.contactPerson.name,
+      }
+    : null;
+
+  const alternativeContactPersonValue: ContactPerson | null = rfp.alternativeContactPerson
+    ? {
+        id: rfp.alternativeContactPerson.id,
+        email: rfp.alternativeContactPerson.email,
+        firstName: rfp.alternativeContactPerson.firstName,
+        lastName: rfp.alternativeContactPerson.lastName,
+        name: rfp.alternativeContactPerson.name,
+      }
+    : null;
 
   useEffect(() => {
     loadData();
@@ -49,12 +84,50 @@ export default function RFPOverview({ projectId, rfp }: RFPOverviewProps) {
   };
 
 
-  const getContactName = (contact: RFP["contactPerson"]) => {
-    if (!contact) return "Not set";
-    if (contact.firstName || contact.lastName) {
-      return `${contact.firstName || ""} ${contact.lastName || ""}`.trim();
+  const handleContactPersonChange = async (person: ContactPerson | null) => {
+    setIsSavingContact(true);
+    try {
+      await api.rfp.update(projectId, {
+        contactPersonId: person?.id || null,
+      });
+      if (onRfpUpdate) {
+        onRfpUpdate();
+      }
+    } catch (err: any) {
+      console.error("Error updating contact person:", err);
+      alert("Failed to update contact person. Please try again.");
+    } finally {
+      setIsSavingContact(false);
     }
-    return contact.name || contact.email || "Unknown";
+  };
+
+  const handleAlternativeContactPersonChange = async (person: ContactPerson | null) => {
+    setIsSavingAlternativeContact(true);
+    try {
+      await api.rfp.update(projectId, {
+        alternativeContactPersonId: person?.id || null,
+      });
+      if (onRfpUpdate) {
+        onRfpUpdate();
+      }
+    } catch (err: any) {
+      console.error("Error updating alternative contact person:", err);
+      alert("Failed to update alternative contact person. Please try again.");
+    } finally {
+      setIsSavingAlternativeContact(false);
+    }
+  };
+
+  const handleUnansweredQuestionsClick = () => {
+    if (onTabChange) {
+      onTabChange("qa");
+    }
+  };
+
+  const handleDateClick = () => {
+    if (onTabChange) {
+      onTabChange("schedule");
+    }
   };
 
   if (loading) {
@@ -72,54 +145,65 @@ export default function RFPOverview({ projectId, rfp }: RFPOverviewProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Status</div>
+            <div className="text-sm font-medium text-text-primary mb-1">Status</div>
             <Badge className={getStatusColor(rfp.status)}>{rfp.status}</Badge>
           </CardBody>
         </Card>
 
-        <Card>
-          <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Unanswered Questions</div>
-            <div className="text-2xl font-bold text-text-primary">{unansweredCount}</div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Contact Person</div>
-            <div className="text-text-primary">{getContactName(rfp.contactPerson)}</div>
-            {rfp.contactPerson?.email && (
-              <div className="text-sm text-text-secondary">{rfp.contactPerson.email}</div>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Alternative Contact</div>
-            <div className="text-text-primary">
-              {rfp.alternativeContactPerson ? getContactName(rfp.alternativeContactPerson) : "Not set"}
+        <Card
+          variant="interactive"
+          onClick={handleUnansweredQuestionsClick}
+        >
+          <CardBody className="min-h-[80px]">
+            <div className="text-sm font-medium text-text-primary mb-1 text-left">Unanswered Questions</div>
+            <div className="text-2xl font-bold text-text-primary text-center">
+              {unansweredCount}
             </div>
-            {rfp.alternativeContactPerson?.email && (
-              <div className="text-sm text-text-secondary">{rfp.alternativeContactPerson.email}</div>
-            )}
+          </CardBody>
+        </Card>
+
+        <Card variant="interactive">
+          <CardBody>
+            <ContactPersonSelector
+              value={contactPersonValue}
+              options={contactOptions}
+              onChange={handleContactPersonChange}
+              placeholder="Not set"
+              label="Contact Person"
+            />
+          </CardBody>
+        </Card>
+
+        <Card variant="interactive">
+          <CardBody>
+            <ContactPersonSelector
+              value={alternativeContactPersonValue}
+              options={contactOptions}
+              onChange={handleAlternativeContactPersonChange}
+              placeholder="Not set"
+              label="Alternative Contact"
+            />
           </CardBody>
         </Card>
       </div>
 
       {/* Dates */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+        <Card variant="interactive" onClick={handleDateClick}>
           <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Publish Date/Time</div>
-            <div className="text-text-primary">{rfp.publishDate ? formatISODateTime(rfp.publishDate) : "Not set"}</div>
+            <div className="text-sm font-medium text-text-primary mb-1 text-left">Publish date</div>
+            <div className="text-text-primary text-left">
+              {rfp.publishDate ? formatISODateTime(rfp.publishDate) : "Not set"}
+            </div>
           </CardBody>
         </Card>
 
-        <Card>
+        <Card variant="interactive" onClick={handleDateClick}>
           <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Delivery Date/Time</div>
-            <div className="text-text-primary">{rfp.deliveryDate ? formatISODateTime(rfp.deliveryDate) : "Not set"}</div>
+            <div className="text-sm font-medium text-text-primary mb-1 text-left">Deadline for Delivery</div>
+            <div className="text-text-primary text-left">
+              {rfp.deliveryDate ? formatISODateTime(rfp.deliveryDate) : "Not set"}
+            </div>
           </CardBody>
         </Card>
       </div>

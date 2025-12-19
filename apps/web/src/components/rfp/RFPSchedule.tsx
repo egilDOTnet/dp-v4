@@ -951,7 +951,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                                 className="rounded"
                               />
                               <label className="text-sm text-text-primary">
-                                Link to delivery date
+                                Link to deadline for delivery
                               </label>
                             </div>
                           )}
@@ -1043,7 +1043,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                           )}
                           {isQuestionsDate && deliveryItem?.date && !isNew && (
                             <p className="text-xs text-text-secondary mt-1">
-                              Must be before delivery date: {displayDateTime(deliveryItem.date)}
+                              Must be before deadline for delivery: {displayDateTime(deliveryItem.date)}
                             </p>
                           )}
                         </>

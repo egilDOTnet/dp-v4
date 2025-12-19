@@ -19,13 +19,20 @@ The API uses JWT (JSON Web Tokens) for authentication. Most endpoints require a 
 
 ### Getting a Token
 
-1. **Login with Password** (if user has password set):
+1. **Check User** (determine authentication method):
+   ```
+   POST /api/auth/check-user
+   Body: { "email": "user@example.com" }
+   ```
+   Returns: `{ "exists": true, "hasPassword": true }`
+
+2. **Login with Password** (if user has password set):
    ```
    POST /api/auth/login
    Body: { "email": "user@example.com", "password": "password123" }
    ```
 
-2. **Magic Link** (passwordless authentication):
+3. **Magic Link** (passwordless authentication):
    ```
    POST /api/auth/magic-link
    Body: { "email": "user@example.com" }
@@ -36,6 +43,20 @@ The API uses JWT (JSON Web Tokens) for authentication. Most endpoints require a 
    POST /api/auth/set-password
    Body: { "token": "<token>", "password": "newpassword123" }
    ```
+
+4. **Get Current User**:
+   ```
+   GET /api/auth/me
+   Authorization: Bearer <token>
+   ```
+   Returns current authenticated user information.
+
+5. **Logout**:
+   ```
+   POST /api/auth/logout
+   Authorization: Bearer <token>
+   ```
+   Note: In stateless JWT systems, logout is primarily client-side. This endpoint exists for consistency and future token blacklist support.
 
 ### Using the Token
 
@@ -53,9 +74,12 @@ Authorization: Bearer <your-jwt-token>
 - **Projects** (`/api/projects`) - Project CRUD, phases, tasks, vendors, dashboard
 - **Requirements** (`/api/projects/:projectId/requirements`) - Requirement hierarchies and management
 - **RFI** (`/api/projects/:id/rfi`) - Request for Information management
+- **RFP** (`/api/projects/:id/rfp`) - Request for Proposal management
 - **Vendors** (`/api/vendors`) - Vendor search and lookup
 - **Templates** (`/api/templates`) - Template management
 - **Notifications** (`/api/notifications`) - User notifications
+- **Vendor RFI** (`/api/vendor-rfi/*`) - Vendor-facing RFI response endpoints (token-based)
+- **Vendor RFP** (`/api/vendor-rfp/*`) - Vendor-facing RFP response endpoints (token-based)
 
 ## Common Patterns
 
@@ -146,6 +170,96 @@ The API is currently at version 1.0.0. Future versions will be indicated in the 
 /api/v2/...
 ```
 
+## Endpoint Details
+
+### RFP Endpoints
+
+All RFP endpoints are under `/api/projects/:id/rfp` where `:id` is the project ID.
+
+#### RFP Management
+- `GET /api/projects/:id/rfp` - Get RFP for a project (creates if doesn't exist)
+- `PUT /api/projects/:id/rfp` - Update RFP settings (status, contacts, dates, about)
+
+#### RFP Publishing and Sending
+- `POST /api/projects/:id/rfp/publish` - Publish the RFP
+- `POST /api/projects/:id/rfp/send` - Send RFP to vendors
+
+#### RFP Schedule
+- `GET /api/projects/:id/rfp/schedule` - Get all schedule items
+- `POST /api/projects/:id/rfp/schedule` - Create a new schedule item
+- `PUT /api/projects/:id/rfp/schedule/:itemId` - Update a schedule item
+- `DELETE /api/projects/:id/rfp/schedule/:itemId` - Delete a schedule item
+
+#### RFP Documents
+- `GET /api/projects/:id/rfp/documents` - Get all RFP documents
+- `POST /api/projects/:id/rfp/documents` - Upload a new document
+- `PUT /api/projects/:id/rfp/documents/:docId` - Update document metadata
+- `DELETE /api/projects/:id/rfp/documents/:docId` - Delete a document
+- `PUT /api/projects/:id/rfp/documents/reorder` - Reorder documents
+
+#### RFP Changelog
+- `GET /api/projects/:id/rfp/changelog` - Get changelog entries
+- `PUT /api/projects/:id/rfp/changelog/:entryId` - Update a changelog entry
+- `DELETE /api/projects/:id/rfp/changelog/:entryId` - Delete a changelog entry
+
+#### RFP Questions
+- `GET /api/projects/:id/rfp/questions` - Get all questions (supports `?filter=answered` or `?filter=unanswered`)
+- `POST /api/projects/:id/rfp/questions` - Create a new question
+- `POST /api/projects/:id/rfp/questions/:questionId/split` - Split a question into multiple questions
+- `PUT /api/projects/:id/rfp/questions/:questionId/answer` - Answer a question
+- `DELETE /api/projects/:id/rfp/questions/:questionId` - Delete a question
+
+#### RFP Announcements
+- `GET /api/projects/:id/rfp/announcements` - Get all announcements
+- `POST /api/projects/:id/rfp/announcements` - Create a new announcement
+- `PUT /api/projects/:id/rfp/announcements/:announcementId` - Update an announcement
+- `DELETE /api/projects/:id/rfp/announcements/:announcementId` - Delete an announcement
+- `POST /api/projects/:id/rfp/announcements/:announcementId/send` - Send an announcement
+
+### Vendor RFI Endpoints
+
+Vendor RFI endpoints use token-based authentication. Vendors receive a magic link token that grants access to their specific RFI response.
+
+**Base Path**: `/api/vendor-rfi/*`
+
+All endpoints use a catch-all route pattern where the token is part of the URL path:
+
+- `GET /api/vendor-rfi/{token}` - Get RFI data, project info, vendor info, and existing responses
+- `GET /api/vendor-rfi/{token}/response` - Get existing response data and contact person
+- `POST /api/vendor-rfi/{token}/response` - Submit RFI response (answers and contact person)
+- `PUT /api/vendor-rfi/{token}/answers` - Save answers incrementally (auto-save)
+- `GET /api/vendor-rfi/{token}/contacts` - Get all contacts for the vendor
+- `POST /api/vendor-rfi/{token}/contacts` - Create a new contact person
+
+**Note**: The token is a JWT that contains the vendor response ID. Tokens expire based on the RFI deadline or configured expiration time.
+
+### Vendor RFP Endpoints
+
+Vendor RFP endpoints support both token-based and authenticated access.
+
+#### Vendor RFP Authentication
+- `POST /api/vendor-rfp/auth/check-user` - Check if vendor contact exists and has password
+- `POST /api/vendor-rfp/auth/login` - Login with email and password
+- `POST /api/vendor-rfp/auth/magic-link` - Request magic link for passwordless auth
+- `POST /api/vendor-rfp/auth/set-password` - Set password from magic link token
+- `GET /api/vendor-rfp/auth/me` - Get current authenticated vendor contact
+
+#### Vendor RFP Data Access
+- `GET /api/vendor-rfp/rfps` - List RFPs accessible to the authenticated vendor
+- `GET /api/vendor-rfp/rfps/:rfpId` - Get RFP details (supports optional `?token=` query param for token-based access)
+- `POST /api/vendor-rfp/rfps/:rfpId/participate` - Participate in an RFP (creates vendor response)
+
+#### Vendor RFP Questions
+- `GET /api/vendor-rfp/rfps/:rfpId/questions` - Get questions for an RFP
+- `POST /api/vendor-rfp/rfps/:rfpId/questions` - Submit a question about the RFP
+
+#### Vendor RFP Proposals
+- `GET /api/vendor-rfp/rfps/:rfpId/proposal` - Get proposal data (questions, answers, files)
+- `POST /api/vendor-rfp/rfps/:rfpId/proposal/files` - Upload a proposal file
+- `PUT /api/vendor-rfp/rfps/:rfpId/proposal/files/:fileId` - Update file metadata
+- `DELETE /api/vendor-rfp/rfps/:rfpId/proposal/files/:fileId` - Delete a proposal file
+- `POST /api/vendor-rfp/rfps/:rfpId/proposal/submit` - Submit the proposal
+
 ## Examples
 
 ### Creating a Project
@@ -183,6 +297,53 @@ Content-Type: application/json
 
 ```bash
 GET /api/vendors/search?query=Acme%20Corporation
+Authorization: Bearer <token>
+```
+
+### RFP Management
+
+```bash
+# Get or create RFP for a project
+GET /api/projects/{projectId}/rfp
+Authorization: Bearer <token>
+
+# Update RFP settings
+PUT /api/projects/{projectId}/rfp
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "status": "Published",
+  "contactPersonId": "contact-id",
+  "publishDate": "2024-01-15T10:00:00Z",
+  "deliveryDate": "2024-02-15T10:00:00Z",
+  "about": "RFP description"
+}
+
+# Publish RFP
+POST /api/projects/{projectId}/rfp/publish
+Authorization: Bearer <token>
+
+# Send RFP to vendors
+POST /api/projects/{projectId}/rfp/send
+Authorization: Bearer <token>
+```
+
+### Vendor Authentication (RFP)
+
+Vendors can authenticate to access RFP responses:
+
+```bash
+# Check if vendor contact exists
+POST /api/vendor-rfp/auth/check-user
+Body: { "email": "vendor@example.com" }
+
+# Login with password
+POST /api/vendor-rfp/auth/login
+Body: { "email": "vendor@example.com", "password": "password123" }
+
+# Get current vendor user
+GET /api/vendor-rfp/auth/me
 Authorization: Bearer <token>
 ```
 

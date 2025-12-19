@@ -77,3 +77,7 @@ export { HeroBanner } from "../HeroBanner";
 // Tabs Components
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
 export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } from "./Tabs";
+
+// Contact Person Selector
+export { ContactPersonSelector } from "./ContactPersonSelector";
+export type { ContactPerson } from "./ContactPersonSelector";
