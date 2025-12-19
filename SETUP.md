@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- Node.js 18+
-- pnpm 8+
+- Node.js 20.9.0+ (LTS)
+- pnpm 10.26.1+
 - Docker and Docker Compose
 - PostgreSQL (via Docker)
 

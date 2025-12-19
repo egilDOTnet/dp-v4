@@ -16,7 +16,7 @@ function findPrismaClientPath() {
   
   try {
     const entries = readdirSync(pnpmPath);
-    const prismaEntry = entries.find(entry => entry.startsWith('@prisma+client@7.1.0'));
+    const prismaEntry = entries.find(entry => entry.startsWith('@prisma+client@7.2.0'));
     if (prismaEntry) {
       const clientPath = resolve(pnpmPath, prismaEntry, 'node_modules/@prisma/client');
       if (existsSync(clientPath)) {
@@ -61,14 +61,10 @@ export default defineConfig({
     setupFiles: ['./src/__tests__/setup.ts'],
     testTimeout: 30000, // Increase timeout for integration tests
     hookTimeout: 30000,
-    // Configure pool options for better Node.js module handling
-    pool: 'threads',
-    poolOptions: {
-      threads: {
-        // Run in a single worker to avoid shared-port conflicts in integration tests
-        singleThread: true,
-      },
-    },
+    // Run in a single worker to avoid shared-port conflicts in integration tests
+    // Vitest 4.0: singleThread replaced with maxWorkers: 1 and isolate: false
+    maxWorkers: 1,
+    isolate: false,
   },
   resolve: {
     alias: {

@@ -15,7 +15,7 @@ function findPrismaClientPath() {
   
   try {
     const entries = readdirSync(pnpmPath);
-    const prismaEntry = entries.find(entry => entry.startsWith('@prisma+client@7.1.0'));
+    const prismaEntry = entries.find(entry => entry.startsWith('@prisma+client@7.2.0'));
     if (prismaEntry) {
       const clientPath = path.resolve(pnpmPath, prismaEntry, 'node_modules/@prisma/client');
       if (existsSync(clientPath)) {
@@ -46,12 +46,9 @@ export default defineConfig({
     hookTimeout: 10000,
     // Run tests sequentially to avoid database race conditions
     // This prevents unique constraint violations from parallel test execution
-    pool: "threads",
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
+    // Vitest 4.0: singleThread replaced with maxWorkers: 1 and isolate: false
+    maxWorkers: 1,
+    isolate: false,
     // Allow mixing ESM and CommonJS
     transformMode: {
       web: [/\.[jt]sx?$/],

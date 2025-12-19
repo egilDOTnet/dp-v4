@@ -15,19 +15,20 @@ This README outlines the tech stack, goals, structure, and setup steps.
 ## Tech Stack
 
 ### Frontend
-- Next.js (App Router)
-- TypeScript
-- Tailwind CSS
+- **Next.js 16.1.0** (App Router)
+- **React 19.2.3** (with React DOM)
+- **TypeScript 5.9.3**
+- **Tailwind CSS 4.1.18**
 - shadcn/ui
 - React Query (server state)
-- React Hook Form + Zod (forms + validation)
+- **React Hook Form 7.68.0** + **Zod 4.2.1** (forms + validation)
 - Optional: NextAuth or AWS Cognito integration
 
 ### Backend
-- Fastify (Node.js + TypeScript)
-- Zod for runtime validation
+- **Fastify 5.6.2** (Node.js + TypeScript)
+- **Zod 4.2.1** for runtime validation
 - PostgreSQL
-- Prisma ORM
+- **Prisma ORM 7.2.0** (with @prisma/client)
 - Optional: tRPC
 
 ### DevOps & Infrastructure
@@ -35,16 +36,18 @@ This README outlines the tech stack, goals, structure, and setup steps.
 - docker-compose (web + api + postgres)
   - Monorepo-aware: entire workspace mounted for proper pnpm workspace resolution
   - Automatic dependency installation and Prisma client generation
+- **Turborepo 2.7.0** (monorepo build system)
+- **pnpm 10.26.1** (package manager)
 - AWS (ECS Fargate or EKS)
 - AWS Secrets Manager for secrets
 - Terraform or AWS CDK (TypeScript)
 - GitHub Actions for CI/CD
 
 ### Testing
-- Vitest
+- **Vitest 4.0.16**
 - Supertest (backend)
 - Playwright (E2E)
-- ESLint + Prettier
+- ESLint 9.39.2 + Prettier
 
 ---
 
@@ -68,9 +71,13 @@ docker/           # Docker configs
 
 ## Initial Setup
 
-### Option 1: Docker (Recommended)
+**Prerequisites:** Node.js 20.9.0+, pnpm 10.26.1+, Docker
 
-1. **Install dependencies locally (for tooling):**
+See [SETUP.md](./SETUP.md) for detailed setup instructions.
+
+### Quick Start
+
+1. **Install dependencies:**
    ```bash
    pnpm install
    ```
@@ -80,47 +87,14 @@ docker/           # Docker configs
    docker-compose up --build
    ```
 
-   This will:
-   - Start PostgreSQL database
-   - Start Fastify API on port 3001
-   - Start Next.js app on port 3000
-   - Automatically install all workspace dependencies
-   - Generate Prisma client
-
 3. **Run database migrations:**
    ```bash
    docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:migrate"
    ```
 
-4. **Optional: Seed database:**
-   ```bash
-   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:seed"
-   ```
-
-### Option 2: Local Development
-
-1. **Install dependencies:**
-   ```bash
-   pnpm install
-   ```
-
-2. **Start PostgreSQL with Docker:**
-   ```bash
-   docker-compose up -d postgres
-   ```
-
-3. **Set up database:**
-   ```bash
-   cd packages/db
-   pnpm db:generate
-   pnpm db:migrate
-   pnpm db:seed  # Optional
-   ```
-
-4. **Start development servers:**
-   ```bash
-   pnpm dev
-   ```
+For more details:
+- **Setup Instructions**: [SETUP.md](./SETUP.md)
+- **Stack Versions**: [STACK_VERSIONS.md](./STACK_VERSIONS.md)
 
 ### Lint
 ```bash
@@ -152,5 +126,11 @@ Recommended pipeline steps:
 	3.	Test
 	4.	Build
 	5.	Deploy to AWS (ECS/EKS)
+
+## Documentation
+
+- **[SETUP.md](./SETUP.md)** - Detailed setup and troubleshooting guide
+- **[STACK_VERSIONS.md](./STACK_VERSIONS.md)** - Current dependency versions and upgrade history
+- **[API_DOCUMENTATION.md](./apps/api/API_DOCUMENTATION.md)** - API endpoint documentation
 
   
