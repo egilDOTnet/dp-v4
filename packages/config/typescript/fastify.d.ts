@@ -4,3 +4,4 @@ declare module "fastify" {
     description?: string;
   }
 }
+

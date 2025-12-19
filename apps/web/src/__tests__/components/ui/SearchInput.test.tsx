@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '../../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -124,7 +124,7 @@ describe('SearchInput', () => {
         expect(input).toBeInTheDocument();
       });
 
-      const input = screen.getByRole('textbox');
+      const _input = screen.getByRole('textbox');
       await user.tab(); // blur
 
       // Wait for collapse delay (150ms + some buffer for React updates)
@@ -227,3 +227,4 @@ describe('SearchInput', () => {
     });
   });
 });
+

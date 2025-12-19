@@ -96,7 +96,6 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
         }
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
 

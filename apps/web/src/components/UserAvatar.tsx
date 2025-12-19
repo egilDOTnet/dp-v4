@@ -1,7 +1,6 @@
 "use client";
 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/Avatar";
-import { User } from "@/lib/api";
 import { getInitials } from "@/lib/user-utils";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";

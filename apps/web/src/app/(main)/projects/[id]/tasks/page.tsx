@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, Phase, Task } from "@/lib/api";
 import PhaseTimeline from "@/components/PhaseTimeline";
 import TaskList from "@/components/TaskList";

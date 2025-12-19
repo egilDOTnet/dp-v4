@@ -149,8 +149,7 @@ export function useDebouncedSearch<T>(
   items: T[],
   options: UseSearchOptions<T> & { debounceMs?: number }
 ): UseSearchResult<T> & { debouncedTerm: string } {
-  const { debounceMs = 300, ...searchOptions } = options;
-  const [debouncedTerm, setDebouncedTerm] = useState("");
+  const { debounceMs: _debounceMs = 300, ...searchOptions } = options;
   
   const result = useSearch(items, {
     ...searchOptions,

@@ -48,7 +48,7 @@ export default function VendorResponseView({
     }
   };
 
-  const formatAnswer = (answer: any, questionType: RFIQuestionType, options?: any[]) => {
+  const formatAnswer = (answer: any, questionType: RFIQuestionType, _options?: any[]) => {
     if (answer === null || answer === undefined) {
       return <span className="text-gray-400 italic">No answer provided</span>;
     }

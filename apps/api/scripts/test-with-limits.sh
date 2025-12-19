@@ -16,3 +16,4 @@ fi
 
 # Run the tests with all passed arguments
 exec pnpm test "$@"
+

@@ -227,7 +227,6 @@ export default function TaskList({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreatingNewTask, editingFields, editingDescriptions, formData, tasks]);
 
   // Handle external new task trigger
@@ -348,7 +347,6 @@ export default function TaskList({
     };
 
     loadAllCommentCounts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, projectId, phaseId]);
 
   const formatDate = (dateString: string | null) => {
@@ -1631,7 +1629,7 @@ export default function TaskList({
                                             // If showPicker doesn't return a Promise, just use click
                                             input.click();
                                           }
-                                        } catch (error) {
+                                        } catch {
                                           // If showPicker throws, fallback to click
                                           input.click();
                                         }
@@ -1702,7 +1700,7 @@ export default function TaskList({
                                             // If showPicker doesn't return a Promise, just use click
                                             input.click();
                                           }
-                                        } catch (error) {
+                                        } catch {
                                           // If showPicker throws, fallback to click
                                           input.click();
                                         }

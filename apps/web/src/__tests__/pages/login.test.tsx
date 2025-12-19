@@ -3,7 +3,6 @@ import { render } from '../utils/test-utils';
 import LoginPage from '@/app/(auth)/login/page';
 import {
   hasHardCodedBackgroundColors,
-  hasSemanticBackgroundColors,
 } from '../utils/color-utils';
 
 // Mock AuthContext to provide useAuth hook
@@ -53,6 +52,7 @@ describe('Login Page', () => {
     expect(foundHardCoded).toBe(false);
   });
 });
+
 
 
 

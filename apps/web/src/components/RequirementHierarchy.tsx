@@ -713,7 +713,7 @@ export default function RequirementHierarchyComponent({
         >
           <div className="space-y-2">
             {level1Hierarchies.map((h1) => {
-          const children = level2Hierarchies.filter((h2) => h2.parentId === h1.id);
+          const _children = level2Hierarchies.filter((h2) => h2.parentId === h1.id);
           const isEditing = editingId === h1.id;
           const isCreatingChild = creatingParentId === h1.id;
 
@@ -1228,7 +1228,7 @@ export default function RequirementHierarchyComponent({
             )}
 
               {/* OLD CODE - Level 2 Hierarchies - only show if parent is expanded */}
-              {false && expandedHierarchies.has(h1.id) && children.length > 0 && (
+              {/* Disabled: {false && expandedHierarchies.has(h1.id) && children.length > 0 && (
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -1305,7 +1305,6 @@ export default function RequirementHierarchyComponent({
                           </div>
                         ) : (
                           <div className="group relative" style={{ marginLeft: '3.5rem' }}>
-                            {/* Drag handle */}
                             <div
                               {...attributes}
                               {...listeners}
@@ -1388,7 +1387,6 @@ export default function RequirementHierarchyComponent({
                                       ) : null;
                                     })()}
                                   </div>
-                                  {/* Description aligned with number */}
                                   {h2.description && expandedDescriptions.has(h2.id) && (
                                     <p className="text-sm text-gray-600 mt-1">
                                       {h2.description}
@@ -1410,7 +1408,6 @@ export default function RequirementHierarchyComponent({
                                   <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        // Expand the hierarchy if not already expanded
                                         if (!expandedHierarchies.has(h2.id)) {
                                           const newSet = new Set(expandedHierarchies);
                                           newSet.add(h2.id);
@@ -1432,7 +1429,6 @@ export default function RequirementHierarchyComponent({
                           </div>
                         )}
 
-                        {/* Requirements inline for Level 2 - only show if expanded */}
                         {expandedHierarchies.has(h2.id) && (
                           <div className="mt-2" style={{ marginLeft: '7rem' }}>
                             <RequirementList
@@ -1455,7 +1451,7 @@ export default function RequirementHierarchyComponent({
                 </div>
                   </SortableContext>
                 </DndContext>
-              )}
+              )} */}
 
               {/* Create Level 2 Hierarchy - only show if parent is expanded */}
               {expandedHierarchies.has(h1.id) && isCreatingChild && (

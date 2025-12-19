@@ -159,7 +159,7 @@ export function VendorFormDialog({
             // Invalid URL, ignore
           }
         }
-      } catch (err: any) {
+      } catch {
         setBrregName(null);
       } finally {
         setLookingUpOrgNumber(false);

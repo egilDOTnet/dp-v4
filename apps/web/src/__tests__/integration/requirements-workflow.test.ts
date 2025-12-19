@@ -6,7 +6,6 @@ import './setup'; // Import setup to ensure test server is running
 import { api } from '@/lib/api';
 import {
   createProjectWithMember,
-  createRequirementsSetup,
 } from './utils';
 
 /**
@@ -125,8 +124,8 @@ describe('Requirements Management Workflow Integration Tests', () => {
       });
 
       // Get initial order
-      const initialHierarchies = await api.requirements.hierarchies.list(project.id);
-      const initialOrder = [hierarchy1.id, hierarchy2.id, hierarchy3.id];
+      const _initialHierarchies = await api.requirements.hierarchies.list(project.id);
+      const _initialOrder = [hierarchy1.id, hierarchy2.id, hierarchy3.id];
 
       // Reorder: 3, 1, 2
       await api.requirements.hierarchies.reorder(project.id, {
@@ -292,9 +291,9 @@ describe('Requirements Management Workflow Integration Tests', () => {
 
       // Get initial order
       const initialRequirements = await api.requirements.list(project.id);
-      const req1InitialOrder = initialRequirements.find(r => r.id === req1.id)?.order || 0;
-      const req2InitialOrder = initialRequirements.find(r => r.id === req2.id)?.order || 0;
-      const req3InitialOrder = initialRequirements.find(r => r.id === req3.id)?.order || 0;
+      const _req1InitialOrder = initialRequirements.find(r => r.id === req1.id)?.order || 0;
+      const _req2InitialOrder = initialRequirements.find(r => r.id === req2.id)?.order || 0;
+      const _req3InitialOrder = initialRequirements.find(r => r.id === req3.id)?.order || 0;
 
       // Reorder: 3, 1, 2
       await api.requirements.reorder(project.id, {
@@ -368,7 +367,7 @@ describe('Requirements Management Workflow Integration Tests', () => {
         type: 'Information',
         status: null,
       });
-      const req2 = await api.requirements.create(project.id, {
+      const _req2 = await api.requirements.create(project.id, {
         hierarchyId: hierarchy.id,
         description: 'Requirement 2',
         type: 'Information',
@@ -628,3 +627,4 @@ describe('Requirements Management Workflow Integration Tests', () => {
     });
   });
 });
+

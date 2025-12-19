@@ -16,7 +16,7 @@ const statusColors = {
   completed: "bg-primary-400 hover:bg-primary-500",
 };
 
-const statusBorders = {
+const _statusBorders = {
   not_started: "border-gray-400",
   ongoing: "border-yellow-500",
   delayed: "border-red-500",

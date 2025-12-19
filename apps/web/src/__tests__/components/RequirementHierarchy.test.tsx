@@ -131,7 +131,7 @@ describe('RequirementHierarchy', () => {
 
   describe('Creating Hierarchies', () => {
     it('should allow creating level 1 hierarchy when creatingParentId is set', async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       const hierarchies: any[] = [];
       const requirements: any[] = [];
       const newHierarchy = createMockRequirementHierarchy({ id: 'new-h1', title: 'New Hierarchy', parentId: null });
@@ -337,3 +337,4 @@ describe('RequirementHierarchy', () => {
     });
   });
 });
+

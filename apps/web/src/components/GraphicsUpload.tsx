@@ -72,7 +72,7 @@ export function GraphicsUpload({
         return `Image dimensions (${img.width}×${img.height}) exceed maximum allowed (${maxWidth}×${maxHeight}px).`;
       }
       return null;
-    } catch (err) {
+    } catch {
       return "Failed to load image for validation.";
     }
   };
@@ -316,3 +316,4 @@ export function GraphicsUpload({
     </div>
   );
 }
+

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '../utils/test-utils';
 import userEvent from '@testing-library/user-event';
 import VendorForm from '@/components/VendorForm';
-import { createMockVendor } from '../utils/mock-data';
 import * as apiModule from '@/lib/api';
 
 // Mock the api module
@@ -583,3 +582,4 @@ describe('VendorForm', () => {
     });
   });
 });
+

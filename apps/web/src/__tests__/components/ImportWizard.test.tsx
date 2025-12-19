@@ -385,7 +385,7 @@ describe('ImportWizard', () => {
       // Select type and proceed
       const tasksRadio = screen.getByLabelText(/tasks/i);
       await user.click(tasksRadio);
-      let nextButton = screen.getByRole('button', { name: /next/i });
+      const nextButton = screen.getByRole('button', { name: /next/i });
       await user.click(nextButton);
 
       await waitFor(() => {

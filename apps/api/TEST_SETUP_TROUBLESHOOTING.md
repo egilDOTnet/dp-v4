@@ -184,3 +184,4 @@ If you encounter this in CI, add to your workflow:
 - [macOS File Descriptor Limits](https://superuser.com/questions/302754/increase-the-maximum-number-of-open-file-descriptors-in-snow-leopard)
 - [Vitest Performance Tuning](https://vitest.dev/guide/performance.html)
 - [Node.js File Descriptor Management](https://nodejs.org/api/fs.html#file-descriptors)
+

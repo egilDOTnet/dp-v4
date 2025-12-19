@@ -244,7 +244,7 @@ describe('MultiEditRequirementModal', () => {
         />
       );
 
-      const statusSelect = screen.getByLabelText(/status/i);
+      const _statusSelect = screen.getByLabelText(/status/i);
       // Note: The component doesn't have a "null" option in the select, but it handles "null" string
       // This test would need to be adjusted based on actual implementation
       const saveButton = screen.getByRole('button', { name: /save/i });
@@ -440,3 +440,4 @@ describe('MultiEditRequirementModal', () => {
     });
   });
 });
+

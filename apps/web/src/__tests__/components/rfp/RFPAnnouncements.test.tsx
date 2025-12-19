@@ -209,7 +209,7 @@ describe('RFPAnnouncements', () => {
     });
 
     it('should not allow editing sent announcements', async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       const announcement = createMockRFPAnnouncement({
         id: 'ann-1',
         title: 'Sent',
@@ -229,3 +229,4 @@ describe('RFPAnnouncements', () => {
     });
   });
 });
+

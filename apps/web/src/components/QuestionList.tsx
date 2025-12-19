@@ -209,8 +209,7 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
     insertAfter?: number,
     skipReload?: boolean
   ): Promise<RFIQuestion> => {
-    try {
-      // Create the question (it will be added at the end)
+    // Create the question (it will be added at the end)
       const newQuestion = await api.rfi.questions.create(projectId, data);
       
       // Don't close the form if this is a Dropdown or MultipleChoice question
@@ -260,16 +259,13 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
         // It will be added when the form is actually saved/closed
       }
       
-      // Return the created question so the form can use its ID
-      return newQuestion;
-      
       // Notify parent component that questions have changed
       if (onQuestionsChange) {
         onQuestionsChange();
       }
-    } catch (err: any) {
-      throw err;
-    }
+      
+      // Return the created question so the form can use its ID
+      return newQuestion;
   };
 
 
@@ -845,7 +841,7 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
               if (createdQuestionId && onReload) {
                 await onReload();
               }
-            } catch (err) {
+            } catch {
               // If save fails, don't close the form
               return;
             }
@@ -857,7 +853,7 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
             if (createdQuestionId) {
               try {
                 await api.rfi.questions.delete(projectId, createdQuestionId);
-              } catch (err) {
+              } catch {
                 // Ignore delete errors
               }
             }

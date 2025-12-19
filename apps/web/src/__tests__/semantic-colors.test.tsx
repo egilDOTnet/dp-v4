@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from './utils/test-utils';
+import { render } from './utils/test-utils';
 import { Card } from '@/components/ui/Card';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import {

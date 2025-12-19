@@ -142,7 +142,7 @@ export default function VendorList({
     }
     try {
       await onDeleteContact(vendorId, contactId);
-    } catch (error) {
+    } catch {
       // Error handling
     }
   };
@@ -213,33 +213,29 @@ export default function VendorList({
     additionalData?: any;
     status?: VendorStatus;
   }) => {
-    try {
-      if (editingVendorId) {
-        await onUpdateVendor(editingVendorId, data);
-        setIsContactFormAnimating((prev) => ({
-          ...prev,
-          [`edit-vendor-${editingVendorId}`]: false,
-        }));
-        setTimeout(() => {
-          setEditingVendorId(null);
-          setIsContactFormAnimating((prev) => {
-            const newState = { ...prev };
-            delete newState[`edit-vendor-${editingVendorId}`];
-            return newState;
-          });
-        }, 300);
-      } else if (addingVendor) {
-        await onAddVendor(data);
-        setIsVendorFormAnimating(false);
-        setTimeout(() => {
-          setAddingVendor(false);
-          if (onAddVendorFormChange) {
-            onAddVendorFormChange(false);
-          }
-        }, 300);
-      }
-    } catch (error: any) {
-      throw error;
+    if (editingVendorId) {
+      await onUpdateVendor(editingVendorId, data);
+      setIsContactFormAnimating((prev) => ({
+        ...prev,
+        [`edit-vendor-${editingVendorId}`]: false,
+      }));
+      setTimeout(() => {
+        setEditingVendorId(null);
+        setIsContactFormAnimating((prev) => {
+          const newState = { ...prev };
+          delete newState[`edit-vendor-${editingVendorId}`];
+          return newState;
+        });
+      }, 300);
+    } else if (addingVendor) {
+      await onAddVendor(data);
+      setIsVendorFormAnimating(false);
+      setTimeout(() => {
+        setAddingVendor(false);
+        if (onAddVendorFormChange) {
+          onAddVendorFormChange(false);
+        }
+      }, 300);
     }
   };
 

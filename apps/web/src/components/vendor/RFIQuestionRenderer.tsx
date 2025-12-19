@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface RFIQuestionOption {
   id: string;
@@ -92,7 +92,7 @@ export function RFIQuestionRenderer({
           </select>
         );
 
-      case "MultipleChoice":
+      case "MultipleChoice": {
         // Check if this is a grid-style multiple choice (has both xAxis and yAxis options)
         const xAxisOptions = question.options?.filter((opt) => opt.xAxis).sort((a, b) => a.order - b.order) || [];
         const yAxisOptions = question.options?.filter((opt) => opt.yAxis).sort((a, b) => a.order - b.order) || [];
@@ -196,8 +196,9 @@ export function RFIQuestionRenderer({
             ))}
           </div>
         );
+      }
 
-      case "Scale":
+      case "Scale": {
         const scaleLabels = question.scaleLabels || {};
         const scalePoints = Object.keys(scaleLabels).sort((a, b) => parseInt(a) - parseInt(b));
         
@@ -248,6 +249,7 @@ export function RFIQuestionRenderer({
             ))}
           </div>
         );
+      }
 
       case "SingleText":
         return (

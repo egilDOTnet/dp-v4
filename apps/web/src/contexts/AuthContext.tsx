@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await api.auth.me();
       setUser(userData);
       setLoading(false);
-    } catch (error) {
+    } catch {
       // Silently fail if API is not available or token is invalid
       localStorage.removeItem("token");
       setUser(null);
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Call API first while token is still available
     try {
       await api.auth.logout();
-    } catch (error) {
+    } catch {
       // Ignore errors on logout - we'll clear local state anyway
     } finally {
       // Always clear local state

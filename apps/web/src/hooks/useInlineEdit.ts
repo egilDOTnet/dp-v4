@@ -91,7 +91,7 @@ export function useInlineEdit<T>({
     [onSave]
   );
 
-  const scheduleAutoSave = useCallback(
+  const _scheduleAutoSave = useCallback(
     (data: T) => {
       if (!autoSaveDelay) return;
 

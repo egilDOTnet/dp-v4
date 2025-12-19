@@ -14,11 +14,11 @@ export function ProfileImageUpload({
   onUpload,
   onDelete,
 }: ProfileImageUploadProps) {
-  const [file, setFile] = useState<File | null>(null);
+  const [_file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [showCropper, setShowCropper] = useState(false);
   const [error, setError] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [_uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

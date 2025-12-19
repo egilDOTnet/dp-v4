@@ -4,7 +4,6 @@
  */
 
 import { vi } from 'vitest';
-import type * as ApiTypes from '@/lib/api';
 
 // Mock the api module
 export const mockApi = {
@@ -213,3 +212,4 @@ export function createSuccessResponse<T>(data: T): Promise<T> {
 export function createErrorResponse(error: string, message?: string): Promise<never> {
   return Promise.reject(new Error(message || error));
 }
+

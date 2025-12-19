@@ -14,7 +14,7 @@ interface RFPQuestionsProps {
   rfp: RFP;
 }
 
-export default function RFPQuestions({ projectId, rfp }: RFPQuestionsProps) {
+export default function RFPQuestions({ projectId, rfp: _rfp }: RFPQuestionsProps) {
   const [questions, setQuestions] = useState<RFPQuestion[]>([]);
   const [vendors, setVendors] = useState<ProjectVendor[]>([]);
   const [loading, setLoading] = useState(true);

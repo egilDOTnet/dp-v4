@@ -27,3 +27,4 @@ export function RFIProgressIndicator({ current, total }: RFIProgressIndicatorPro
     </div>
   );
 }
+

@@ -19,7 +19,7 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
 
 const AllTheProviders = ({ 
   children, 
-  user 
+  user: _user 
 }: { 
   children: React.ReactNode;
   user?: User | null;
@@ -61,6 +61,7 @@ const customRender = (
 export * from '@testing-library/react';
 export { customRender as render };
 export type { CustomRenderOptions };
+
 
 
 

@@ -111,3 +111,4 @@ If keeping tests in `apps/web`, consider:
 5. ✅ Tests still test from client perspective (HTTP requests)
 
 The main work is creating a test API client that doesn't depend on browser APIs, which is straightforward.
+

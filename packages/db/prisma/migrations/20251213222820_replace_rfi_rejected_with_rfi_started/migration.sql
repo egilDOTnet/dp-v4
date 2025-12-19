@@ -33,3 +33,4 @@ ALTER TABLE "ProjectVendor" ALTER COLUMN "status" SET DEFAULT 'Pending';
 -- Step 4: Drop the old enum type and rename the new one
 DROP TYPE "VendorStatus";
 ALTER TYPE "VendorStatus_new" RENAME TO "VendorStatus";
+

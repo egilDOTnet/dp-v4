@@ -70,12 +70,8 @@ export default function VendorsPage() {
     additionalData?: any;
     status?: VendorStatus;
   }) => {
-    try {
-      await api.projects.vendors.create(projectId, data);
-      await loadVendors();
-    } catch (error: any) {
-      throw error;
-    }
+    await api.projects.vendors.create(projectId, data);
+    await loadVendors();
   };
 
   const handleUpdateVendor = async (
@@ -88,35 +84,31 @@ export default function VendorsPage() {
       status?: VendorStatus;
     }
   ) => {
-    try {
-      const vendor = vendors.find((pv) => pv.vendor.id === vendorId);
-      if (vendor) {
-        const hasDetailsChanged =
-          data.name !== vendor.vendor.name ||
-          data.organizationNumber !==
-            (vendor.vendor.organizationNumber || undefined) ||
-          data.emailDomain !== (vendor.vendor.emailDomain || undefined);
+    const vendor = vendors.find((pv) => pv.vendor.id === vendorId);
+    if (vendor) {
+      const hasDetailsChanged =
+        data.name !== vendor.vendor.name ||
+        data.organizationNumber !==
+          (vendor.vendor.organizationNumber || undefined) ||
+        data.emailDomain !== (vendor.vendor.emailDomain || undefined);
 
-        if (hasDetailsChanged) {
-          await api.projects.vendors.updateDetails(projectId, vendorId, {
-            name: data.name,
-            organizationNumber: data.organizationNumber,
-            emailDomain: data.emailDomain,
-            additionalData: data.additionalData,
-          });
-        }
-
-        if (data.status && data.status !== vendor.status) {
-          await api.projects.vendors.update(projectId, vendorId, {
-            status: data.status,
-          });
-        }
+      if (hasDetailsChanged) {
+        await api.projects.vendors.updateDetails(projectId, vendorId, {
+          name: data.name,
+          organizationNumber: data.organizationNumber,
+          emailDomain: data.emailDomain,
+          additionalData: data.additionalData,
+        });
       }
 
-      await loadVendors();
-    } catch (error: any) {
-      throw error;
+      if (data.status && data.status !== vendor.status) {
+        await api.projects.vendors.update(projectId, vendorId, {
+          status: data.status,
+        });
+      }
     }
+
+    await loadVendors();
   };
 
   const handleStatusChange = async (vendorId: string, status: VendorStatus) => {

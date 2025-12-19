@@ -59,7 +59,7 @@ export async function createAuthenticatedUser(overrides?: {
   const email = overrides?.email || `test-${uniqueSuffix}@example.com`;
   
   // Create tenant if tenantId is provided
-  let tenantId = overrides?.tenantId;
+  const tenantId = overrides?.tenantId;
   if (tenantId) {
     const { createTestTenant } = await getDbHelpers();
     await createTestTenant({ id: tenantId, name: 'Test Company' });

@@ -21,3 +21,4 @@ export const PROFILE_COLOR_PALETTE = [
   "#EC4899", // pink-500
 ] as const;
 
+

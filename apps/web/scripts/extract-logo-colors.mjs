@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
