@@ -1,4 +1,5 @@
 import { db, Role, VendorStatus, Prisma } from "@dp/db";
+import { RFPVendorResponseStatus } from "@prisma/client";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -903,6 +904,7 @@ export async function createTestRFP(overrides?: {
   alternativeContactPersonId?: string | null;
   publishDate?: Date | null;
   deliveryDate?: Date | null;
+  about?: string | null;
 }) {
   if (!overrides?.projectId) {
     throw new Error("projectId is required");
@@ -918,9 +920,21 @@ export async function createTestRFP(overrides?: {
       throw new Error(`Project with id ${overrides.projectId} does not exist`);
     }
 
-    // Create RFP in the same transaction - project is guaranteed to exist
-    return await tx.rFP.create({
-      data: {
+    // Use upsert to handle unique constraint on projectId
+    // If RFP already exists for this project, update it; otherwise create new one
+    return await tx.rFP.upsert({
+      where: {
+        projectId: overrides.projectId,
+      },
+      update: {
+        status: (overrides.status || "Draft") as any,
+        contactPersonId: overrides.contactPersonId ?? null,
+        alternativeContactPersonId: overrides.alternativeContactPersonId ?? null,
+        publishDate: overrides.publishDate ?? null,
+        deliveryDate: overrides.deliveryDate ?? null,
+        about: overrides.about ?? null,
+      },
+      create: {
         id: overrides.id || `test-rfp-${randomUUID()}`,
         projectId: overrides.projectId,
         status: (overrides.status || "Draft") as any,
@@ -928,6 +942,7 @@ export async function createTestRFP(overrides?: {
         alternativeContactPersonId: overrides.alternativeContactPersonId ?? null,
         publishDate: overrides.publishDate ?? null,
         deliveryDate: overrides.deliveryDate ?? null,
+        about: overrides.about ?? null,
       },
     });
   });
@@ -1190,6 +1205,116 @@ export async function createTestRFPAnnouncement(overrides?: {
   });
 
   return announcement;
+}
+
+/**
+ * Create a test RFP vendor response
+ */
+export async function createTestRFPVendorResponse(overrides?: {
+  id?: string;
+  rfpId: string;
+  projectVendorId: string;
+  contactPersonId: string;
+  status?: "Sent" | "Viewed" | "Participating" | "ProposalSubmitted" | "Declined";
+  participatedAt?: Date | null;
+  proposalSubmittedAt?: Date | null;
+}) {
+  if (!overrides?.rfpId || !overrides?.projectVendorId || !overrides?.contactPersonId) {
+    throw new Error("rfpId, projectVendorId, and contactPersonId are required");
+  }
+
+  // Use transaction to verify RFP, project vendor, and contact person exist before creating response
+  const response = await db.$transaction(async (tx) => {
+    // Verify RFP exists
+    const rfp = await tx.rFP.findUnique({
+      where: { id: overrides.rfpId },
+    });
+    if (!rfp) {
+      throw new Error(`RFP with id ${overrides.rfpId} does not exist`);
+    }
+
+    // Verify project vendor exists
+    const projectVendor = await tx.projectVendor.findUnique({
+      where: { id: overrides.projectVendorId },
+    });
+    if (!projectVendor) {
+      throw new Error(`ProjectVendor with id ${overrides.projectVendorId} does not exist`);
+    }
+
+    // Verify contact person exists
+    const contactPerson = await tx.vendorContactPerson.findUnique({
+      where: { id: overrides.contactPersonId },
+    });
+    if (!contactPerson) {
+      throw new Error(`VendorContactPerson with id ${overrides.contactPersonId} does not exist`);
+    }
+
+    // Create response in the same transaction - parent entities are guaranteed to exist
+    return await tx.rFPVendorResponse.create({
+      data: {
+        id: overrides.id || `test-rfp-vendor-response-${randomUUID()}`,
+        rfpId: overrides.rfpId,
+        projectVendorId: overrides.projectVendorId,
+        contactPersonId: overrides.contactPersonId,
+        status: overrides.status === "Participating" 
+          ? RFPVendorResponseStatus.Participating
+          : overrides.status === "Viewed"
+          ? RFPVendorResponseStatus.Viewed
+          : overrides.status === "ProposalSubmitted"
+          ? RFPVendorResponseStatus.ProposalSubmitted
+          : overrides.status === "Declined"
+          ? RFPVendorResponseStatus.Declined
+          : RFPVendorResponseStatus.Sent,
+        participatedAt: overrides.participatedAt ?? null,
+        proposalSubmittedAt: overrides.proposalSubmittedAt ?? null,
+      },
+    });
+  });
+
+  return response;
+}
+
+/**
+ * Create a test RFP proposal file
+ */
+export async function createTestRFPProposalFile(overrides?: {
+  id?: string;
+  vendorResponseId: string;
+  fileName?: string;
+  fileType?: string;
+  fileData?: string;
+  fileSize?: number;
+  order?: number;
+}) {
+  if (!overrides?.vendorResponseId) {
+    throw new Error("vendorResponseId is required");
+  }
+
+  // Use transaction to verify vendor response exists before creating file
+  const file = await db.$transaction(async (tx) => {
+    // Verify vendor response exists
+    const vendorResponse = await tx.rFPVendorResponse.findUnique({
+      where: { id: overrides.vendorResponseId },
+    });
+    if (!vendorResponse) {
+      throw new Error(`RFPVendorResponse with id ${overrides.vendorResponseId} does not exist`);
+    }
+
+    // Create file in the same transaction - parent entity is guaranteed to exist
+    return await tx.rFPProposalFile.create({
+      data: {
+        id: overrides.id || `test-rfp-proposal-file-${randomUUID()}`,
+        vendorResponseId: overrides.vendorResponseId,
+        fileName: overrides.fileName || "test-proposal.pdf",
+        fileType: overrides.fileType || "application/pdf",
+        fileData: overrides.fileData || Buffer.from("test file content").toString("base64"),
+        fileSize: overrides.fileSize ?? 1000,
+        order: overrides.order ?? 0,
+      },
+    });
+  });
+
+  return file;
 }
 
 /**

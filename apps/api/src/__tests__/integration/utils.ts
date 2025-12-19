@@ -335,3 +335,4 @@ export async function clearAuthentication(): Promise<void> {
   clearToken();
 }
 
+

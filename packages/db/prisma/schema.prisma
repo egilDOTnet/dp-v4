@@ -269,6 +269,7 @@ model ProjectVendor {
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   vendor             Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   RFIVendorResponses RFIVendorResponse[] @relation("ProjectVendorRFIResponses")
+  RFPVendorResponses RFPVendorResponse[]
 
   @@unique([projectId, vendorId])
   @@index([projectId])
@@ -289,6 +290,7 @@ model VendorContactPerson {
   vendor             Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   RFIVendorResponses RFIVendorResponse[] @relation("ContactPersonRFIResponses")
   rfpQuestions       RFPQuestion[]
+  rfpVendorResponses RFPVendorResponse[]
 
   @@index([vendorId])
   @@index([email])
@@ -335,6 +337,14 @@ enum RFPScheduleItemType {
 enum RFPDocumentType {
   Document
   Link
+}
+
+enum RFPVendorResponseStatus {
+  Sent
+  Viewed
+  Participating
+  ProposalSubmitted
+  Declined
 }
 
 model RFI {
@@ -498,6 +508,7 @@ model RFP {
   changelogEntries         RFPChangelogEntry[]
   questions                RFPQuestion[]
   announcements            RFPAnnouncement[]
+  vendorResponses          RFPVendorResponse[]
 
   @@index([projectId])
   @@index([contactPersonId])
@@ -598,4 +609,43 @@ model RFPAnnouncement {
 
   @@index([rfpId])
   @@index([createdById])
+}
+
+model RFPVendorResponse {
+  id                  String                  @id @default(cuid())
+  rfpId               String
+  projectVendorId     String
+  contactPersonId     String
+  status              RFPVendorResponseStatus @default(Sent)
+  participatedAt      DateTime?
+  proposalSubmittedAt DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  rfp           RFP                 @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  projectVendor ProjectVendor       @relation(fields: [projectVendorId], references: [id], onDelete: Cascade)
+  contactPerson VendorContactPerson @relation(fields: [contactPersonId], references: [id], onDelete: Restrict)
+  proposalFiles RFPProposalFile[]
+
+  @@unique([rfpId, projectVendorId])
+  @@index([rfpId])
+  @@index([projectVendorId])
+  @@index([contactPersonId])
+}
+
+model RFPProposalFile {
+  id              String   @id @default(cuid())
+  vendorResponseId String
+  fileName        String
+  fileType        String
+  fileData        String   // Base64 encoded
+  fileSize        Int
+  order           Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendorResponse RFPVendorResponse @relation(fields: [vendorResponseId], references: [id], onDelete: Cascade)
+
+  @@index([vendorResponseId])
+  @@index([vendorResponseId, order])
 }

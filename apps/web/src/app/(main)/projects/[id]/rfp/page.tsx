@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api, Project, RFP } from "@/lib/api";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
+import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner } from "@/components/ui";
 import RFPOverview from "@/components/rfp/RFPOverview";
 import RFPSchedule from "@/components/rfp/RFPSchedule";
 import RFPDocuments from "@/components/rfp/RFPDocuments";
@@ -25,6 +25,7 @@ export default function RFPPage() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [about, setAbout] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -69,6 +70,42 @@ export default function RFPPage() {
       setError(err.message || "Failed to save about information");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!rfp?.id) {
+      setError("RFP not loaded");
+      return;
+    }
+    try {
+      setError("");
+      const { token } = await api.rfp.getPreviewToken(projectId);
+      // Open vendor portal in new window
+      const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || window.location.origin;
+      const previewUrl = `${baseUrl}/portal/rfp/${rfp.id}?preview=${token}`;
+      window.open(previewUrl, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      setError(err.message || "Failed to generate preview token");
+    }
+  };
+
+  const handlePublish = async () => {
+    // Warn user that start date will be set to current time
+    const confirmMessage = "Publishing the RFP will set the start date to the current time. All required dates must be set, and a main contact person must be assigned. Continue?";
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      await api.rfp.publish(projectId);
+      await loadRFP();
+      setError("");
+    } catch (err: any) {
+      setError(err.message || err.error?.message || "Failed to publish RFP");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -119,6 +156,46 @@ export default function RFPPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-4">Request for Proposal (RFP)</h1>
 
+        {/* Hero Banner */}
+        <HeroBanner
+          storageKey="rfp-hero-banner"
+          title="Welcome to the RFP Module"
+          description={
+            <>
+              A <strong>Request for Proposal (RFP)</strong> is your formal invitation to vendors to submit detailed proposals for your project. Use this module to create comprehensive RFPs, manage schedules, handle vendor questions, and receive proposals.
+            </>
+          }
+          features={[
+            {
+              label: "About",
+              description: "Add detailed information about your RFP that vendors will see",
+            },
+            {
+              label: "Schedule",
+              description: "Set important dates including start, acceptance, questions, and delivery deadlines",
+            },
+            {
+              label: "Documents & Links",
+              description: "Share project documents and external resources with vendors",
+            },
+            {
+              label: "Q&A",
+              description: "Manage questions from vendors and provide answers",
+            },
+            {
+              label: "Preview & Publish",
+              description: "Preview how vendors will see your RFP, then publish when ready",
+            },
+          ]}
+          tip={
+            <>
+              <div className="font-bold not-italic mb-1">Tip:</div>
+              <div>Use the Preview button to see exactly how vendors will view your RFP before publishing.</div>
+              <div>Make sure all required dates are set and a main contact person is assigned before publishing.</div>
+            </>
+          }
+        />
+
         {error && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
             <p className="text-sm font-medium text-red-800 mb-1">Error</p>
@@ -129,15 +206,38 @@ export default function RFPPage() {
 
       {rfp && (
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)}>
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="about">About</TabsTrigger>
-            <TabsTrigger value="schedule">Schedule</TabsTrigger>
-            <TabsTrigger value="documents">Documents/Links</TabsTrigger>
-            <TabsTrigger value="changelog">Changelog</TabsTrigger>
-            <TabsTrigger value="qa">Q&A</TabsTrigger>
-            <TabsTrigger value="announcements">Announcements</TabsTrigger>
-          </TabsList>
+          {/* Tab bar with action buttons */}
+          <div className="flex items-end justify-between border-b border-gray-200">
+            {/* Tabs on the left */}
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="about">About</TabsTrigger>
+              <TabsTrigger value="schedule">Schedule</TabsTrigger>
+              <TabsTrigger value="documents">Documents/Links</TabsTrigger>
+              <TabsTrigger value="changelog">Changelog</TabsTrigger>
+              <TabsTrigger value="qa">Q&A</TabsTrigger>
+              <TabsTrigger value="announcements">Announcements</TabsTrigger>
+            </TabsList>
+
+            {/* Action buttons on the right */}
+            <div className="flex items-end gap-3 pb-2">
+              <button
+                onClick={handlePreview}
+                className="px-4 py-1.5 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
+              >
+                Preview
+              </button>
+              {rfp?.status !== "Published" && (
+                <button
+                  onClick={handlePublish}
+                  disabled={isPublishing}
+                  className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {isPublishing ? "Publishing..." : "Publish"}
+                </button>
+              )}
+            </div>
+          </div>
 
           <TabsContent value="overview">
             <RFPOverview projectId={projectId} rfp={rfp} />

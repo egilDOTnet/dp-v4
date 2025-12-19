@@ -174,3 +174,4 @@ app/
 - [Next.js Dynamic Routes](https://nextjs.org/docs/app/building-your-application/routing/dynamic-routes)
 - [Next.js Route Groups](https://nextjs.org/docs/app/building-your-application/routing/route-groups)
 
+

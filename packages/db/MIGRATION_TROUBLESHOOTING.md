@@ -110,3 +110,4 @@ This allows Prisma to use a specific database for shadow operations instead of t
 - This is a common issue when projects transition from `db push` to migrations
 - The workaround is safe and doesn't affect production deployments
 
+

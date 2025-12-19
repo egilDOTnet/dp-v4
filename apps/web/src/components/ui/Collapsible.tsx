@@ -199,7 +199,7 @@ const bannerVariantClasses = {
   success: "bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 border-primary-200 dark:border-primary-700",
   warning: "bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-yellow-200 dark:border-yellow-700",
   neutral: "bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 border-gray-200 dark:border-gray-700",
-  hero: "bg-gradient-to-r from-accent-50 to-accent-100 dark:from-accent-900/20 dark:to-accent-800/20 border-accent-200 dark:border-accent-700",
+  hero: "bg-gradient-to-r from-accent-50 to-accent-100 dark:from-accent-800 dark:to-accent-900 border-accent-200 dark:border-accent-600",
 };
 
 export function DismissibleBanner({

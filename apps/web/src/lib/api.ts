@@ -744,6 +744,10 @@ export const api = {
       apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfp/publish`, {
         method: "POST",
       }),
+    getPreviewToken: (projectId: string) =>
+      apiRequest<{ token: string }>(`/api/projects/${projectId}/rfp/preview-token`, {
+        method: "POST",
+      }),
     send: (projectId: string) =>
       apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfp/send`, {
         method: "POST",
@@ -1114,6 +1118,150 @@ export const api = {
         }>(`/api/vendor/rfi/${encodeURIComponent(token)}/contacts`, {
           method: "POST",
           body: JSON.stringify(data),
+        }),
+    },
+  },
+  vendorRfp: {
+    auth: {
+      checkUser: (email: string) =>
+        apiRequest<{ exists: boolean; hasPassword: boolean }>("/api/vendor-rfp/auth/check-user", {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        }),
+      login: (email: string, password?: string) =>
+        apiRequest<{ token: string; contactPerson: VendorContactPerson }>("/api/vendor-rfp/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        }),
+      requestMagicLink: (email: string) =>
+        apiRequest<{
+          message: string;
+          magicLink?: string;
+          token?: string;
+        }>("/api/vendor-rfp/auth/magic-link", {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        }),
+      setPassword: (token: string, password: string) =>
+        apiRequest<{ token: string; contactPerson: VendorContactPerson }>("/api/vendor-rfp/auth/set-password", {
+          method: "POST",
+          body: JSON.stringify({ token, password }),
+        }),
+      me: () => apiRequest<{ contactPerson: VendorContactPerson }>("/api/vendor-rfp/auth/me"),
+    },
+    rfps: {
+      list: () => apiRequest<RFPListItem[]>("/api/vendor-rfp/rfps"),
+      get: (rfpId: string) => apiRequest<RFPDetail>(`/api/vendor-rfp/rfps/${rfpId}`),
+      getPreview: (rfpId: string, previewToken: string) => {
+        // Preview requests don't use Authorization header - token is in query string
+        const apiUrl = getApiUrlRuntime();
+        return fetch(`${apiUrl}/api/vendor-rfp/rfps/${rfpId}/preview?token=${encodeURIComponent(previewToken)}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }).then(async (response) => {
+          if (!response.ok) {
+            let errorData: ApiError;
+            try {
+              errorData = await response.json();
+            } catch {
+              errorData = { error: `Request failed with status ${response.status}` };
+            }
+            const errorMessage = errorData.message 
+              ? `${errorData.error || "Request failed"}: ${errorData.message}`
+              : (errorData.error || "Request failed");
+            throw new Error(errorMessage);
+          }
+          return response.json();
+        }) as Promise<RFPDetail>;
+      },
+      participate: (rfpId: string) =>
+        apiRequest<{
+          id: string;
+          status: RFPVendorResponseStatus;
+          participatedAt: string | null;
+        }>(`/api/vendor-rfp/rfps/${rfpId}/participate`, {
+          method: "POST",
+        }),
+      askQuestion: (rfpId: string, question: string) =>
+        apiRequest<{
+          id: string;
+          question: string;
+          createdAt: string;
+        }>(`/api/vendor-rfp/rfps/${rfpId}/questions`, {
+          method: "POST",
+          body: JSON.stringify({ question }),
+        }),
+      getQuestions: (rfpId: string) =>
+        apiRequest<
+          Array<{
+            id: string;
+            question: string;
+            cleanedQuestion: string | null;
+            answer: string | null;
+            answeredAt: string | null;
+            createdAt: string;
+            vendor: { id: string; name: string };
+            contactPerson: {
+              id: string;
+              firstName: string;
+              lastName: string;
+              email: string;
+            };
+            answeredBy: { id: string; name: string; email: string } | null;
+          }>
+        >(`/api/vendor-rfp/rfps/${rfpId}/questions`),
+      getProposal: (rfpId: string) =>
+        apiRequest<RFPProposalFile[]>(`/api/vendor-rfp/rfps/${rfpId}/proposal`),
+      uploadFile: async (rfpId: string, file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const token = typeof window !== "undefined"
+          ? localStorage.getItem("token")
+          : (globalThis as any).localStorage?.getItem("token") ?? null;
+
+        const headers: HeadersInit = {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        };
+
+        const apiUrl = getApiUrlRuntime();
+        const response = await fetch(`${apiUrl}/api/vendor-rfp/rfps/${rfpId}/proposal/files`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Request failed" }));
+          throw new Error(errorData.error || "Request failed");
+        }
+
+        return response.json() as Promise<{
+          id: string;
+          fileName: string;
+          fileType: string;
+          fileSize: number;
+          order: number;
+        }>;
+      },
+      updateFileName: (rfpId: string, fileId: string, fileName: string) =>
+        apiRequest<{ id: string; fileName: string }>(`/api/vendor-rfp/rfps/${rfpId}/proposal/files/${fileId}`, {
+          method: "PUT",
+          body: JSON.stringify({ fileName }),
+        }),
+      deleteFile: (rfpId: string, fileId: string) =>
+        apiRequest<{ message: string }>(`/api/vendor-rfp/rfps/${rfpId}/proposal/files/${fileId}`, {
+          method: "DELETE",
+        }),
+      submitProposal: (rfpId: string) =>
+        apiRequest<{
+          id: string;
+          status: RFPVendorResponseStatus;
+          proposalSubmittedAt: string | null;
+        }>(`/api/vendor-rfp/rfps/${rfpId}/proposal/submit`, {
+          method: "POST",
         }),
     },
   },
@@ -1622,5 +1770,138 @@ export interface RFPAnnouncement {
     lastName: string | null;
     name: string | null;
   };
+}
+
+// Vendor RFP Portal Types
+export enum RFPVendorResponseStatus {
+  Sent = "Sent",
+  Viewed = "Viewed",
+  Participating = "Participating",
+  ProposalSubmitted = "ProposalSubmitted",
+  Declined = "Declined",
+}
+
+export interface RFPVendorResponse {
+  id: string;
+  rfpId: string;
+  projectVendorId: string;
+  contactPersonId: string;
+  status: RFPVendorResponseStatus;
+  participatedAt: string | null;
+  proposalSubmittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RFPProposalFile {
+  id: string;
+  vendorResponseId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VendorContactPerson {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  isMainContact: boolean;
+  vendor: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface RFPListItem {
+  id: string;
+  projectId: string;
+  project: {
+    id: string;
+    name: string;
+    logoData: string | null;
+    logoFileName: string | null;
+    logoFileType: string | null;
+    bannerData: string | null;
+    bannerFileName: string | null;
+    bannerFileType: string | null;
+  };
+  about: string | null;
+  deliveryDate: string | null;
+  scheduleItems: Array<{
+    type: string;
+    date: string | null;
+  }>;
+  vendorResponse: {
+    id: string;
+    status: RFPVendorResponseStatus;
+    participatedAt: string | null;
+  } | null;
+}
+
+export interface RFPDetail extends RFPListItem {
+  scheduleItems: Array<{
+    id: string;
+    type: string;
+    description: string;
+    date: string | null;
+    fromDate: string | null;
+    toDate: string | null;
+    order: number;
+    isRequired: boolean;
+  }>;
+  documents: Array<{
+    id: string;
+    type: string;
+    description: string;
+    fileName: string | null;
+    fileType: string | null;
+    fileSize: number | null;
+    url: string | null;
+    order: number;
+  }>;
+  changelogEntries: Array<{
+    id: string;
+    description: string;
+    createdAt: string;
+    createdBy: {
+      id: string;
+      name: string;
+      email: string;
+    } | null;
+  }>;
+  questions: Array<{
+    id: string;
+    question: string;
+    cleanedQuestion: string | null;
+    answer: string | null;
+    answeredAt: string | null;
+    createdAt: string;
+    vendor: {
+      id: string;
+      name: string;
+    };
+    contactPerson: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    answeredBy: {
+      id: string;
+      name: string;
+      email: string;
+    } | null;
+  }>;
+  vendorResponse: {
+    id: string;
+    status: RFPVendorResponseStatus;
+    participatedAt: string | null;
+    proposalSubmittedAt: string | null;
+    proposalFiles: RFPProposalFile[];
+  } | null;
 }
 

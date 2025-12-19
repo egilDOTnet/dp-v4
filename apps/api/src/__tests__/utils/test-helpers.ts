@@ -10,6 +10,7 @@ import vendorRoutes from "../../routes/vendors";
 import rfiRoutes from "../../routes/rfi";
 import vendorRFIRoutes from "../../routes/vendor-rfi";
 import rfpRoutes from "../../routes/rfp";
+import vendorRFPRoutes from "../../routes/vendor-rfp";
 import notificationRoutes from "../../routes/notifications";
 import { errorHandler } from "../../middleware/error-handler";
 import { JWTPayload, Role } from "@dp/lib";
@@ -46,6 +47,7 @@ export async function buildTestApp(): Promise<FastifyInstance> {
   await app.register(rfiRoutes, { prefix: "/api/projects" });
   await app.register(vendorRFIRoutes, { prefix: "/api" });
   await app.register(rfpRoutes, { prefix: "/api/projects" });
+  await app.register(vendorRFPRoutes, { prefix: "/api" });
   await app.register(notificationRoutes, { prefix: "/api/notifications" });
 
   return app;
@@ -94,4 +96,5 @@ export const testData = {
     name: (index = 0) => `Test Project ${index}`,
   },
 };
+
 

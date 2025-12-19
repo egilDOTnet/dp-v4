@@ -157,6 +157,37 @@ beforeAll(async () => {
     console.log(`✅ Test database connected: ${dbName}`);
     console.log(`   Using database URL: ${testDbUrl.replace(/:[^:@]+@/, ':****@')}`);
     console.log(`   Verified connection to: ${connectedDbName}`);
+    
+    // Apply migrations to test database
+    // This ensures the test database schema is up-to-date
+    try {
+      console.log(`🔄 Applying migrations to test database...`);
+      const { execSync } = await import("child_process");
+      const { resolve } = await import("path");
+      
+      // Get the packages/db directory path
+      const dbPackagePath = resolve(__dirname, "../../../../packages/db");
+      
+      // Run prisma migrate deploy
+      execSync(
+        `pnpm prisma migrate deploy`,
+        {
+          cwd: dbPackagePath,
+          env: {
+            ...process.env,
+            DATABASE_URL: testDbUrl,
+          },
+          stdio: "pipe", // Suppress output unless there's an error
+        }
+      );
+      console.log(`✅ Migrations applied successfully`);
+    } catch (migrationError: any) {
+      // If migrations fail, log but don't fail the test setup
+      // This allows tests to run even if migrations have issues
+      // (e.g., if database already has schema but migration history is incomplete)
+      console.warn(`⚠️  Migration deployment warning:`, migrationError.message);
+      console.warn(`   Tests may still run if database schema is already up-to-date`);
+    }
   } catch (error) {
     console.error("❌ Failed to connect to test database:", error);
     throw error;

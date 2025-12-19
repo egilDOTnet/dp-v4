@@ -32,6 +32,8 @@
   --color-accent-500: #06b6d4;
   --color-accent-600: #0891b2;
   --color-accent-700: #0e7490;
+  --color-accent-800: #0a5561;  /* Dark blue-teal for dark mode backgrounds */
+  --color-accent-900: #083d47;  /* Darker blue-teal for dark mode backgrounds */
 
   /* Alternative Colors (YELLOW) - Warnings & Highlights */
   --color-alternative-50: #fffbeb;

@@ -398,15 +398,38 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         await verifyProjectAccess(request, reply);
         if (reply.sent) return;
 
+        const user = getUser(request);
         const rfp = await db.rFP.findUnique({
           where: { projectId },
+          include: {
+            contactPerson: true,
+            alternativeContactPerson: true,
+          },
         });
 
         if (!rfp) {
           return reply.status(404).send({ error: "RFP not found" });
         }
 
-        // Check if all required dates are set
+        // Check if main contact person is set
+        if (!rfp.contactPersonId) {
+          return reply.status(400).send({
+            error: "Main contact person must be set before publishing",
+          });
+        }
+
+        // Verify user permissions: must be company admin, main contact, or alternative contact
+        const isCompanyAdmin = user.role === "CompanyAdministrator" || user.role === "GlobalAdministrator";
+        const isMainContact = rfp.contactPersonId === user.userId;
+        const isAlternativeContact = rfp.alternativeContactPersonId === user.userId;
+
+        if (!isCompanyAdmin && !isMainContact && !isAlternativeContact) {
+          return reply.status(403).send({
+            error: "Only company administrators, main contact person, or alternative contact can publish the RFP",
+          });
+        }
+
+        // Check if all required dates are set (except StartDate which will be set to current time)
         const requiredItems = await db.rFPScheduleItem.findMany({
           where: {
             rfpId: rfp.id,
@@ -416,7 +439,8 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
 
         const missingDates: string[] = [];
         for (const item of requiredItems) {
-          if (!item.date) {
+          // Skip StartDate as it will be set to current time
+          if (item.type !== "StartDate" && !item.date) {
             missingDates.push(item.description);
           }
         }
@@ -428,25 +452,111 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Get start date for publishDate
+        // Get start date item
         const startDateItem = requiredItems.find((item) => item.type === "StartDate");
-        if (!startDateItem || !startDateItem.date) {
+        if (!startDateItem) {
           return reply.status(400).send({
-            error: "Start date must be set before publishing",
+            error: "Start date schedule item not found",
           });
         }
 
+        // Set start date to current time
+        const currentTime = new Date();
+
+        // Update start date schedule item
+        await db.rFPScheduleItem.update({
+          where: { id: startDateItem.id },
+          data: {
+            date: currentTime,
+          },
+        });
+
+        // Update RFP status and publish date
         await db.rFP.update({
           where: { projectId },
           data: {
             status: "Published",
-            publishDate: startDateItem.date,
+            publishDate: currentTime,
           },
         });
 
         return reply.send({ success: true });
       } catch (error: any) {
         request.log.error({ err: error }, "Error in POST /:id/rfp/publish");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Generate preview token for RFP
+   * Creates a temporary token for company users to preview the vendor portal in read-only mode
+   */
+  fastify.post<{
+    Params: { id: string };
+  }>(
+    "/:id/rfp/preview-token",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Generate a preview token for the RFP vendor portal. User must be a project member or company administrator.",
+        tags: ["rfp"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string", description: "Project ID" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              token: { type: "string", description: "Preview token for vendor portal access" },
+            },
+          },
+          400: { type: "object", properties: { error: { type: "string" } } },
+          401: { type: "object", properties: { error: { type: "string" } } },
+          404: { type: "object", properties: { error: { type: "string" } } },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        if (!request.user) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Get RFP
+        const rfp = await db.rFP.findUnique({
+          where: { projectId },
+        });
+
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        // Generate preview token with user context
+        const user = getUser(request);
+        const token = fastify.jwt.sign({
+          userId: user.userId,
+          projectId,
+          rfpId: rfp.id,
+          type: "rfp-preview",
+        } as any, { expiresIn: "1h" });
+
+        return reply.send({ token });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in POST /:id/rfp/preview-token");
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "An unexpected error occurred",

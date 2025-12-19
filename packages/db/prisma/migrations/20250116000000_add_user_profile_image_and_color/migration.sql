@@ -4,3 +4,4 @@ ADD COLUMN "profileImageFileType" TEXT,
 ADD COLUMN "profileColor" TEXT;
 
 
+

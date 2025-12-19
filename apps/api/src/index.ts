@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import multipart from "@fastify/multipart";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import authRoutes from "./routes/auth";
@@ -11,6 +12,7 @@ import requirementRoutes from "./routes/requirements";
 import vendorRoutes from "./routes/vendors";
 import rfiRoutes from "./routes/rfi";
 import vendorRFIRoutes from "./routes/vendor-rfi";
+import vendorRFPRoutes from "./routes/vendor-rfp";
 import rfpRoutes from "./routes/rfp";
 import notificationRoutes from "./routes/notifications";
 import { errorHandler } from "./middleware/error-handler";
@@ -56,6 +58,12 @@ const start = async () => {
       secret: process.env.JWT_SECRET || "your-secret-key-change-in-production",
     });
 
+    await fastify.register(multipart, {
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB
+      },
+    });
+
     // Register Swagger for API documentation
     await fastify.register(swagger, swaggerOptions);
     await fastify.register(swaggerUi, swaggerUiOptions);
@@ -74,6 +82,7 @@ const start = async () => {
     await fastify.register(vendorRoutes, { prefix: "/api/vendors" });
     await fastify.register(rfiRoutes, { prefix: "/api/projects" });
     await fastify.register(vendorRFIRoutes, { prefix: "/api" });
+    await fastify.register(vendorRFPRoutes, { prefix: "/api" });
     await fastify.register(rfpRoutes, { prefix: "/api/projects" });
     await fastify.register(notificationRoutes, { prefix: "/api/notifications" });
 

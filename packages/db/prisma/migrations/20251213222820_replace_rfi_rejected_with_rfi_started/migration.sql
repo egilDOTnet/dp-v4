@@ -34,3 +34,4 @@ ALTER TABLE "ProjectVendor" ALTER COLUMN "status" SET DEFAULT 'Pending';
 DROP TYPE "VendorStatus";
 ALTER TYPE "VendorStatus_new" RENAME TO "VendorStatus";
 
+
