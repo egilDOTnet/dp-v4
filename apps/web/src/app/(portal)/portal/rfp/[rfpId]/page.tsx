@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { api, RFPDetail, RFPVendorResponseStatus, VendorContactPerson } from "@/lib/api";
+import { api, RFPDetail, VendorContactPerson } from "@/lib/api";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/FormField";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";

@@ -11,7 +11,6 @@ export default function PortalLoginPage() {
   const [step, setStep] = useState<"email" | "password" | "magic-link" | "set-password">("email");
   const [magicLink, setMagicLink] = useState("");
   const [magicLinkToken, setMagicLinkToken] = useState("");
-  const [userExists, setUserExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -38,7 +37,6 @@ export default function PortalLoginPage() {
 
       // Check user status first
       const userStatus = await api.vendorRfp.auth.checkUser(email);
-      setUserExists(userStatus.exists);
 
       // If user exists and has password, show password field
       if (userStatus.exists && userStatus.hasPassword) {
@@ -131,7 +129,6 @@ export default function PortalLoginPage() {
               setMagicLink("");
               setMagicLinkToken("");
               setPassword("");
-              setUserExists(null);
             }}
             className="mt-4 text-sm text-primary-600 hover:underline"
           >
@@ -220,8 +217,6 @@ export default function PortalLoginPage() {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                // Reset user status when email changes
-                setUserExists(null);
                 if (step === "password") {
                   setStep("email");
                 }

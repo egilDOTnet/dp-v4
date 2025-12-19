@@ -3,8 +3,6 @@ import bcrypt from "bcrypt";
 import { db } from "@dp/db";
 import { RFPVendorResponseStatus } from "@prisma/client";
 import { authenticateVendorContact, requireMainContact, verifyRFPAccess, VendorContactRequest } from "../middleware/vendor-auth";
-import { authenticate, getUser } from "../middleware/auth";
-import { verifyProjectAccess } from "../middleware/project-access";
 
 // Store magic links in memory (in production, use Redis or database)
 const vendorMagicLinks = new Map<string, { email: string; expiresAt: number }>();
@@ -655,9 +653,6 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
           },
         },
       });
-
-      // Get project vendor IDs for filtering
-      const projectVendorIds = projectVendors.map((pv) => pv.id);
 
       // Flatten and format RFPs
       const rfps = projectVendors

@@ -44,8 +44,7 @@ export default function PortalLayout({
 
     // Load vendor contact info
     loadContactPerson();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, previewToken]);
+  }, [pathname, previewToken, router]);
 
   const loadContactPerson = async () => {
     try {

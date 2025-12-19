@@ -15,7 +15,7 @@ interface RFPProposalProps {
   isPreviewMode?: boolean;
 }
 
-export function RFPProposal({ rfpId, rfp, contactPerson, onReload, isPreviewMode = false }: RFPProposalProps) {
+export function RFPProposal({ rfpId, rfp: _rfp, contactPerson, onReload, isPreviewMode = false }: RFPProposalProps) {
   const [files, setFiles] = useState<RFPProposalFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);

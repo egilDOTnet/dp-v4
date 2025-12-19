@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { buildTestApp, generateTestToken, createAuthHeader } from "../utils/test-helpers";
+import { buildTestApp, createAuthHeader } from "../utils/test-helpers";
 import {
   createTestUser,
   createTestTenant,
   createTestProject,
-  createTestProjectMember,
   createTestVendor,
   createTestProjectVendor,
   createTestVendorContactPerson,
@@ -15,7 +14,6 @@ import {
 } from "../utils/db-helpers";
 import type { FastifyInstance } from "fastify";
 import { db } from "@dp/db";
-import bcrypt from "bcrypt";
 
 /**
  * Generate a vendor contact JWT token for testing
@@ -306,7 +304,7 @@ describe("Vendor RFP Routes", () => {
         email: "contact@example.com",
       });
       const project = await createTestProject({ tenantId: tenant.id });
-      const projectVendor = await createTestProjectVendor({
+      const _projectVendor = await createTestProjectVendor({
         projectId: project.id,
         vendorId: vendor.id,
       });
@@ -485,7 +483,7 @@ describe("Vendor RFP Routes", () => {
         email: "contact@example.com",
       });
       const project = await createTestProject({ tenantId: tenant.id });
-      const projectVendor = await createTestProjectVendor({
+      const _projectVendor = await createTestProjectVendor({
         projectId: project.id,
         vendorId: vendor.id,
       });
@@ -585,7 +583,7 @@ describe("Vendor RFP Routes", () => {
         isMainContact: true,
       });
       const project = await createTestProject({ tenantId: tenant.id });
-      const projectVendor = await createTestProjectVendor({
+      const _projectVendor = await createTestProjectVendor({
         projectId: project.id,
         vendorId: vendor.id,
       });
@@ -881,7 +879,7 @@ describe("Vendor RFP Routes", () => {
       });
 
       // Create vendor response first
-      const vendorResponse = await createTestRFPVendorResponse({
+      const _vendorResponse = await createTestRFPVendorResponse({
         rfpId: rfp.id,
         projectVendorId: projectVendor.id,
         contactPersonId: contactPerson.id,
@@ -1050,7 +1048,7 @@ describe("Vendor RFP Routes", () => {
         status: "Published",
       });
 
-      const vendorResponse = await createTestRFPVendorResponse({
+      const _vendorResponse = await createTestRFPVendorResponse({
         rfpId: rfp.id,
         projectVendorId: projectVendor.id,
         contactPersonId: contactPerson.id,
