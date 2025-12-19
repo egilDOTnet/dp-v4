@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, User } from "@/lib/api";
-import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button } from "@/components/ui";
+import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button, ContactPersonSelector, ContactPerson } from "@/components/ui";
 import { ImportWizard } from "@/components/ImportWizard";
 import { GraphicsUpload } from "@/components/GraphicsUpload";
 import { useSearch } from "@/hooks/useSearch";
@@ -24,6 +24,7 @@ export default function ManageProjectPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [selectedUserForAdd, setSelectedUserForAdd] = useState<ContactPerson | null>(null);
   const [newMemberForm, setNewMemberForm] = useState({
     email: "",
     firstName: "",
@@ -558,16 +559,14 @@ export default function ManageProjectPage() {
                         <form
                           onSubmit={async (e) => {
                             e.preventDefault();
-                            const select = e.currentTarget.querySelector('select') as HTMLSelectElement;
-                            const userId = select.value;
-                            if (!userId) {
+                            if (!selectedUserForAdd) {
                               setFormError("Please select a user");
                               return;
                             }
                             setAddingMember(true);
                             setFormError("");
                             try {
-                              await api.projects.addMembers(projectId, [userId]);
+                              await api.projects.addMembers(projectId, [selectedUserForAdd.id]);
                               
                               // Reload project and available users
                               const [updatedProject, updatedUsers] = await Promise.all([
@@ -578,6 +577,7 @@ export default function ManageProjectPage() {
                               setAvailableUsers(updatedUsers);
                               
                               setShowAddMemberForm(false);
+                              setSelectedUserForAdd(null);
                               setFormError("");
                             } catch (err: any) {
                               setFormError(err.message || "Failed to add member");
@@ -588,29 +588,21 @@ export default function ManageProjectPage() {
                           className="space-y-3"
                         >
                           <div>
-                            <label className="block text-sm font-medium text-text-primary mb-1">
-                              Select from Company Users
-                            </label>
-                            <select
-                              required
-                              className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                              defaultValue=""
-                            >
-                              <option value="">Select a user...</option>
-                              {availableUsers
+                            <ContactPersonSelector
+                              value={selectedUserForAdd}
+                              options={availableUsers
                                 .filter(u => !project.members?.some(m => m.id === u.id))
-                                .map((user) => {
-                                  const displayName =
-                                    user.firstName && user.lastName
-                                      ? `${user.firstName} ${user.lastName}`
-                                      : user.firstName || user.lastName || user.name || user.email;
-                                  return (
-                                    <option key={user.id} value={user.id}>
-                                      {displayName} ({user.email}) - {user.role}
-                                    </option>
-                                  );
-                                })}
-                            </select>
+                                .map((user) => ({
+                                  id: user.id,
+                                  email: user.email,
+                                  firstName: user.firstName || null,
+                                  lastName: user.lastName || null,
+                                  name: user.name || null,
+                                }))}
+                              onChange={(person) => setSelectedUserForAdd(person)}
+                              placeholder="Select a user..."
+                              label="Select from Company Users"
+                            />
                           </div>
                           <div className="flex items-center gap-2">
                             <button
@@ -624,6 +616,7 @@ export default function ManageProjectPage() {
                               type="button"
                               onClick={() => {
                                 setShowAddMemberForm(false);
+                                setSelectedUserForAdd(null);
                                 setFormError("");
                               }}
                               className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"

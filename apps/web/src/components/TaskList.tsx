@@ -21,6 +21,13 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from "./ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "./ui/Avatar";
+import { ContactPerson } from "./ui/ContactPersonSelector";
 
 interface TaskListProps {
   projectId: string;
@@ -52,6 +59,234 @@ interface SortableTaskItemProps {
   isCompleted: boolean;
   isDraggable: boolean;
   children: (props: { attributes: any; listeners: any }) => React.ReactNode;
+}
+
+interface OwnerSelectorProps {
+  taskId: string;
+  owner: Project["members"][0] | null;
+  selectedOwnerId: string | null;
+  projectMembers: Project["members"];
+  onOwnerChange: (ownerId: string | null) => void;
+  hoveredOwnerButtonId: string | null;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}
+
+function OwnerSelector({
+  taskId,
+  owner,
+  selectedOwnerId,
+  projectMembers,
+  onOwnerChange,
+  hoveredOwnerButtonId,
+  onMouseEnter,
+  onMouseLeave,
+}: OwnerSelectorProps) {
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Convert members to ContactPerson format
+  const contactPersonOptions: ContactPerson[] = projectMembers.map((member) => ({
+    id: member.id,
+    email: member.email,
+    firstName: member.firstName || null,
+    lastName: member.lastName || null,
+    name: member.name || null,
+  }));
+
+  const selectedContactPerson: ContactPerson | null = selectedOwnerId
+    ? contactPersonOptions.find((p) => p.id === selectedOwnerId) || null
+    : null;
+
+  // Filter options based on search query
+  const filteredOptions = contactPersonOptions.filter((person) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    const firstName = person.firstName?.toLowerCase() || "";
+    const lastName = person.lastName?.toLowerCase() || "";
+    const name = person.name?.toLowerCase() || "";
+    const email = person.email.toLowerCase();
+    return (
+      firstName.includes(query) ||
+      lastName.includes(query) ||
+      name.includes(query) ||
+      email.includes(query) ||
+      `${firstName} ${lastName}`.trim().includes(query)
+    );
+  });
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (open && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    } else {
+      setSearchQuery("");
+    }
+  }, [open]);
+
+  const getDisplayName = (person: ContactPerson | null) => {
+    if (!person) return "";
+    if (person.firstName || person.lastName) {
+      return `${person.firstName || ""} ${person.lastName || ""}`.trim();
+    }
+    return person.name || person.email || "Unknown";
+  };
+
+  const getInitials = (person: ContactPerson | null) => {
+    if (!person) return "?";
+    if (person.firstName && person.lastName) {
+      return `${person.firstName[0]}${person.lastName[0]}`.toUpperCase();
+    }
+    if (person.firstName) {
+      return person.firstName[0].toUpperCase();
+    }
+    if (person.name) {
+      const parts = person.name.split(" ");
+      if (parts.length >= 2) {
+        return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+      }
+      return person.name[0].toUpperCase();
+    }
+    if (person.email) {
+      return person.email[0].toUpperCase();
+    }
+    return "?";
+  };
+
+  const handleSelect = (person: ContactPerson) => {
+    onOwnerChange(person.id);
+    setOpen(false);
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onOwnerChange(null);
+    setOpen(false);
+  };
+
+  return (
+    <div
+      className="flex-shrink-0 relative"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={`w-7 h-7 rounded-full border flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-selection transition-colors relative z-10 ${
+              hoveredOwnerButtonId === taskId
+                ? "border-selection"
+                : "border-gray-300 dark:border-gray-600"
+            }`}
+            title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
+          >
+            {owner ? (
+              <UserAvatar user={owner} size="xs" />
+            ) : (
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="w-[280px] p-0"
+          align="start"
+        >
+          <div className="p-2 border-b border-border-primary">
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search contacts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                // Handle Ctrl-A/Command-A to select all text
+                if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+                  e.preventDefault();
+                  e.currentTarget.select();
+                  return;
+                }
+                // Escape to close
+                if (e.key === "Escape") {
+                  setOpen(false);
+                }
+                // Prevent dropdown from closing when typing
+                e.stopPropagation();
+              }}
+              className="w-full px-3 py-2 border rounded-md text-text-primary bg-background-secondary border-border-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+            />
+          </div>
+          <div className="max-h-[300px] overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-text-secondary text-center">
+                No contacts found
+              </div>
+            ) : (
+              <>
+                {filteredOptions.map((person) => (
+                  <button
+                    key={person.id}
+                    type="button"
+                    onClick={() => handleSelect(person)}
+                    className={`w-full px-3 py-2 flex items-center gap-2 hover:bg-background-secondary transition-colors text-left focus:outline-none focus:bg-background-secondary ${
+                      selectedContactPerson?.id === person.id ? "bg-background-secondary" : ""
+                    }`}
+                  >
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarFallback className="bg-primary-600 text-white text-xs">
+                        {getInitials(person)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-text-primary truncate">
+                        {getDisplayName(person)}
+                      </div>
+                      {person.email && (
+                        <div className="text-xs text-text-secondary truncate">
+                          {person.email}
+                        </div>
+                      )}
+                    </div>
+                    {selectedContactPerson?.id === person.id && (
+                      <svg
+                        className="h-4 w-4 text-primary-600 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+          {selectedContactPerson && (
+            <div className="p-2 border-t border-border-primary">
+              <button
+                type="button"
+                onClick={handleClear}
+                className="w-full px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-secondary rounded transition-colors text-left"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
 function SortableTaskItem({
@@ -1410,52 +1645,20 @@ export default function TaskList({
                             </button>
                           )}
 
-                          {/* Owner Avatar */}
-                          <div 
-                            className="flex-shrink-0 relative"
+                          {/* Owner Avatar with Dropdown */}
+                          <OwnerSelector
+                            taskId={task.id}
+                            owner={owner}
+                            selectedOwnerId={taskFormData.ownerId}
+                            projectMembers={projectMembers || []}
+                            onOwnerChange={(ownerId) => {
+                              updateFormField(task.id, "ownerId", ownerId);
+                              handleFieldSave(task.id, "ownerId", ownerId);
+                            }}
+                            hoveredOwnerButtonId={hoveredOwnerButtonId}
                             onMouseEnter={() => setHoveredOwnerButtonId(task.id)}
                             onMouseLeave={() => setHoveredOwnerButtonId(null)}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const select = document.getElementById(`owner-select-${task.id}`);
-                                select?.click();
-                              }}
-                              className={`w-7 h-7 rounded-full border flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-selection transition-colors relative z-10 ${
-                                hoveredOwnerButtonId === task.id
-                                  ? "border-selection"
-                                  : "border-gray-300 dark:border-gray-600"
-                              }`}
-                              title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
-                            >
-                              {owner ? (
-                                <UserAvatar user={owner} size="xs" />
-                              ) : (
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                                </svg>
-                              )}
-                            </button>
-                            <select
-                              id={`owner-select-${task.id}`}
-                              value={taskFormData.ownerId ?? ""}
-                              onChange={(e) => {
-                                updateFormField(task.id, "ownerId", e.target.value || null);
-                                handleFieldSave(task.id, "ownerId", e.target.value || null);
-                              }}
-                              className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                            >
-                              <option value="">No owner</option>
-                              {projectMembers?.map((member) => (
-                                <option key={member.id} value={member.id}>
-                                  {member.firstName && member.lastName
-                                    ? `${member.firstName} ${member.lastName}`
-                                    : member.firstName || member.lastName || member.name || member.email}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          />
 
                           {/* Task Name */}
                           <div className="flex-1 min-w-0">
@@ -1979,51 +2182,19 @@ export default function TaskList({
                             </button>
                           )}
 
-                          <div 
-                            className="flex-shrink-0 relative"
+                          <OwnerSelector
+                            taskId={task.id}
+                            owner={owner}
+                            selectedOwnerId={taskFormData.ownerId}
+                            projectMembers={projectMembers || []}
+                            onOwnerChange={(ownerId) => {
+                              updateFormField(task.id, "ownerId", ownerId);
+                              handleFieldSave(task.id, "ownerId", ownerId);
+                            }}
+                            hoveredOwnerButtonId={hoveredOwnerButtonId}
                             onMouseEnter={() => setHoveredOwnerButtonId(task.id)}
                             onMouseLeave={() => setHoveredOwnerButtonId(null)}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const select = document.getElementById(`owner-select-${task.id}`);
-                                select?.click();
-                              }}
-                              className={`rounded-full border flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-selection transition-colors relative z-10 ${
-                                hoveredOwnerButtonId === task.id
-                                  ? "border-selection"
-                                  : "border-gray-300 dark:border-gray-600"
-                              }`}
-                              title={owner ? `${owner.firstName || ""} ${owner.lastName || ""}`.trim() || owner.email : "No owner - click to assign"}
-                            >
-                              {owner ? (
-                                <UserAvatar user={owner} size="xs" />
-                              ) : (
-                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                                </svg>
-                              )}
-                            </button>
-                            <select
-                              id={`owner-select-${task.id}`}
-                              value={taskFormData.ownerId ?? ""}
-                              onChange={(e) => {
-                                updateFormField(task.id, "ownerId", e.target.value || null);
-                                handleFieldSave(task.id, "ownerId", e.target.value || null);
-                              }}
-                              className="absolute inset-0 opacity-0 cursor-pointer z-20"
-                            >
-                              <option value="">No owner</option>
-                              {projectMembers?.map((member) => (
-                                <option key={member.id} value={member.id}>
-                                  {member.firstName && member.lastName
-                                    ? `${member.firstName} ${member.lastName}`
-                                    : member.firstName || member.lastName || member.name || member.email}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          />
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
