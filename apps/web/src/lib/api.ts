@@ -733,6 +733,7 @@ export const api = {
         alternativeContactPersonId?: string | null;
         publishDate?: string | null;
         deliveryDate?: string | null;
+        about?: string | null;
       }
     ) =>
       apiRequest<RFP>(`/api/projects/${projectId}/rfp`, {
@@ -1509,6 +1510,7 @@ export interface RFP {
   alternativeContactPersonId: string | null;
   publishDate: string | null;
   deliveryDate: string | null;
+  about: string | null;
   createdAt: string;
   updatedAt: string;
   contactPerson?: {

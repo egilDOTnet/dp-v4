@@ -11,8 +11,9 @@ import RFPDocuments from "@/components/rfp/RFPDocuments";
 import RFPChangelog from "@/components/rfp/RFPChangelog";
 import RFPQuestions from "@/components/rfp/RFPQuestions";
 import RFPAnnouncements from "@/components/rfp/RFPAnnouncements";
+import WysiwygEditor from "@/components/WysiwygEditor";
 
-type TabType = "overview" | "schedule" | "documents" | "changelog" | "qa" | "announcements";
+type TabType = "overview" | "about" | "schedule" | "documents" | "changelog" | "qa" | "announcements";
 
 export default function RFPPage() {
   const params = useParams();
@@ -22,6 +23,8 @@ export default function RFPPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [about, setAbout] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -45,11 +48,27 @@ export default function RFPPage() {
       setError("");
       const rfpData = await api.rfp.get(projectId);
       setRfp(rfpData);
+      setAbout(rfpData.about || "");
     } catch (err: any) {
       console.error("Error loading RFP:", err);
       setError(err.message || err.error?.message || "Failed to load RFP");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveAbout = async () => {
+    setIsSaving(true);
+    try {
+      await api.rfp.update(projectId, {
+        about,
+      });
+      await loadRFP();
+      setError("");
+    } catch (err: any) {
+      setError(err.message || "Failed to save about information");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -112,6 +131,7 @@ export default function RFPPage() {
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)}>
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="about">About</TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="documents">Documents/Links</TabsTrigger>
             <TabsTrigger value="changelog">Changelog</TabsTrigger>
@@ -121,6 +141,35 @@ export default function RFPPage() {
 
           <TabsContent value="overview">
             <RFPOverview projectId={projectId} rfp={rfp} />
+          </TabsContent>
+
+          <TabsContent value="about">
+            <div className="bg-background-secondary rounded-lg shadow-md p-6 border border-border-primary">
+              <div className="space-y-4">
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold mb-2">About</h2>
+                  <p className="text-sm text-gray-600">
+                    Add information about the RFP that will be shown to vendors.
+                  </p>
+                </div>
+                <div>
+                  <WysiwygEditor
+                    value={about}
+                    onChange={setAbout}
+                    placeholder="Enter RFP information..."
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSaveAbout}
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {isSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="schedule">

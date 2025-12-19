@@ -263,8 +263,96 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
   );
 
   const execCommand = (command: string, value?: string) => {
+    if (!editorRef.current) return;
+    
+    // Ensure editor is focused
+    editorRef.current.focus();
+    const editor = editorRef.current;
+    
+    // For formatBlock commands (H1, H2, H3, P), ensure we have a selection
+    if (command === "formatBlock" && value) {
+      let selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        // No selection - create a range at the cursor or wrap the current block
+        const range = document.createRange();
+        
+        // Try to find the current block element from the anchor node
+        let blockElement: Node | null = null;
+        if (selection && selection.anchorNode) {
+          let node: Node | null = selection.anchorNode;
+          while (node && node !== editor) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element;
+              if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'DIV', 'LI'].includes(element.tagName)) {
+                blockElement = node;
+                break;
+              }
+            }
+            node = node.parentNode;
+          }
+        }
+        
+        // Ensure we have a selection object
+        if (!selection) {
+          selection = window.getSelection();
+        }
+        
+        if (blockElement && selection) {
+          // Wrap existing block
+          range.selectNodeContents(blockElement);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        } else if (selection) {
+          // Create a new block at the end or current position
+          const newBlock = document.createElement(value);
+          if (editor.childNodes.length === 0 || editor.lastChild?.nodeType === Node.TEXT_NODE) {
+            // Editor is empty or ends with text, append new block
+            editor.appendChild(newBlock);
+            range.selectNodeContents(newBlock);
+            range.collapse(false);
+          } else {
+            // Insert after last block
+            editor.appendChild(newBlock);
+            range.selectNodeContents(newBlock);
+            range.collapse(false);
+          }
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      } else {
+        // We have a selection, but formatBlock might not work if selection spans multiple blocks
+        // Try to ensure we're formatting a single block
+        const range = selection.getRangeAt(0);
+        let blockElement: Node | null = null;
+        
+        // Find common ancestor that's a block element
+        let node: Node | null = range.commonAncestorContainer;
+        while (node && node !== editorRef.current) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as Element;
+            if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'DIV', 'LI', 'BODY'].includes(element.tagName)) {
+              blockElement = node;
+              break;
+            }
+          }
+          node = node.parentNode;
+        }
+        
+        // If we found a block, select it entirely for formatting
+        if (blockElement && blockElement !== editorRef.current) {
+          const newRange = document.createRange();
+          newRange.selectNodeContents(blockElement);
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        }
+      }
+    }
+    
+    // Execute the command
     document.execCommand(command, false, value);
-    editorRef.current?.focus();
+    
+    // Ensure editor stays focused and update content
+    editorRef.current.focus();
     handleInput();
   };
 
@@ -565,6 +653,32 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
         }
         :global(.mention *) {
           color: var(--color-primary-600, #65d405) !important;
+        }
+        :global([contenteditable] h1) {
+          font-size: 2em;
+          font-weight: bold;
+          margin: 0.67em 0;
+        }
+        :global([contenteditable] h2) {
+          font-size: 1.5em;
+          font-weight: bold;
+          margin: 0.75em 0;
+        }
+        :global([contenteditable] h3) {
+          font-size: 1.17em;
+          font-weight: bold;
+          margin: 0.83em 0;
+        }
+        :global([contenteditable] p) {
+          margin: 1em 0;
+        }
+        :global([contenteditable] ul),
+        :global([contenteditable] ol) {
+          margin: 1em 0;
+          padding-left: 2em;
+        }
+        :global([contenteditable] li) {
+          margin: 0.5em 0;
         }
       `}</style>
     </div>

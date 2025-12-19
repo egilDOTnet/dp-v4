@@ -147,6 +147,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
             alternativeContactPersonId: true,
             publishDate: true,
             deliveryDate: true,
+            about: true,
             createdAt: true,
             updatedAt: true,
             contactPerson: {
@@ -184,6 +185,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
               alternativeContactPersonId: true,
               publishDate: true,
               deliveryDate: true,
+              about: true,
               createdAt: true,
               updatedAt: true,
               contactPerson: {
@@ -233,6 +235,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
       alternativeContactPersonId?: string | null;
       publishDate?: string | null;
       deliveryDate?: string | null;
+      about?: string | null;
     };
   }>(
     "/:id/rfp",
@@ -257,6 +260,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
             alternativeContactPersonId: { type: "string", nullable: true },
             publishDate: { type: "string", format: "date-time", nullable: true },
             deliveryDate: { type: "string", format: "date-time", nullable: true },
+            about: { type: "string", nullable: true },
           },
         },
         response: {
@@ -291,6 +295,9 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         if (request.body.deliveryDate !== undefined) {
           updateData.deliveryDate = request.body.deliveryDate ? new Date(request.body.deliveryDate) : null;
         }
+        if (request.body.about !== undefined) {
+          updateData.about = request.body.about || null;
+        }
 
         const rfp = await db.rFP.upsert({
           where: { projectId },
@@ -311,6 +318,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
             alternativeContactPersonId: true,
             publishDate: true,
             deliveryDate: true,
+            about: true,
             createdAt: true,
             updatedAt: true,
             contactPerson: {

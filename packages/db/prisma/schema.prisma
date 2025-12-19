@@ -486,6 +486,7 @@ model RFP {
   alternativeContactPersonId String?
   publishDate                DateTime?
   deliveryDate               DateTime?
+  about                      String?   // HTML from WYSIWYG editor
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
