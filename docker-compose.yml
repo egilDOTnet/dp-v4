@@ -21,11 +21,16 @@ services:
   api:
     build: ./apps/api
     container_name: api
-    command: sh -c 'echo "Waiting for package.json..."; while [ ! -f package.json ]; do sleep 2; done; echo "package.json found! Installing dependencies..." && pnpm install && exec pnpm dev'
+    command: sh -c 'echo "Waiting for workspace..."; while [ ! -f /workspace/package.json ]; do sleep 2; done; echo "Workspace found! Installing dependencies..." && cd /workspace && pnpm install && echo "Generating Prisma client..." && cd packages/db && pnpm prisma generate && echo "Cleaning up empty migration directories..." && find prisma/migrations -type d -mindepth 1 -maxdepth 1 -empty -exec rm -rf {} \; 2>/dev/null || true && echo "Applying database migrations..." && pnpm prisma migrate deploy && cd /workspace/apps/api && exec pnpm dev'
     restart: unless-stopped
     volumes:
-      - ./apps/api:/app
-      - /app/node_modules
+      - .:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/api/node_modules
+      - /workspace/packages/config/node_modules
+      - /workspace/packages/db/node_modules
+      - /workspace/packages/lib/node_modules
+      - /workspace/packages/ui/node_modules
     ports:
       - "3001:3001"
     environment:
@@ -44,14 +49,20 @@ services:
   web:
     build: ./apps/web
     container_name: web
-    command: sh -c 'echo "Waiting for package.json..."; while [ ! -f package.json ]; do sleep 2; done; echo "package.json found! Installing dependencies..." && pnpm install && exec pnpm dev'
+    command: sh -c 'echo "Waiting for workspace..."; while [ ! -f /workspace/package.json ]; do sleep 2; done; echo "Workspace found! Installing dependencies..." && cd /workspace && pnpm install && cd apps/web && exec pnpm dev'
     restart: unless-stopped
     volumes:
-      - ./apps/web:/app
-      - /app/node_modules
+      - .:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/web/node_modules
+      - /workspace/packages/config/node_modules
+      - /workspace/packages/db/node_modules
+      - /workspace/packages/lib/node_modules
+      - /workspace/packages/ui/node_modules
     ports:
       - "3000:3000"
     environment:
+      # NEXT_PUBLIC_API_URL is only used for SSR - client-side uses dynamic hostname
       NEXT_PUBLIC_API_URL: http://localhost:3001
     networks:
       - appnet

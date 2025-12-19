@@ -1,22 +1,19 @@
 FROM node:20-alpine
 
-# Install pnpm and wget for healthcheck
+# Install pnpm, wget for healthcheck, and OpenSSL for Prisma
 RUN npm install -g pnpm && \
-    apk add --no-cache wget
+    apk add --no-cache wget openssl openssl-dev
 
-# Set working directory
-WORKDIR /app
+# Set working directory to workspace root
+WORKDIR /workspace
 
 # Copy all files (package.json will be available via volume mount in dev)
-# This COPY is mainly for initial dependency installation
+# Dependencies are installed at runtime via docker-compose command
 COPY . .
-
-# Install dependencies (use --no-frozen-lockfile for dev flexibility)
-RUN if [ -f package.json ]; then pnpm install; else echo "No package.json found, skipping install"; fi
 
 # Expose port
 EXPOSE 3000
 
-# Start dev server with hot reload (install deps if package.json exists)
-CMD sh -c 'if [ -f package.json ]; then echo "Installing dependencies..." && pnpm install; fi && exec pnpm dev'
+# Start dev server (dependencies installed via docker-compose command)
+CMD ["pnpm", "dev"]
 

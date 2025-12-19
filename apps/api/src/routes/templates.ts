@@ -3,10 +3,43 @@ import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
 
 export default async function templateRoutes(fastify: FastifyInstance) {
-  // Get all templates (global + tenant-specific)
+  /**
+   * Get all available templates
+   * Returns both global templates and tenant-specific templates
+   */
   fastify.get(
     "/",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all templates available to the current user. Includes global templates and templates specific to the user's tenant.",
+        tags: ["templates"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                content: { type: "string" },
+                isGlobal: { type: "boolean" },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (!request.user) {
         return reply.status(401).send({ error: "Unauthorized" });
@@ -35,10 +68,65 @@ export default async function templateRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // Get single template
+  /**
+   * Get a single template by ID
+   * User must have access (global template or tenant-specific template)
+   */
   fastify.get(
     "/:id",
-    { preHandler: [authenticate] },
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get a single template by ID. User must have access (template must be global or belong to user's tenant).",
+        tags: ["templates"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: {
+              type: "string",
+              description: "Template ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              content: { type: "string" },
+              isGlobal: { type: "boolean" },
+              tenantId: { type: "string", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - template not accessible",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Template not found",
+          },
+        },
+      },
+    },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const id = (request.params as { id: string }).id;
       const currentUser = getUser(request);

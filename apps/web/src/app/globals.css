@@ -1,28 +1,375 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+/* =================================================================
+   Theme Configuration
+   Using Tailwind v4's @theme directive for CSS custom properties
+   ================================================================= */
+
+@theme {
+  /* Primary Colors (GREEN) - Brand Colors from Logo */
+  --color-primary-50: #f7ffec;   /* Lightest green tint - derived from logo light green */
+  --color-primary-100: #eeffda;  /* Very light green - derived from logo light green */
+  --color-primary-200: #c7ff82;  /* Light green from logo (C=22 M=0 Y=49 K=0) */
+  --color-primary-300: #aaf25d;  /* Light-medium green - interpolated between light and main */
+  --color-primary-400: #8ce537;  /* Medium-light green - interpolated between light and main */
+  --color-primary-500: #65d405;  /* Main brand green from logo (C=60 M=16 Y=98 K=1) */
+  --color-primary-600: #56b404;  /* Medium-dark green - darkened from main */
+  --color-primary-700: #428a03;  /* Dark green - further darkened for contrast */
+  --color-primary-800: #2d5f02;  /* Very dark green - for deep contrast */
+  --color-primary-900: #193501;  /* Darkest green - near black with green tint */
+  --color-primary-950: #0a1500;  /* Almost black green - maximum darkness */
+
+  /* Accent Colors (BLUE) - Secondary Actions */
+  --color-accent-50: #ecfeff;
+  --color-accent-100: #cffafe;
+  --color-accent-200: #a5f3fc;
+  --color-accent-300: #67e8f9;
+  --color-accent-400: #4ff5fc;  /* Main accent blue from brand manual (C=69 M=4 Y=1 K=0) */
+  --color-accent-500: #06b6d4;
+  --color-accent-600: #0891b2;
+  --color-accent-700: #0e7490;
+  --color-accent-800: #0a5561;  /* Dark blue-teal for dark mode backgrounds */
+  --color-accent-900: #083d47;  /* Darker blue-teal for dark mode backgrounds */
+
+  /* Alternative Colors (YELLOW) - Warnings & Highlights */
+  --color-alternative-50: #fffbeb;
+  --color-alternative-100: #fef3c7;
+  --color-alternative-200: #fde68a;
+  --color-alternative-300: #fcd34d;
+  --color-alternative-400: #ffcf33;  /* Main alternative yellow from brand manual (C=0 M=19 Y=80 K=0) */
+  --color-alternative-500: #f59e0b;
+  --color-alternative-600: #d97706;
+  --color-alternative-700: #b45309;
+
+  /* Error/Danger Colors (RED) */
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-200: #fecaca;
+  --color-error-300: #fca5a5;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #e80c00;  /* Main error red from brand manual (C=7 M=95 Y=100 K=2) */
+  --color-error-700: #b91c1c;
+
+  /* Success Colors - Uses Primary Green from Logo */
+  --color-success-50: #f7ffec;  /* Same as primary-50 */
+  --color-success-100: #eeffda;  /* Same as primary-100 */
+  --color-success-500: #65d405;  /* Same as primary-500 - main brand green */
+  --color-success-600: #56b404;  /* Same as primary-600 */
+  --color-success-700: #428a03;  /* Same as primary-700 */
+
+  /* Warning Colors - Uses Alternative Yellow */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #ffcf33;  /* Same as alternative-400 */
+  --color-warning-600: #d97706;  /* Same as alternative-600 */
+
+  /* Semantic Background Colors - Light mode defaults (will be overridden in :root and .dark) */
+  --color-background-primary: #f3f4f6;  /* Gray-100 - page background (darkest) */
+  --color-background-secondary: #f9fafb; /* Gray-50 - cards/content (medium) */
+  --color-background-tertiary: #ffffff;  /* White - sidebar/elevated (lightest) */
+
+  /* Semantic Text Colors - Light mode defaults */
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
+
+  /* Semantic Border Colors - Light mode defaults */
+  --color-border-primary: #e5e7eb;
+  --color-border-secondary: #d1d5db;
+
+  /* Selection/Highlight Colors - for selected/hovered elements */
+  --color-selection: #111827;  /* Gray-900 - dark/black for selection borders */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+/* =================================================================
+   Base Styles - Light Mode (Default)
+   ================================================================= */
+
+:root {
+  /* Light mode colors - override @theme defaults */
+  /* For visual hierarchy: page=gray-100 (darkest), cards=gray-50 (medium), elevated=white (lightest) */
+  --color-background-primary: #f3f4f6;  /* Gray-100 - page background (darkest shade for depth) */
+  --color-background-secondary: #f9fafb; /* Gray-50 - cards/content (medium) */
+  --color-background-tertiary: #ffffff;  /* White - sidebar/elevated (lightest, most elevated) */
+
+  --color-text-primary: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
+
+  --color-border-primary: #e5e7eb;
+  --color-border-secondary: #d1d5db;
+
+  --color-selection: #111827;  /* Gray-900 - dark/black for selection borders in light mode */
+
+  /* Legacy variable names for backwards compatibility */
+  --color-bg-primary: var(--color-background-primary);
+  --color-bg-secondary: var(--color-background-secondary);
+  --color-bg-tertiary: var(--color-background-tertiary);
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* =================================================================
+   Dark Mode Styles
+   ================================================================= */
+
+.dark {
+  /* Dark mode colors - override @theme defaults */
+  /* For visual hierarchy: page=gray-950 (darkest), cards=gray-900 (medium), elevated=gray-800 (lightest) */
+  --color-background-primary: #0f172a;  /* Gray-950 - page background (darkest at back) */
+  --color-background-secondary: #1e293b; /* Gray-900 - cards/content (medium, elevated) */
+  --color-background-tertiary: #334155;  /* Gray-800 - sidebar/elevated (lightest, most elevated) */
+
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-tertiary: #9ca3af;
+
+  --color-border-primary: #374151;
+  --color-border-secondary: #4b5563;
+
+  --color-selection: #f9fafb;  /* Gray-50 - light/white for selection borders in dark mode */
+
+  /* Legacy variable names for backwards compatibility */
+  --color-bg-primary: var(--color-background-primary);
+  --color-bg-secondary: var(--color-background-secondary);
+  --color-bg-tertiary: var(--color-background-tertiary);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* =================================================================
+   Base Element Styles
+   ================================================================= */
+
+html {
+  /* Smooth theme transitions */
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* =================================================================
+   Focus Styles
+   ================================================================= */
+
+*:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+/* =================================================================
+   Scrollbar Styles (Optional - for consistency)
+   ================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: var(--color-background-tertiary);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-border-primary);
+}
+
+/* =================================================================
+   Animation Utilities
+   ================================================================= */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(8px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes slideDown {
+  from { 
+    opacity: 0; 
+    transform: translateY(-8px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes jiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: rotate(-5deg);
+  }
+  20%, 40%, 60%, 80% {
+    transform: rotate(5deg);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+.animate-jiggle {
+  animation: jiggle 1s ease-in-out;
+}
+
+.animate-jiggle {
+  animation: jiggle 1s ease-in-out;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Checkbox accent color - matches multi-edit button color */
+  input[type="checkbox"] {
+    accent-color: var(--color-accent-600);
+  }
+}
