@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, RFP, RFPQuestion, ProjectVendor } from "@/lib/api";
-import { Button, Card, CardHeader, CardBody, SearchBar, EmptyState } from "@/components/ui";
+import { Button, Card, CardHeader, CardBody, SearchBar, EmptyState, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui";
 import { useSearch } from "@/hooks/useSearch";
 import { formatISODateTime } from "@/lib/utils";
 import SplitQuestionModal from "./SplitQuestionModal";
@@ -110,23 +110,24 @@ export default function RFPQuestions({ projectId, rfp: _rfp }: RFPQuestionsProps
         <CardHeader>
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Questions & Answers</h2>
-            <div className="flex items-center gap-2 bg-background-tertiary rounded-md p-1 border border-border-primary">
+            <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
               <button
                 onClick={() => setFilter("unanswered")}
-                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 text-sm transition-colors ${
                   filter === "unanswered"
                     ? "bg-primary-600 text-white"
-                    : "text-text-secondary hover:text-text-primary"
+                    : "bg-background-secondary text-text-primary hover:bg-background-tertiary"
                 }`}
               >
                 Unanswered
               </button>
+              <div className="w-px h-6 bg-gray-300"></div>
               <button
                 onClick={() => setFilter("answered")}
-                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 text-sm transition-colors ${
                   filter === "answered"
                     ? "bg-primary-600 text-white"
-                    : "text-text-secondary hover:text-text-primary"
+                    : "bg-background-secondary text-text-primary hover:bg-background-tertiary"
                 }`}
               >
                 Answered
@@ -147,57 +148,92 @@ export default function RFPQuestions({ projectId, rfp: _rfp }: RFPQuestionsProps
               }
             />
           ) : (
-            <div className="space-y-4">
-              {filteredItems.map((question) => (
-                <Card key={question.id}>
-                  <CardBody>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-sm text-text-secondary mb-1">
-                          {formatISODateTime(question.createdAt)} • {question.vendor?.name || "Unknown Vendor"} •{" "}
-                          {question.contactPerson
-                            ? `${question.contactPerson.firstName} ${question.contactPerson.lastName}`.trim()
-                            : "Unknown Contact"}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="align-top w-[12%] min-w-[120px]">Date</TableHead>
+                  <TableHead className="align-top w-[18%] min-w-[150px]">Company & Person</TableHead>
+                  <TableHead className="align-top">Question</TableHead>
+                  <TableHead className="align-top w-[20%] min-w-[180px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((question) => {
+                  const dateTime = formatISODateTime(question.createdAt);
+                  const [date, time] = dateTime.includes(" ") ? dateTime.split(" ") : [dateTime, null];
+                  return (
+                    <TableRow key={question.id}>
+                      <TableCell className="align-top">
+                        <div className="text-sm text-text-primary">
+                          <div>{date}</div>
+                          {time && <div className="text-text-secondary">{time}</div>}
                         </div>
-                        <div className="text-text-primary font-medium mt-2">
-                          {question.cleanedQuestion || question.question}
-                        </div>
-                        {question.answer && (
-                          <div className="mt-4 p-4 bg-background-tertiary rounded-md">
-                            <div className="text-sm font-semibold text-text-primary mb-2">Answer:</div>
-                            <div
-                              className="text-text-primary prose prose-sm max-w-none"
-                              dangerouslySetInnerHTML={{ __html: question.answer }}
-                            />
-                            <div className="text-xs text-text-secondary mt-2">
-                              Answered {question.answeredAt ? formatISODateTime(question.answeredAt) : ""} by {getUserName(question)}
-                            </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="text-sm">
+                          <div className="text-text-primary font-medium">
+                            {question.vendor?.name || "Unknown Vendor"}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={() => handleSplit(question)} variant="secondary" size="sm">
-                          Split
-                        </Button>
-                        {!question.answer && (
-                          <Button onClick={() => handleAnswer(question)} variant="primary" size="sm">
-                            Answer
+                          <div className="text-text-secondary mt-1">
+                            {question.contactPerson
+                              ? `${question.contactPerson.firstName} ${question.contactPerson.lastName}`.trim() || "Unknown Contact"
+                              : "Unknown Contact"}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="space-y-2">
+                          {question.answer && question.cleanedQuestion && question.cleanedQuestion !== question.question && (
+                            <div>
+                              <div className="text-xs text-text-secondary mb-1">Original Question:</div>
+                              <div className="text-sm text-text-secondary italic break-words">
+                                {question.question}
+                              </div>
+                            </div>
+                          )}
+                          <div className="text-text-primary font-medium break-words">
+                            {question.cleanedQuestion || question.question}
+                          </div>
+                          {question.answer && (
+                            <div className="mt-3 p-3 bg-background-tertiary rounded-md">
+                              <div className="text-sm font-semibold text-text-primary mb-2">Answer:</div>
+                              <div
+                                className="text-text-primary prose prose-sm max-w-none"
+                                dangerouslySetInnerHTML={{ __html: question.answer }}
+                              />
+                              <div className="text-xs text-text-secondary mt-2">
+                                Answered {question.answeredAt ? formatISODateTime(question.answeredAt) : ""} by {getUserName(question)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="flex flex-row gap-1.5">
+                          <Button onClick={() => handleSplit(question)} variant="secondary" size="sm" className="px-2">
+                            Split
                           </Button>
-                        )}
-                        <Button
-                          onClick={() => handleDelete(question.id)}
-                          disabled={deletingId === question.id}
-                          variant="danger"
-                          size="sm"
-                        >
-                          {deletingId === question.id ? "Deleting..." : "Delete"}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
+                          {!question.answer && (
+                            <Button onClick={() => handleAnswer(question)} variant="primary" size="sm" className="px-2">
+                              Answer
+                            </Button>
+                          )}
+                          <Button
+                            onClick={() => handleDelete(question.id)}
+                            disabled={deletingId === question.id}
+                            variant="danger"
+                            size="sm"
+                            className="px-2"
+                          >
+                            {deletingId === question.id ? "Deleting..." : "Delete"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+              </Table>
           )}
         </CardBody>
       </Card>
