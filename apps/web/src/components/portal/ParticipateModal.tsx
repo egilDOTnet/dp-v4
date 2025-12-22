@@ -32,3 +32,4 @@ export function ParticipateModal({ rfp, onConfirm, onCancel }: ParticipateModalP
     </Dialog>
   );
 }
+

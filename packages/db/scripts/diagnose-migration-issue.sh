@@ -39,3 +39,4 @@ echo "      Connect to postgres and run: SELECT migration_name FROM _prisma_migr
 echo ""
 echo "   c) To recreate the missing migration:"
 echo "      pnpm prisma migrate dev --name <migration_name> --create-only"
+

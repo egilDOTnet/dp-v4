@@ -119,3 +119,4 @@ pnpm --version
 
 See the upgrade plan for detailed migration notes:
 - `.cursor/plans/stack_version_review_and_upgrade_plan_*.plan.md`
+

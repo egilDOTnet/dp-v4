@@ -9,3 +9,4 @@ CREATE UNIQUE INDEX "RFIVendorResponse_magicLinkToken_key" ON "RFIVendorResponse
 CREATE INDEX "RFIVendorResponse_magicLinkToken_idx" ON "RFIVendorResponse"("magicLinkToken");
 
 
+

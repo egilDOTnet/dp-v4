@@ -340,6 +340,7 @@ enum RFPScheduleItemType {
 enum RFPDocumentType {
   Document
   Link
+  Requirements
 }
 
 enum RFPVendorResponseStatus {

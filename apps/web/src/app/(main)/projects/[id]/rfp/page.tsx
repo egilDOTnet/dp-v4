@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api, Project, RFP } from "@/lib/api";
 import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner, Breadcrumbs } from "@/components/ui";
@@ -154,7 +153,7 @@ export default function RFPPage() {
               description: "Set important dates including start, acceptance, questions, and delivery deadlines",
             },
             {
-              label: "Documents & Links",
+              label: "Documents",
               description: "Share project documents and external resources with vendors",
             },
             {
@@ -193,7 +192,7 @@ export default function RFPPage() {
               <TabsTrigger value="about">About</TabsTrigger>
               <TabsTrigger value="announcements">Announcements</TabsTrigger>
               <TabsTrigger value="changelog">Changelog</TabsTrigger>
-              <TabsTrigger value="documents">Documents/Links</TabsTrigger>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
               <TabsTrigger value="schedule">Schedule</TabsTrigger>
               <TabsTrigger value="qa">Q&A</TabsTrigger>
             </TabsList>

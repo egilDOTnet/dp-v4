@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { api, RFP, RFPDocument } from "@/lib/api";
 import { Button, Card, CardBody, CardHeader, EmptyState } from "@/components/ui";
+import { AddRequirementsDialog } from "./AddRequirementsDialog";
 import {
   DndContext,
   closestCenter,
@@ -59,7 +60,7 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
   const [documents, setDocuments] = useState<RFPDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingFields, setEditingFields] = useState<Record<string, Set<string>>>({});
-  const [formData, setFormData] = useState<Record<string, { description: string; url: string; type: "Document" | "Link" }>>({});
+  const [formData, setFormData] = useState<Record<string, { description: string; url: string; type: "Document" | "Link" | "Requirements" }>>({});
   const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isNewDocAnimating, setIsNewDocAnimating] = useState(false);
@@ -71,6 +72,8 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
   });
   const [, setSaving] = useState(false);
   const [removedFiles, setRemovedFiles] = useState<Set<string>>(new Set());
+  const [isAddRequirementsDialogOpen, setIsAddRequirementsDialogOpen] = useState(false);
+  const [fileInputActive, setFileInputActive] = useState<Set<string>>(new Set());
   const newDocInputRef = useRef<HTMLInputElement | null>(null);
   const newDocUrlInputRef = useRef<HTMLInputElement | null>(null);
   const newDocFormRef = useRef<HTMLDivElement | null>(null);
@@ -219,6 +222,10 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
         if (doc.type === "Link") {
           newFields[doc.id].add("url");
         }
+        // Requirements documents can also be edited (for rename/delete)
+        if (doc.type === "Requirements") {
+          // Just description for Requirements
+        }
       }
       return newFields;
     });
@@ -235,6 +242,18 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
     const doc = documents.find((d) => d.id === docId);
     const data = formData[docId];
     
+    // Check if focus is moving to the file input - if so, don't close edit mode
+    const relatedTarget = _e.relatedTarget as HTMLElement;
+    if (relatedTarget && relatedTarget.tagName === "INPUT" && relatedTarget.type === "file") {
+      // Focus is moving to file input, keep edit mode open
+      return;
+    }
+    
+    // If file input is active (dialog might be open), don't close edit mode
+    if (fileInputActive.has(docId)) {
+      return;
+    }
+    
     if (doc && data) {
       if (field === "description" && data.description.trim() !== (doc.description || "").trim()) {
         handleFieldSave(docId, field, data.description);
@@ -242,18 +261,33 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
         handleFieldSave(docId, field, data.url);
       } else {
         // No changes, just exit edit mode for this field
+        // For Requirements documents, keep edit mode open even if description hasn't changed
+        // This allows the delete button to remain visible
+        if (doc.type === "Requirements" && field === "description") {
+          // Don't exit edit mode for Requirements documents on blur without changes
+          // This keeps the delete button visible
+          return;
+        }
+        // For Documents with removed files, keep edit mode open to allow file replacement
+        if (doc.type === "Document" && removedFiles.has(docId) && field === "description") {
+          // Don't exit edit mode when file has been removed and user might be uploading a new one
+          return;
+        }
         setEditingFields((prev) => {
           const newFields = { ...prev };
           if (newFields[docId]) {
             newFields[docId].delete(field);
             if (newFields[docId].size === 0) {
               delete newFields[docId];
-              // Clear removed files state when exiting edit mode
-              setRemovedFiles((prev) => {
-                const newSet = new Set(prev);
-                newSet.delete(docId);
-                return newSet;
-              });
+              // Clear removed files state when exiting edit mode (only if not actively replacing file)
+              // Don't clear if file input is active
+              if (!fileInputActive.has(docId)) {
+                setRemovedFiles((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.delete(docId);
+                  return newSet;
+                });
+              }
             }
           }
           return newFields;
@@ -479,7 +513,7 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
   const renderDocumentForm = (
     doc: RFPDocument | null,
     isNew: boolean,
-    docFormData: { description: string; url: string; type: "Document" | "Link" },
+    docFormData: { description: string; url: string; type: "Document" | "Link" | "Requirements" },
     isEditing: boolean,
     attributes?: any,
     listeners?: any
@@ -487,11 +521,14 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
     const isEditingDescription = isEditing && (editingFields[doc?.id || ""]?.has("description") || isNew);
     const isEditingUrl = isEditing && docFormData.type === "Link" && (editingFields[doc?.id || ""]?.has("url") || isNew);
     const canEditType = isNew;
+    const isRequirements = docFormData.type === "Requirements" || doc?.type === "Requirements";
+    const borderColor = isRequirements ? "border-secondary-500" : "border-primary-500";
+    const bgColor = isRequirements ? "bg-secondary-500" : "bg-primary-500";
 
     return (
       <div
         className={`
-          border-2 border-primary-500 rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-300 ease-out
+          border-2 ${borderColor} rounded-lg bg-background-secondary flex items-stretch overflow-hidden transition-all duration-300 ease-out
           ${isNew 
             ? (isNewDocAnimating ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4")
             : ""
@@ -502,7 +539,7 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
       >
         {/* Left side: Drag handle or plus icon */}
         {isNew ? (
-          <div className="bg-primary-500 text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg">
+          <div className={`${bgColor} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -511,7 +548,7 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
           <div
             {...attributes}
             {...listeners}
-            className="bg-primary-500 text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all"
+            className={`${bgColor} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all`}
             title="Drag to reorder"
           >
             {/* White grip dots (2x4 pattern) */}
@@ -584,6 +621,10 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                   />
                 ) : (
                   <div
+                    onMouseDown={(e) => {
+                      // Prevent blur on inputs when clicking description
+                      e.preventDefault();
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isNew && doc) {
@@ -665,8 +706,14 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
               </div>
             </div>
 
-            {/* URL or File info */}
-            {docFormData.type === "Link" ? (
+            {/* URL, File info, or Requirements info */}
+            {isRequirements ? (
+              <div className="text-sm text-text-secondary">
+                <p className="text-xs">
+                  This document will display the list of approved requirements in the RFP. Vendors will be able to view and download the requirements.
+                </p>
+              </div>
+            ) : docFormData.type === "Link" ? (
               <div>
                 {isEditingUrl ? (
                   <input
@@ -871,10 +918,17 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                           }
                         }}
                         onMouseDown={(e) => {
+                          // Prevent blur on inputs when clicking drop container
                           e.preventDefault();
+                          e.stopPropagation();
                         }}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           if (doc) {
+                            // Mark file input as active before opening dialog
+                            setFileInputActive((prev) => new Set(prev).add(doc.id));
+                            // Trigger file input click
                             editFileInputRefs.current[doc.id]?.click();
                           }
                         }}
@@ -883,13 +937,70 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                           ref={(el) => { if (doc) { editFileInputRefs.current[doc.id] = el; } }}
                           type="file"
                           accept=".pdf,.zip"
-                          onChange={(e) => {
+                          onFocus={() => {
+                            if (doc) {
+                              setFileInputActive((prev) => new Set(prev).add(doc.id));
+                            }
+                          }}
+                          onBlur={() => {
+                            if (doc) {
+                              // Delay clearing to allow for file dialog interactions
+                              setTimeout(() => {
+                                setFileInputActive((prev) => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(doc.id);
+                                  return newSet;
+                                });
+                              }, 100);
+                            }
+                          }}
+                          onMouseDown={(e) => {
+                            // Prevent blur when clicking file input
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (doc) {
+                              setFileInputActive((prev) => new Set(prev).add(doc.id));
+                            }
+                          }}
+                          onClick={(e) => {
+                            // Prevent click from bubbling up
+                            e.stopPropagation();
+                            if (doc) {
+                              setFileInputActive((prev) => new Set(prev).add(doc.id));
+                            }
+                          }}
+                          onChange={async (e) => {
                             const file = e.target.files?.[0] || null;
                             if (file && doc) {
-                              // TODO: File replacement requires API support for updating fileData
-                              // For now, update description only
-                              handleFieldSave(doc.id, "description", stripFileExtension(file.name));
-                              console.warn("File replacement requires API support for updating fileData");
+                              try {
+                                // Convert file to base64
+                                const reader = new FileReader();
+                                reader.onload = async () => {
+                                  const base64 = (reader.result as string).split(",")[1];
+                                  await api.rfp.documents.update(projectId, doc.id, {
+                                    fileName: file.name,
+                                    fileType: file.type,
+                                    fileData: base64,
+                                    fileSize: file.size,
+                                  });
+                                  // Clear the removedFiles state since we're replacing the file
+                                  setRemovedFiles((prev) => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(doc.id);
+                                    return newSet;
+                                  });
+                                  setFileInputActive((prev) => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(doc.id);
+                                    return newSet;
+                                  });
+                                  await loadDocuments();
+                                };
+                                reader.readAsDataURL(file);
+                              } catch (err: any) {
+                                console.error("Error replacing file:", err);
+                                alert("Failed to replace file. Please try again.");
+                              }
                             }
                           }}
                           className="hidden"
@@ -933,14 +1044,32 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                           {isEditing && (
                             <button
                               type="button"
-                              onClick={(e) => {
+                              onMouseDown={(e) => {
+                                // Prevent blur on inputs when clicking remove button
+                                e.preventDefault();
+                              }}
+                              onClick={async (e) => {
                                 e.stopPropagation();
+                                e.preventDefault();
                                 if (doc) {
-                                  setRemovedFiles((prev) => {
-                                    const newSet = new Set(prev);
-                                    newSet.add(doc.id);
-                                    return newSet;
-                                  });
+                                  try {
+                                    // Remove file by setting file data to null
+                                    await api.rfp.documents.update(projectId, doc.id, {
+                                      fileName: null,
+                                      fileType: null,
+                                      fileData: null,
+                                      fileSize: null,
+                                    });
+                                    setRemovedFiles((prev) => {
+                                      const newSet = new Set(prev);
+                                      newSet.add(doc.id);
+                                      return newSet;
+                                    });
+                                    await loadDocuments();
+                                  } catch (err: any) {
+                                    console.error("Error removing file:", err);
+                                    alert("Failed to remove file. Please try again.");
+                                  }
                                 }
                               }}
                               className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
@@ -964,7 +1093,15 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
             {!isNew && isEditing && doc && (
               <div className="flex items-end justify-end">
                 <button
-                  onClick={() => handleDelete(doc.id)}
+                  onMouseDown={(e) => {
+                    // Prevent blur on inputs when clicking delete button
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleDelete(doc.id);
+                  }}
                   disabled={savingFields.has(doc.id)}
                   className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
                 >
@@ -987,26 +1124,36 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
     );
   }
 
+  // Check if a Requirements document already exists
+  const hasRequirementsDocument = documents.some((doc) => doc.type === "Requirements");
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-text-primary">Documents & Links</h2>
+            <h2 className="text-xl font-semibold text-text-primary">Documents</h2>
             {!isCreatingNew && (
-              <Button onClick={handleStartNew} variant="primary">
-                Add Document/Link
-              </Button>
+              <div className="flex gap-2">
+                {!hasRequirementsDocument && (
+                  <Button onClick={() => setIsAddRequirementsDialogOpen(true)} variant="secondary">
+                    Add Requirements
+                  </Button>
+                )}
+                <Button onClick={handleStartNew} variant="primary">
+                  Add Document
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
         <CardBody>
           {documents.length === 0 && !isCreatingNew ? (
             <EmptyState
-              title="No documents or links yet"
-              description="Add documents or links to share important information with vendors. You can upload PDF or ZIP files, or add links to external resources."
+              title="No documents yet"
+              description="Add documents to share important information with vendors. You can upload PDF or ZIP files, or add links to external resources."
               action={{
-                label: "Add Document/Link",
+                label: "Add Document",
                 onClick: handleStartNew,
               }}
             />
@@ -1035,7 +1182,7 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
                     const docFormData = formData[doc.id] || {
                       description: doc.description || "",
                       url: doc.url || "",
-                      type: doc.type,
+                      type: doc.type as "Document" | "Link" | "Requirements",
                     };
 
                     return (
@@ -1059,6 +1206,24 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
           )}
         </CardBody>
       </Card>
+
+      <AddRequirementsDialog
+        open={isAddRequirementsDialogOpen}
+        onOpenChange={setIsAddRequirementsDialogOpen}
+        projectId={projectId}
+        onConfirm={async () => {
+          try {
+            await api.rfp.documents.create(projectId, {
+              type: "Requirements",
+              description: "Requirements",
+            });
+            await loadDocuments();
+          } catch (err: any) {
+            console.error("Error creating requirements document:", err);
+            alert("Failed to create requirements document. Please try again.");
+          }
+        }}
+      />
     </div>
   );
 }

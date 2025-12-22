@@ -60,3 +60,4 @@ ALTER TABLE "RFPVendorResponse" ADD CONSTRAINT "RFPVendorResponse_contactPersonI
 
 -- AddForeignKey
 ALTER TABLE "RFPProposalFile" ADD CONSTRAINT "RFPProposalFile_vendorResponseId_fkey" FOREIGN KEY ("vendorResponseId") REFERENCES "RFPVendorResponse"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

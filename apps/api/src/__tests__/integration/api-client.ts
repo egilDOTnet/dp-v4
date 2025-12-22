@@ -406,7 +406,7 @@ export type RFPScheduleItemType =
   | 'CustomDate'
   | 'CustomDateRange';
 
-export type RFPDocumentType = 'Document' | 'Link';
+export type RFPDocumentType = 'Document' | 'Link' | 'Requirements';
 
 export interface RFP {
   id: string;

@@ -127,3 +127,4 @@ export async function verifyRFPAccess(
   // Attach RFP to request for use in route handlers
   (request as any).rfp = rfp;
 }
+

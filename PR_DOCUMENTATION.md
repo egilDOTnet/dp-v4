@@ -187,3 +187,4 @@ This is a large feature addition that introduces vendor portal functionality. Ke
 - Vendor portal implementation
 - RFP system enhancements
 - User profile improvements
+

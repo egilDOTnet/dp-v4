@@ -12,3 +12,4 @@ for dir in */; do
 done
 
 echo "Migration check complete."
+

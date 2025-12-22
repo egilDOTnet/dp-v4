@@ -523,6 +523,49 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(data),
       }),
+    approved: (projectId: string) =>
+      apiRequest<Requirement[]>(`/api/projects/${projectId}/requirements/approved`),
+    bulkApprove: (projectId: string) =>
+      apiRequest<{ message: string; updatedCount: number }>(
+        `/api/projects/${projectId}/requirements/bulk-approve`,
+        {
+          method: "PUT",
+        }
+      ),
+    downloadPdf: async (projectId: string): Promise<Blob> => {
+      const token = typeof window !== "undefined"
+        ? localStorage.getItem("token")
+        : null;
+      const apiUrl = getApiUrlRuntime();
+      const response = await fetch(`${apiUrl}/api/projects/${projectId}/requirements/pdf`, {
+        method: "GET",
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+        throw new Error(errorData.message || errorData.error || "Failed to download PDF");
+      }
+      return response.blob();
+    },
+    downloadExcel: async (projectId: string): Promise<Blob> => {
+      const token = typeof window !== "undefined"
+        ? localStorage.getItem("token")
+        : null;
+      const apiUrl = getApiUrlRuntime();
+      const response = await fetch(`${apiUrl}/api/projects/${projectId}/requirements/excel`, {
+        method: "GET",
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+        throw new Error(errorData.message || errorData.error || "Failed to download Excel");
+      }
+      return response.blob();
+    },
     bulkUpdate: (
       projectId: string,
       data: {
@@ -804,7 +847,7 @@ export const api = {
       create: (
         projectId: string,
         data: {
-          type: "Document" | "Link";
+          type: "Document" | "Link" | "Requirements";
           description: string;
           url?: string;
           fileName?: string;
@@ -823,6 +866,10 @@ export const api = {
         data: {
           description?: string;
           url?: string | null;
+          fileName?: string | null;
+          fileType?: string | null;
+          fileData?: string | null;
+          fileSize?: number | null;
         }
       ) =>
         apiRequest<RFPDocument>(
@@ -1657,7 +1704,7 @@ export type RFPScheduleItemType =
   | "CustomDate"
   | "CustomDateRange";
 
-export type RFPDocumentType = "Document" | "Link";
+export type RFPDocumentType = "Document" | "Link" | "Requirements";
 
 export interface RFP {
   id: string;

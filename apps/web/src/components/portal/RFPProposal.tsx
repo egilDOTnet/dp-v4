@@ -349,3 +349,4 @@ export function RFPProposal({ rfpId, rfp: _rfp, contactPerson, onReload, isPrevi
     </>
   );
 }
+

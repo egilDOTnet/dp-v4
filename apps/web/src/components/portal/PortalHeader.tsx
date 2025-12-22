@@ -280,3 +280,4 @@ export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, p
     </header>
   );
 }
+

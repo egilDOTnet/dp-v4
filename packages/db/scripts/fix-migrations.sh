@@ -18,3 +18,4 @@ echo "Attempting to resolve migration issues..."
 # pnpm prisma migrate resolve --applied <migration_name>
 
 echo "Migration check complete."
+

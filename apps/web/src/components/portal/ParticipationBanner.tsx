@@ -18,3 +18,4 @@ export function ParticipationBanner({ onDismiss, acceptanceDate }: Participation
     />
   );
 }
+

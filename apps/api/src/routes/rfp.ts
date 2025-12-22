@@ -1064,7 +1064,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           type: "object",
           required: ["type", "description"],
           properties: {
-            type: { type: "string", enum: ["Document", "Link"] },
+            type: { type: "string", enum: ["Document", "Link", "Requirements"] },
             description: { type: "string" },
             url: { type: "string" },
             fileName: { type: "string" },
@@ -1104,6 +1104,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         if (request.body.type === "Document" && !request.body.fileData) {
           return reply.status(400).send({ error: "File data is required for documents" });
         }
+        // Requirements documents don't need URL or fileData
 
         // Validate file type for documents
         if (request.body.type === "Document" && request.body.fileType) {
@@ -1145,7 +1146,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         // Create changelog entry
         await createChangelogEntry(
           rfp.id,
-          `"${description}" was added to Documents & Links`,
+          `"${description}" was added to Documents`,
           user.userId
         );
 
@@ -1165,6 +1166,10 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
     Body: {
       description?: string;
       url?: string | null;
+      fileName?: string | null;
+      fileType?: string | null;
+      fileData?: string | null;
+      fileSize?: number | null;
     };
   }>(
     "/:id/rfp/documents/:docId",
@@ -1187,6 +1192,10 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           properties: {
             description: { type: "string" },
             url: { type: "string", nullable: true },
+            fileName: { type: "string", nullable: true },
+            fileType: { type: "string", nullable: true },
+            fileData: { type: "string", nullable: true },
+            fileSize: { type: "number", nullable: true },
           },
         },
         response: {
@@ -1229,6 +1238,28 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         if (request.body.url !== undefined) {
           updateData.url = request.body.url || null;
         }
+        if (request.body.fileName !== undefined) {
+          updateData.fileName = request.body.fileName || null;
+        }
+        if (request.body.fileType !== undefined) {
+          updateData.fileType = request.body.fileType || null;
+        }
+        if (request.body.fileData !== undefined) {
+          updateData.fileData = request.body.fileData || null;
+        }
+        if (request.body.fileSize !== undefined) {
+          updateData.fileSize = request.body.fileSize || null;
+        }
+        
+        // Validate file type if updating file data
+        if (updateData.fileType && updateData.fileType !== null) {
+          const allowedTypes = ["application/pdf", "application/zip"];
+          if (!allowedTypes.includes(updateData.fileType)) {
+            return reply.status(400).send({
+              error: "Only PDF and ZIP files are allowed",
+            });
+          }
+        }
 
         const updated = await db.rFPDocument.update({
           where: { id: docId },
@@ -1238,7 +1269,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         // Create changelog entry
         await createChangelogEntry(
           rfp.id,
-          `"${doc.description}" was changed in Documents & Links`,
+          `"${doc.description}" was changed in Documents`,
           user.userId
         );
 
@@ -1311,7 +1342,7 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         // Create changelog entry
         await createChangelogEntry(
           rfp.id,
-          `"${doc.description}" was removed from Documents & Links`,
+          `"${doc.description}" was removed from Documents`,
           user.userId
         );
 

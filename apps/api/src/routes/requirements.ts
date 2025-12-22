@@ -2,6 +2,8 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
+import { generateRequirementsPDF } from "../utils/requirements-pdf";
+import { generateRequirementsExcel } from "../utils/requirements-excel";
 
 // Helper function to generate hierarchy number
 async function generateHierarchyNumber(
@@ -2949,6 +2951,555 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         reply.status(500).send({
           error: "Failed to export requirements",
           message: err.message,
+        });
+      }
+    }
+  );
+
+  /**
+   * Get approved requirements for a project
+   * User must be a project member or company admin
+   * Returns only requirements with status = "Approved"
+   */
+  fastify.get(
+    "/:projectId/requirements/approved",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get approved requirements for a project. User must be a project member or company administrator. Returns only requirements with status = 'Approved'.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "Array of approved requirements",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        request.log.info({ projectId }, "Fetching approved requirements");
+
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+            status: "Approved",
+          },
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                name: true,
+              },
+            },
+            lastModifiedBy: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: [
+            { hierarchyId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        request.log.info({ count: requirements.length, projectId }, "Found approved requirements");
+
+        return reply.send(requirements);
+      } catch (error: any) {
+        request.log.error({ err: error, projectId: request.params }, "Error fetching approved requirements");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to fetch approved requirements",
+        });
+      }
+    }
+  );
+
+  /**
+   * Bulk approve all requirements for a project
+   * User must be a project member or company admin
+   * Updates all requirements to status = "Approved"
+   */
+  fastify.put(
+    "/:projectId/requirements/bulk-approve",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Bulk approve all requirements for a project. User must be a project member or company administrator. Updates all requirements to status = 'Approved'.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "Bulk approval successful",
+            type: "object",
+            properties: {
+              message: { type: "string" },
+              updatedCount: { type: "number" },
+            },
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
+        const user = await getUser(request, reply);
+        if (reply.sent || !user) return;
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        request.log.info({ projectId, userId: user.userId }, "Bulk approving requirements");
+
+        // Get all requirements for the project
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        // Update all requirements to Approved status
+        const result = await db.requirement.updateMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+          },
+          data: {
+            status: "Approved",
+            lastModifiedById: user.userId,
+            updatedAt: new Date(),
+          },
+        });
+
+        // Create history entries for all updated requirements
+        for (const requirement of requirements) {
+          const fullRequirement = await db.requirement.findUnique({
+            where: { id: requirement.id },
+            select: {
+              description: true,
+              type: true,
+              status: true,
+            },
+          });
+
+          if (fullRequirement) {
+            await createRequirementHistory(
+              requirement.id,
+              fullRequirement.description,
+              fullRequirement.type,
+              "Approved",
+              user.userId
+            );
+          }
+        }
+
+        request.log.info({ projectId, updatedCount: result.count }, "Bulk approved requirements");
+
+        return reply.send({
+          message: "Requirements approved successfully",
+          updatedCount: result.count,
+        });
+      } catch (error: any) {
+        request.log.error({ err: error, projectId: request.params }, "Error bulk approving requirements");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to bulk approve requirements",
+        });
+      }
+    }
+  );
+
+  /**
+   * Generate and download requirements PDF
+   * User must be a project member or company admin
+   * Returns PDF file with approved requirements
+   */
+  fastify.get(
+    "/:projectId/requirements/pdf",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Generate and download requirements PDF. User must be a project member or company administrator. Returns PDF file with approved requirements.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "PDF file",
+            type: "string",
+            format: "binary",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        request.log.info({ projectId }, "Generating requirements PDF");
+
+        // Get project info
+        const project = await db.project.findUnique({
+          where: { id: projectId },
+          select: { name: true },
+        });
+
+        if (!project) {
+          return reply.status(404).send({ error: "Project not found" });
+        }
+
+        // Get approved requirements with hierarchy information
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+            status: "Approved",
+          },
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+          },
+          orderBy: [
+            { hierarchyId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        // Generate PDF
+        const pdfDoc = generateRequirementsPDF(
+          { name: project.name },
+          requirements as any
+        );
+
+        // Use hijack() to take full control of the response stream
+        reply.hijack();
+        const responseStream = reply.raw;
+        
+        // Get origin from request for CORS
+        const origin = request.headers.origin;
+        const isDevelopment = process.env.NODE_ENV !== "production";
+        
+        // Determine allowed origin (match Fastify CORS config from index.ts)
+        let allowedOrigin: string | null = null;
+        if (origin) {
+          if (isDevelopment) {
+            // Check if origin matches development patterns
+            if (
+              origin === "http://localhost:3000" ||
+              origin === "http://127.0.0.1:3000" ||
+              /^http:\/\/.*\.local:\d+$/.test(origin) ||
+              /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin) ||
+              /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
+              /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/.test(origin)
+            ) {
+              allowedOrigin = origin;
+            }
+          } else {
+            // Production: only allow specific origins
+            if (origin === "http://localhost:3000" || origin === "http://127.0.0.1:3000") {
+              allowedOrigin = origin;
+            }
+          }
+        }
+        
+        // Set headers directly on the raw response
+        responseStream.statusCode = 200;
+        responseStream.setHeader("Content-Type", "application/pdf");
+        responseStream.setHeader("Content-Disposition", `attachment; filename="${project.name.replace(/[^a-z0-9]/gi, "_")}_Requirements.pdf"`);
+        
+        // Add CORS headers (since hijack() bypasses Fastify CORS middleware)
+        if (allowedOrigin) {
+          responseStream.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+          responseStream.setHeader("Access-Control-Allow-Credentials", "true");
+          responseStream.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+          responseStream.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        }
+        
+        // Handle PDF stream errors
+        pdfDoc.on("error", (err) => {
+          request.log.error({ err, projectId }, "PDF stream error");
+          if (!responseStream.destroyed && !responseStream.writableEnded) {
+            if (!responseStream.headersSent) {
+              responseStream.statusCode = 500;
+              responseStream.end();
+            } else {
+              responseStream.destroy(err);
+            }
+          }
+        });
+
+        // Handle response stream errors  
+        responseStream.on("error", (err) => {
+          request.log.error({ err, projectId }, "Response stream error");
+          if (!pdfDoc.destroyed) {
+            pdfDoc.destroy();
+          }
+        });
+
+        // Handle client disconnect - prevent write after end
+        responseStream.on("close", () => {
+          if (!pdfDoc.destroyed) {
+            pdfDoc.destroy();
+          }
+        });
+
+        // Pipe PDF to response - this will automatically end the response when PDF ends
+        pdfDoc.pipe(responseStream, { end: true });
+        
+        // End the PDF document to start streaming
+        pdfDoc.end();
+        
+        // Don't call reply.send() - the stream handles the response
+        return;
+      } catch (error: any) {
+        request.log.error({ err: error, projectId: request.params }, "Error generating requirements PDF");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to generate PDF",
+        });
+      }
+    }
+  );
+
+  /**
+   * Generate and download requirements Excel
+   * User must be a project member or company admin
+   * Returns Excel file with approved requirements
+   */
+  fastify.get(
+    "/:projectId/requirements/excel",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Generate and download requirements Excel. User must be a project member or company administrator. Returns Excel file with approved requirements following the template format.",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: {
+              type: "string",
+              description: "Project ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "Excel file",
+            type: "string",
+            format: "binary",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Access denied - not a project member",
+          },
+          404: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Project not found",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        request.log.info({ projectId }, "Generating requirements Excel");
+
+        // Get project info
+        const project = await db.project.findUnique({
+          where: { id: projectId },
+          select: { name: true },
+        });
+
+        if (!project) {
+          return reply.status(404).send({ error: "Project not found" });
+        }
+
+        // Get approved requirements with hierarchy information
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+            status: "Approved",
+          },
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+          },
+          orderBy: [
+            { hierarchyId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        // Generate Excel
+        const excelBuffer = generateRequirementsExcel(
+          { name: project.name },
+          requirements as any
+        );
+
+        // Set response headers
+        reply
+          .type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+          .header("Content-Disposition", `attachment; filename="${project.name.replace(/[^a-z0-9]/gi, "_")}_Requirements.xlsx"`)
+          .send(excelBuffer);
+      } catch (error: any) {
+        request.log.error({ err: error, projectId: request.params }, "Error generating requirements Excel");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to generate Excel",
         });
       }
     }

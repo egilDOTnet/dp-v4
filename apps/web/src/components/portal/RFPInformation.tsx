@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { RFPDetail } from "@/lib/api";
+import { RFPDetail, api } from "@/lib/api";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 import { Button } from "@/components/ui/FormField";
 import { formatISODate, formatISODateTime } from "@/lib/utils";
+import { CheckSquare } from "lucide-react";
 
 interface RFPInformationProps {
   rfp: RFPDetail;
@@ -13,6 +14,11 @@ interface RFPInformationProps {
 
 export function RFPInformation({ rfp }: RFPInformationProps) {
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
+
+  // Get project ID from RFP - RFPDetail extends RFPListItem which has projectId
+  const projectId = rfp.projectId;
 
   const handleDocumentDownload = (doc: RFPDetail["documents"][0]) => {
     if (!doc.fileData || !doc.fileName || !doc.fileType) return;
@@ -47,7 +53,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
   };
 
   // Generate Windows .url file content
-  const generateUrlFile = (url: string, description: string): string => {
+  const generateUrlFile = (url: string): string => {
     return `[InternetShortcut]\r\nURL=${url}\r\n`;
   };
 
@@ -108,7 +114,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
           
           if (isWindows) {
             // Create .url file for Windows
-            const urlContent = generateUrlFile(doc.url, doc.description || "");
+            const urlContent = generateUrlFile(doc.url);
             zip.file(`${linkFileName}.url`, urlContent);
           } else if (isMacOrIOS) {
             // Create .webloc file for macOS/iOS
@@ -192,7 +198,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
           </CardBody>
         </Card>
 
-        {/* Column 3: Documents/Links */}
+        {/* Column 3: Documents */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -266,6 +272,69 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
                           {doc.description}
                         </a>
                       </div>
+                    ) : doc.type === "Requirements" ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <CheckSquare className="w-4 h-4 text-text-secondary flex-shrink-0" />
+                          <span className="font-medium text-text-primary">{doc.description}</span>
+                        </div>
+                        <div className="flex items-center gap-3 ml-6 text-sm">
+                          <button
+                            onClick={async () => {
+                              if (!projectId) return;
+                              try {
+                                setDownloadingPdf(true);
+                                const blob = await api.requirements.downloadPdf(projectId);
+                                const url = window.URL.createObjectURL(blob);
+                                const link = document.createElement("a");
+                                link.href = url;
+                                link.download = `${rfp.project?.name || "Requirements"}_Requirements.pdf`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                window.URL.revokeObjectURL(url);
+                              } catch (err: any) {
+                                console.error("Error downloading PDF:", err);
+                                alert("Failed to download PDF. Please try again.");
+                              } finally {
+                                setDownloadingPdf(false);
+                              }
+                            }}
+                            disabled={downloadingPdf}
+                            className="text-primary-600 hover:text-primary-700 hover:underline disabled:opacity-50"
+                          >
+                            PDF
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!projectId) return;
+                              try {
+                                setDownloadingExcel(true);
+                                const blob = await api.requirements.downloadExcel(projectId);
+                                const url = window.URL.createObjectURL(blob);
+                                const link = document.createElement("a");
+                                link.href = url;
+                                link.download = `${rfp.project?.name || "Requirements"}_Requirements.xlsx`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                window.URL.revokeObjectURL(url);
+                              } catch (err: any) {
+                                console.error("Error downloading Excel:", err);
+                                alert("Failed to download Excel. Please try again.");
+                              } finally {
+                                setDownloadingExcel(false);
+                              }
+                            }}
+                            disabled={downloadingExcel}
+                            className="text-primary-600 hover:text-primary-700 hover:underline disabled:opacity-50"
+                          >
+                            Excel
+                          </button>
+                          <span className="text-text-tertiary">Inline editing</span>
+                          <span className="text-xs text-text-tertiary italic">(Coming soon)</span>
+                        </div>
+                      </div>
                     ) : (
                       <div className="font-medium text-text-primary">{doc.description}</div>
                     )}
@@ -296,7 +365,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
               <TableBody>
                 {rfp.changelogEntries.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="text-text-secondary">
+                    <TableCell className="text-text-secondary align-top">
                       {formatISODateTime(entry.createdAt)}
                     </TableCell>
                     <TableCell className="text-text-primary whitespace-pre-line">

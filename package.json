@@ -20,10 +20,21 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "bcrypt",
       "@prisma/engines",
+      "bcrypt",
       "esbuild",
+      "prisma",
       "sharp"
-    ]
+    ],
+    "ignoredBuiltDependencies": [
+      "msw",
+      "unrs-resolver"
+    ],
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "react": "19",
+        "react-dom": "19"
+      }
+    }
   }
 }
