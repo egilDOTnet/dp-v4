@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, RFPListItem } from "@/lib/api";
 import { Card, CardBody } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { ProjectLogo } from "@/components/ProjectLogo";
 
 export default function RFPListPage() {
   const router = useRouter();
@@ -116,13 +117,14 @@ export default function RFPListPage() {
                       <div className="mb-2">{getStatusBadge(rfp.vendorResponse.status)}</div>
                     )}
                   </div>
-                  {rfp.project.logoData && (
-                    <img
-                      src={`data:${rfp.project.logoFileType || "image/png"};base64,${rfp.project.logoData}`}
-                      alt={`${rfp.project.name} logo`}
-                      className="w-16 h-16 object-contain ml-4"
-                    />
-                  )}
+                  <ProjectLogo
+                    logoData={rfp.project.logoData}
+                    logoFileType={rfp.project.logoFileType}
+                    logoShape={rfp.project.logoShape}
+                    logoPlacement={rfp.project.logoPlacement}
+                    logoBorder={rfp.project.logoBorder}
+                    className="w-16 h-16 ml-4"
+                  />
                 </div>
 
                 {rfp.about && (
@@ -156,3 +158,4 @@ export default function RFPListPage() {
     </div>
   );
 }
+

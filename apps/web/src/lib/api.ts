@@ -186,6 +186,9 @@ export const api = {
         logoData?: string | null;
         logoFileName?: string | null;
         logoFileType?: string | null;
+        logoShape?: string | null;
+        logoPlacement?: string | null;
+        logoBorder?: string | null;
         bannerData?: string | null;
         bannerFileName?: string | null;
         bannerFileType?: string | null;
@@ -1002,6 +1005,9 @@ export const api = {
             logoData: string | null;
             logoFileName: string | null;
             logoFileType: string | null;
+            logoShape: string | null;
+            logoPlacement: string | null;
+            logoBorder: string | null;
             bannerData: string | null;
             bannerFileName: string | null;
             bannerFileType: string | null;
@@ -1290,6 +1296,9 @@ export interface Project {
   logoData: string | null;
   logoFileName: string | null;
   logoFileType: string | null;
+  logoShape: string | null;
+  logoPlacement: string | null;
+  logoBorder: string | null;
   bannerData: string | null;
   bannerFileName: string | null;
   bannerFileType: string | null;
@@ -1825,6 +1834,9 @@ export interface RFPListItem {
     logoData: string | null;
     logoFileName: string | null;
     logoFileType: string | null;
+    logoShape: string | null;
+    logoPlacement: string | null;
+    logoBorder: string | null;
     bannerData: string | null;
     bannerFileName: string | null;
     bannerFileType: string | null;

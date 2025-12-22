@@ -12,6 +12,7 @@ import { RFPQuestions } from "@/components/portal/RFPQuestions";
 import { RFPProposal } from "@/components/portal/RFPProposal";
 import { ParticipateModal } from "@/components/portal/ParticipateModal";
 import { ParticipationBanner } from "@/components/portal/ParticipationBanner";
+import { ProjectLogo } from "@/components/ProjectLogo";
 
 export default function RFPDetailPage() {
   const params = useParams();
@@ -131,27 +132,48 @@ export default function RFPDetailPage() {
         />
       )}
 
-      {/* Project Logo - Left Aligned */}
-      {rfp.project.logoData && (
+      {/* Logo above banner (if placement is "above" mode) */}
+      {rfp.project.logoData && 
+       rfp.project.logoPlacement?.startsWith("above") && (
         <div className="mb-8">
-          <img
-            src={`data:${rfp.project.logoFileType || "image/png"};base64,${rfp.project.logoData}`}
-            alt={`${rfp.project.name} logo`}
-            className="h-24 w-auto object-contain"
+          <ProjectLogo
+            logoData={rfp.project.logoData}
+            logoFileType={rfp.project.logoFileType}
+            logoShape={rfp.project.logoShape}
+            logoPlacement={rfp.project.logoPlacement}
+            logoBorder={rfp.project.logoBorder}
+            className=""
           />
         </div>
       )}
 
-      {/* Project Banner */}
-      {rfp.project.bannerData && (
-        <div className="mb-8">
-          <img
-            src={`data:${rfp.project.bannerFileType || "image/png"};base64,${rfp.project.bannerData}`}
-            alt={`${rfp.project.name} banner`}
-            className="w-full h-auto max-h-64 object-cover rounded-lg"
-          />
+      {/* Banner with Logo Overlay */}
+      {(rfp.project.bannerData || (rfp.project.logoData && (!rfp.project.logoPlacement || rfp.project.logoPlacement.startsWith("overlay")))) ? (
+        <div className="mb-8 relative rounded-lg overflow-hidden min-h-[200px]">
+          {rfp.project.bannerData ? (
+            <img
+              src={`data:${rfp.project.bannerFileType || "image/png"};base64,${rfp.project.bannerData}`}
+              alt={`${rfp.project.name} banner`}
+              className="w-full h-auto max-h-64 object-contain rounded-lg"
+            />
+          ) : (
+            /* Transparent placeholder when no banner but overlay logo exists */
+            <div className="w-full min-h-[200px] bg-transparent rounded-lg" />
+          )}
+          {/* Logo overlay on banner (if placement is "overlay" mode, null, or undefined - defaults to overlay) */}
+          {rfp.project.logoData && 
+           (!rfp.project.logoPlacement || rfp.project.logoPlacement.startsWith("overlay")) && (
+            <ProjectLogo
+              logoData={rfp.project.logoData}
+              logoFileType={rfp.project.logoFileType}
+              logoShape={rfp.project.logoShape}
+              logoPlacement={rfp.project.logoPlacement}
+              logoBorder={rfp.project.logoBorder}
+              className=""
+            />
+          )}
         </div>
-      )}
+      ) : null}
 
       {/* Project Name and Actions */}
       <div className="mb-6">
@@ -251,3 +273,4 @@ export default function RFPDetailPage() {
     </div>
   );
 }
+

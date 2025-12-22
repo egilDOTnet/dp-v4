@@ -12,6 +12,9 @@ export default function VendorRFIThankYouPage() {
     name: string;
     logoData: string | null;
     logoFileType: string | null;
+    logoShape: string | null;
+    logoPlacement: string | null;
+    logoBorder: string | null;
     bannerData: string | null;
     bannerFileType: string | null;
   } | null>(null);
@@ -26,6 +29,9 @@ export default function VendorRFIThankYouPage() {
           name: data.project.name,
           logoData: data.project.logoData,
           logoFileType: data.project.logoFileType,
+          logoShape: data.project.logoShape,
+          logoPlacement: data.project.logoPlacement,
+          logoBorder: data.project.logoBorder,
           bannerData: data.project.bannerData,
           bannerFileType: data.project.bannerFileType,
         });
@@ -42,6 +48,9 @@ export default function VendorRFIThankYouPage() {
           projectName={projectData.name}
           logoData={projectData.logoData}
           logoFileType={projectData.logoFileType}
+          logoShape={projectData.logoShape}
+          logoPlacement={projectData.logoPlacement}
+          logoBorder={projectData.logoBorder}
           bannerData={projectData.bannerData}
           bannerFileType={projectData.bannerFileType}
         />
@@ -79,5 +88,6 @@ export default function VendorRFIThankYouPage() {
     </div>
   );
 }
+
 
 

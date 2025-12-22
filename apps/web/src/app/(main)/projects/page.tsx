@@ -176,6 +176,16 @@ export default function ProjectsPage() {
             <Link key={project.id} href={`/projects/${project.id}`}>
               <Card variant="interactive" className="h-full">
                 <CardBody>
+                  {/* Mini Banner */}
+                  {project.bannerData && (
+                    <div className="mb-4 -mx-6 -mt-6 rounded-t-lg overflow-hidden">
+                      <img
+                        src={`data:${project.bannerFileType || "image/png"};base64,${project.bannerData}`}
+                        alt={`${project.name} banner`}
+                        className="w-full h-auto object-cover max-h-32"
+                      />
+                    </div>
+                  )}
                   <h2 className="text-xl font-semibold text-text-primary mb-2">
                     {project.name}
                   </h2>

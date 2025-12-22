@@ -12,6 +12,9 @@ type RFIData = {
     name: string;
     logoData: string | null;
     logoFileType: string | null;
+    logoShape: string | null;
+    logoPlacement: string | null;
+    logoBorder: string | null;
     bannerData: string | null;
     bannerFileType: string | null;
   };
@@ -107,6 +110,9 @@ export default function VendorRFIPage() {
         projectName={data.project.name}
         logoData={data.project.logoData}
         logoFileType={data.project.logoFileType}
+        logoShape={data.project.logoShape}
+        logoPlacement={data.project.logoPlacement}
+        logoBorder={data.project.logoBorder}
         bannerData={data.project.bannerData}
         bannerFileType={data.project.bannerFileType}
       />

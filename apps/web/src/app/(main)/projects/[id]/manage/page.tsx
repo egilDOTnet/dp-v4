@@ -33,6 +33,12 @@ export default function ManageProjectPage() {
   const [addingMember, setAddingMember] = useState(false);
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [logoConfig, setLogoConfig] = useState({
+    logoShape: "rounded-rect" as string,
+    logoPlacement: "overlay-bottom-left" as string,
+    logoBorder: "none" as string,
+  });
+  const [savingLogoConfig, setSavingLogoConfig] = useState(false);
 
   const isAdmin =
     user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
@@ -70,7 +76,7 @@ export default function ManageProjectPage() {
       api.projects.get(projectId),
       api.users.getCompanyUsers(),
     ])
-      .then(([projectData, users]) => {
+      .then(async ([projectData, users]) => {
         setProject(projectData);
         setAvailableUsers(users);
         setFormData({
@@ -83,6 +89,31 @@ export default function ManageProjectPage() {
             ? new Date(projectData.endDate).toISOString().split("T")[0]
             : "",
         });
+        
+        // If logo exists but config is null, save defaults to database
+        const logoConfig = {
+          logoShape: projectData.logoShape || "rounded-rect",
+          logoPlacement: projectData.logoPlacement || "overlay-bottom-left",
+          logoBorder: projectData.logoBorder || "none",
+        };
+        setLogoConfig(logoConfig);
+        
+        // If logo exists but any config field is null, save defaults
+        if (projectData.logoData && (!projectData.logoShape || !projectData.logoPlacement || !projectData.logoBorder)) {
+          try {
+            await api.projects.updateGraphics(projectId, {
+              logoShape: logoConfig.logoShape,
+              logoPlacement: logoConfig.logoPlacement,
+              logoBorder: logoConfig.logoBorder,
+            });
+            // Reload project to get updated values
+            const updatedProject = await api.projects.get(projectId);
+            setProject(updatedProject);
+          } catch (err) {
+            console.error("Failed to save default logo config:", err);
+          }
+        }
+        
         setLoading(false);
       })
       .catch((err) => {
@@ -697,6 +728,9 @@ export default function ManageProjectPage() {
                       logoData: base64Data.trim(),
                       logoFileName: fileName,
                       logoFileType: fileType,
+                      logoShape: logoConfig.logoShape,
+                      logoPlacement: logoConfig.logoPlacement,
+                      logoBorder: logoConfig.logoBorder,
                     });
                     
                     // The update response should contain the logo data
@@ -716,6 +750,269 @@ export default function ManageProjectPage() {
                 }}
                 projectId={projectId}
               />
+
+              {/* Logo Configuration */}
+              {project.logoData && (
+                <div className="mt-6 space-y-4 pt-6 border-t border-border-primary">
+                  <h3 className="text-lg font-semibold mb-4">Logo Configuration</h3>
+                  
+                  {/* Shape Rocker Switch */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-text-primary">
+                      Shape
+                    </label>
+                    <div className="flex border border-gray-300 rounded-md overflow-hidden w-fit">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newShape = "rounded-rect";
+                          // Use current project values, not state defaults
+                          const currentShape = project?.logoShape || "rounded-rect";
+                          const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
+                          const currentBorder = project?.logoBorder || "none";
+                          const newConfig = { logoShape: newShape, logoPlacement: currentPlacement, logoBorder: currentBorder };
+                          setLogoConfig(newConfig);
+                          setSavingLogoConfig(true);
+                          try {
+                            const updateResponse = await api.projects.updateGraphics(projectId, {
+                              logoShape: newShape,
+                              logoPlacement: currentPlacement,
+                              logoBorder: currentBorder,
+                            });
+                            setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                            setLogoConfig({
+                              logoShape: updateResponse.logoShape || newShape,
+                              logoPlacement: updateResponse.logoPlacement || logoConfig.logoPlacement,
+                              logoBorder: updateResponse.logoBorder || newConfig.logoBorder,
+                            });
+                          } catch (err: any) {
+                            setFormError(err.message || "Failed to update logo shape");
+                            // Revert on error
+                            setLogoConfig(logoConfig);
+                          } finally {
+                            setSavingLogoConfig(false);
+                          }
+                        }}
+                        disabled={savingLogoConfig}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          logoConfig.logoShape === "rounded-rect"
+                            ? "bg-primary-600 text-white"
+                            : "bg-background-tertiary text-text-primary hover:bg-background-primary"
+                        } disabled:opacity-50`}
+                      >
+                        Rounded rect
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newShape = "circle";
+                          // Use current project values, not state defaults
+                          const currentShape = project?.logoShape || "rounded-rect";
+                          const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
+                          const currentBorder = project?.logoBorder || "none";
+                          const newConfig = { logoShape: newShape, logoPlacement: currentPlacement, logoBorder: currentBorder };
+                          setLogoConfig(newConfig);
+                          setSavingLogoConfig(true);
+                          try {
+                            const updateResponse = await api.projects.updateGraphics(projectId, {
+                              logoShape: newShape,
+                              logoPlacement: currentPlacement,
+                              logoBorder: currentBorder,
+                            });
+                            setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                            setLogoConfig({
+                              logoShape: updateResponse.logoShape || newShape,
+                              logoPlacement: updateResponse.logoPlacement || logoConfig.logoPlacement,
+                              logoBorder: updateResponse.logoBorder || newConfig.logoBorder,
+                            });
+                          } catch (err: any) {
+                            setFormError(err.message || "Failed to update logo shape");
+                            // Revert on error
+                            setLogoConfig(logoConfig);
+                          } finally {
+                            setSavingLogoConfig(false);
+                          }
+                        }}
+                        disabled={savingLogoConfig}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          logoConfig.logoShape === "circle"
+                            ? "bg-primary-600 text-white"
+                            : "bg-background-tertiary text-text-primary hover:bg-background-primary"
+                        } disabled:opacity-50`}
+                      >
+                        Circle
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Placement Dropdown */}
+                  <div className="space-y-2">
+                    <label htmlFor="logoPlacement" className="block text-sm font-medium text-text-primary">
+                      Placement
+                    </label>
+                    <select
+                      id="logoPlacement"
+                      value={logoConfig.logoPlacement}
+                      onChange={async (e) => {
+                        const newPlacement = e.target.value;
+                        // Use current project values, not state defaults
+                        const currentShape = project?.logoShape || "rounded-rect";
+                        const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
+                        const currentBorder = project?.logoBorder || "none";
+                        const newConfig = { logoShape: currentShape, logoPlacement: newPlacement, logoBorder: currentBorder };
+                        setLogoConfig(newConfig);
+                        setSavingLogoConfig(true);
+                        try {
+                          const updateResponse = await api.projects.updateGraphics(projectId, {
+                            logoShape: currentShape,
+                            logoPlacement: newPlacement,
+                            logoBorder: currentBorder,
+                          });
+                          setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                          setLogoConfig({
+                            logoShape: updateResponse.logoShape || logoConfig.logoShape,
+                            logoPlacement: updateResponse.logoPlacement || newPlacement,
+                            logoBorder: updateResponse.logoBorder || logoConfig.logoBorder,
+                          });
+                        } catch (err: any) {
+                          setFormError(err.message || "Failed to update logo placement");
+                          // Revert on error
+                          setLogoConfig(logoConfig);
+                        } finally {
+                          setSavingLogoConfig(false);
+                        }
+                      }}
+                      disabled={savingLogoConfig}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                    >
+                      <option value="above-top-left">Above - Top Left</option>
+                      <option value="above-center">Above - Center</option>
+                      <option value="above-right">Above - Right</option>
+                      <option value="overlay-top-left">Overlay - Top Left</option>
+                      <option value="overlay-top-right">Overlay - Top Right</option>
+                      <option value="overlay-bottom-left">Overlay - Bottom Left</option>
+                      <option value="overlay-bottom-right">Overlay - Bottom Right</option>
+                    </select>
+                  </div>
+
+                  {/* Border Rocker Switch (Three-way) */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-text-primary">
+                      Border
+                    </label>
+                    <div className="flex border border-gray-300 rounded-md overflow-hidden w-fit">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newBorder = "none";
+                          // Use current project values, not state defaults
+                          const currentShape = project?.logoShape || "rounded-rect";
+                          const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
+                          const currentBorder = project?.logoBorder || "none";
+                          const newConfig = { logoShape: currentShape, logoPlacement: currentPlacement, logoBorder: newBorder };
+                          setLogoConfig(newConfig);
+                          setSavingLogoConfig(true);
+                          try {
+                            const updateResponse = await api.projects.updateGraphics(projectId, {
+                              logoShape: currentShape,
+                              logoPlacement: currentPlacement,
+                              logoBorder: newBorder,
+                            });
+                            setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                            setLogoConfig(newConfig);
+                          } catch (err: any) {
+                            setFormError(err.message || "Failed to update logo border");
+                            // Revert on error
+                            setLogoConfig(logoConfig);
+                          } finally {
+                            setSavingLogoConfig(false);
+                          }
+                        }}
+                        disabled={savingLogoConfig}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          logoConfig.logoBorder === "none"
+                            ? "bg-primary-600 text-white"
+                            : "bg-background-tertiary text-text-primary hover:bg-background-primary"
+                        } disabled:opacity-50`}
+                      >
+                        No border
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newBorder = "white";
+                          // Use current project values, not state defaults
+                          const currentShape = project?.logoShape || "rounded-rect";
+                          const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
+                          const currentBorder = project?.logoBorder || "none";
+                          const newConfig = { logoShape: currentShape, logoPlacement: currentPlacement, logoBorder: newBorder };
+                          setLogoConfig(newConfig);
+                          setSavingLogoConfig(true);
+                          try {
+                            const updateResponse = await api.projects.updateGraphics(projectId, {
+                              logoShape: currentShape,
+                              logoPlacement: currentPlacement,
+                              logoBorder: newBorder,
+                            });
+                            setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                            setLogoConfig(newConfig);
+                          } catch (err: any) {
+                            setFormError(err.message || "Failed to update logo border");
+                            // Revert on error
+                            setLogoConfig(logoConfig);
+                          } finally {
+                            setSavingLogoConfig(false);
+                          }
+                        }}
+                        disabled={savingLogoConfig}
+                        className={`px-4 py-2 text-sm font-medium transition-colors border-l border-r border-gray-300 ${
+                          logoConfig.logoBorder === "white"
+                            ? "bg-primary-600 text-white"
+                            : "bg-background-tertiary text-text-primary hover:bg-background-primary"
+                        } disabled:opacity-50`}
+                      >
+                        White border
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const newBorder = "black";
+                          // Use current project values, not state defaults
+                          const currentShape = project?.logoShape || "rounded-rect";
+                          const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
+                          const currentBorder = project?.logoBorder || "none";
+                          const newConfig = { logoShape: currentShape, logoPlacement: currentPlacement, logoBorder: newBorder };
+                          setLogoConfig(newConfig);
+                          setSavingLogoConfig(true);
+                          try {
+                            const updateResponse = await api.projects.updateGraphics(projectId, {
+                              logoShape: currentShape,
+                              logoPlacement: currentPlacement,
+                              logoBorder: newBorder,
+                            });
+                            setProject((prev) => prev ? { ...prev, ...updateResponse } : updateResponse);
+                            setLogoConfig(newConfig);
+                          } catch (err: any) {
+                            setFormError(err.message || "Failed to update logo border");
+                            // Revert on error
+                            setLogoConfig(logoConfig);
+                          } finally {
+                            setSavingLogoConfig(false);
+                          }
+                        }}
+                        disabled={savingLogoConfig}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${
+                          logoConfig.logoBorder === "black"
+                            ? "bg-primary-600 text-white"
+                            : "bg-background-tertiary text-text-primary hover:bg-background-primary"
+                        } disabled:opacity-50`}
+                      >
+                        Black border
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Banner Section */}

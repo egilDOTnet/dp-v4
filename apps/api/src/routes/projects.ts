@@ -350,6 +350,15 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                 type: { type: "string", nullable: true },
                 startDate: { type: "string", format: "date-time", nullable: true },
                 endDate: { type: "string", format: "date-time", nullable: true },
+                logoData: { type: "string", nullable: true },
+                logoFileName: { type: "string", nullable: true },
+                logoFileType: { type: "string", nullable: true },
+                logoShape: { type: "string", nullable: true },
+                logoPlacement: { type: "string", nullable: true },
+                logoBorder: { type: "string", nullable: true },
+                bannerData: { type: "string", nullable: true },
+                bannerFileName: { type: "string", nullable: true },
+                bannerFileType: { type: "string", nullable: true },
                 tenantId: { type: "string", nullable: true },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
@@ -461,6 +470,15 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           type: p.type,
           startDate: p.startDate,
           endDate: p.endDate,
+          logoData: p.logoData,
+          logoFileName: p.logoFileName,
+          logoFileType: p.logoFileType,
+          logoShape: p.logoShape,
+          logoPlacement: p.logoPlacement,
+          logoBorder: p.logoBorder,
+          bannerData: p.bannerData,
+          bannerFileName: p.bannerFileName,
+          bannerFileType: p.bannerFileType,
           tenantId: p.tenantId,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
@@ -513,6 +531,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               logoData: { type: "string", nullable: true },
               logoFileName: { type: "string", nullable: true },
               logoFileType: { type: "string", nullable: true },
+              logoShape: { type: "string", nullable: true },
+              logoPlacement: { type: "string", nullable: true },
+              logoBorder: { type: "string", nullable: true },
               bannerData: { type: "string", nullable: true },
               bannerFileName: { type: "string", nullable: true },
               bannerFileType: { type: "string", nullable: true },
@@ -602,6 +623,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         logoData: project.logoData,
         logoFileName: project.logoFileName,
         logoFileType: project.logoFileType,
+        logoShape: project.logoShape,
+        logoPlacement: project.logoPlacement,
+        logoBorder: project.logoBorder,
         bannerData: project.bannerData,
         bannerFileName: project.bannerFileName,
         bannerFileType: project.bannerFileType,
@@ -2991,6 +3015,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       logoData?: string | null;
       logoFileName?: string | null;
       logoFileType?: string | null;
+      logoShape?: string | null;
+      logoPlacement?: string | null;
+      logoBorder?: string | null;
       bannerData?: string | null;
       bannerFileName?: string | null;
       bannerFileType?: string | null;
@@ -3035,6 +3062,21 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               nullable: true,
               description: "Logo MIME type (e.g., image/png)",
             },
+            logoShape: {
+              type: "string",
+              nullable: true,
+              description: "Logo shape: 'rounded-rect' or 'circle'",
+            },
+            logoPlacement: {
+              type: "string",
+              nullable: true,
+              description: "Logo placement: 'above-top-left', 'above-center', 'above-right', 'overlay-top-left', 'overlay-top-right', 'overlay-bottom-left', 'overlay-bottom-right'",
+            },
+            logoBorder: {
+              type: "string",
+              nullable: true,
+              description: "Logo border: 'none', 'white', or 'black'",
+            },
             bannerData: {
               type: "string",
               nullable: true,
@@ -3064,6 +3106,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               logoData: { type: "string", nullable: true },
               logoFileName: { type: "string", nullable: true },
               logoFileType: { type: "string", nullable: true },
+              logoShape: { type: "string", nullable: true },
+              logoPlacement: { type: "string", nullable: true },
+              logoBorder: { type: "string", nullable: true },
               bannerData: { type: "string", nullable: true },
               bannerFileName: { type: "string", nullable: true },
               bannerFileType: { type: "string", nullable: true },
@@ -3104,6 +3149,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           logoData?: string | null;
           logoFileName?: string | null;
           logoFileType?: string | null;
+          logoShape?: string | null;
+          logoPlacement?: string | null;
+          logoBorder?: string | null;
           bannerData?: string | null;
           bannerFileName?: string | null;
           bannerFileType?: string | null;
@@ -3140,6 +3188,15 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       }
       if (request.body.logoFileType !== undefined) {
         updateData.logoFileType = request.body.logoFileType === null ? null : request.body.logoFileType;
+      }
+      if (request.body.logoShape !== undefined) {
+        updateData.logoShape = request.body.logoShape === null ? null : request.body.logoShape;
+      }
+      if (request.body.logoPlacement !== undefined) {
+        updateData.logoPlacement = request.body.logoPlacement === null ? null : request.body.logoPlacement;
+      }
+      if (request.body.logoBorder !== undefined) {
+        updateData.logoBorder = request.body.logoBorder === null ? null : request.body.logoBorder;
       }
       if (request.body.bannerData !== undefined) {
         updateData.bannerData = request.body.bannerData === null ? null : request.body.bannerData;
@@ -3194,6 +3251,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         logoData: updatedProject.logoData,
         logoFileName: updatedProject.logoFileName,
         logoFileType: updatedProject.logoFileType,
+        logoShape: updatedProject.logoShape,
+        logoPlacement: updatedProject.logoPlacement,
+        logoBorder: updatedProject.logoBorder,
         bannerData: updatedProject.bannerData,
         bannerFileName: updatedProject.bannerFileName,
         bannerFileType: updatedProject.bannerFileType,

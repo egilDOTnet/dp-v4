@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { RFIQuestionRenderer } from "@/components/vendor/RFIQuestionRenderer";
 import { RFIProgressIndicator } from "@/components/vendor/RFIProgressIndicator";
 import { VendorContactForm } from "@/components/vendor/VendorContactForm";
+import { ProjectLogo } from "@/components/ProjectLogo";
 
 type Question = {
   id: string;
@@ -31,6 +32,9 @@ type RFIData = {
     name: string;
     logoData: string | null;
     logoFileType: string | null;
+    logoShape: string | null;
+    logoPlacement: string | null;
+    logoBorder: string | null;
     bannerData: string | null;
     bannerFileType: string | null;
   };
@@ -460,27 +464,47 @@ export default function VendorRFIPage() {
   if (deadlinePassed) {
     return (
       <div className="max-w-4xl mx-auto">
-        {/* Project Logo */}
-        {data.project.logoData && (
-          <div className="mb-8 flex justify-start">
-            <img
-              src={`data:${data.project.logoFileType || "image/png"};base64,${data.project.logoData}`}
-              alt={`${data.project.name} logo`}
-              className="max-h-24 max-w-full object-contain"
+        {/* Logo above banner (if placement is "above" mode) */}
+        {data.project.logoData && 
+         data.project.logoPlacement?.startsWith("above") && (
+          <div className="mb-8">
+            <ProjectLogo
+              logoData={data.project.logoData}
+              logoFileType={data.project.logoFileType}
+              logoShape={data.project.logoShape}
+              logoPlacement={data.project.logoPlacement}
+              logoBorder={data.project.logoBorder}
+              className=""
             />
           </div>
         )}
 
-        {/* Project Banner */}
-        {data.project.bannerData && (
-          <div className="mb-8">
-            <img
-              src={`data:${data.project.bannerFileType || "image/png"};base64,${data.project.bannerData}`}
-              alt={`${data.project.name} banner`}
-              className="w-full h-auto max-h-64 object-cover rounded-lg"
-            />
+        {/* Banner with Logo Overlay */}
+        {(data.project.bannerData || (data.project.logoData && data.project.logoPlacement?.startsWith("overlay"))) ? (
+          <div className="mb-8 relative rounded-lg overflow-hidden min-h-[200px]">
+            {data.project.bannerData ? (
+              <img
+                src={`data:${data.project.bannerFileType || "image/png"};base64,${data.project.bannerData}`}
+                alt={`${data.project.name} banner`}
+                className="w-full h-auto max-h-64 object-contain rounded-lg"
+              />
+            ) : (
+              /* Transparent placeholder when no banner but overlay logo exists */
+              <div className="w-full min-h-[200px] bg-transparent rounded-lg" />
+            )}
+            {/* Logo overlay on banner (if placement is "overlay" mode) */}
+            {data.project.logoData && data.project.logoPlacement?.startsWith("overlay") && (
+              <ProjectLogo
+                logoData={data.project.logoData}
+                logoFileType={data.project.logoFileType}
+                logoShape={data.project.logoShape}
+                logoPlacement={data.project.logoPlacement}
+                logoBorder={data.project.logoBorder}
+                className=""
+              />
+            )}
           </div>
-        )}
+        ) : null}
 
         {/* Project Name */}
         <h1 className="text-4xl font-bold text-text-primary mb-6 text-center">
@@ -520,27 +544,47 @@ export default function VendorRFIPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Project Logo */}
-      {data.project.logoData && (
-        <div className="mb-8 flex justify-start">
-          <img
-            src={`data:${data.project.logoFileType || "image/png"};base64,${data.project.logoData}`}
-            alt={`${data.project.name} logo`}
-            className="max-h-24 max-w-full object-contain"
+      {/* Logo above banner (if placement is "above" mode) */}
+      {data.project.logoData && 
+       data.project.logoPlacement?.startsWith("above") && (
+        <div className="mb-8">
+          <ProjectLogo
+            logoData={data.project.logoData}
+            logoFileType={data.project.logoFileType}
+            logoShape={data.project.logoShape}
+            logoPlacement={data.project.logoPlacement}
+            logoBorder={data.project.logoBorder}
+            className=""
           />
         </div>
       )}
 
-      {/* Project Banner */}
-      {data.project.bannerData && (
-        <div className="mb-8">
-          <img
-            src={`data:${data.project.bannerFileType || "image/png"};base64,${data.project.bannerData}`}
-            alt={`${data.project.name} banner`}
-            className="w-full h-auto max-h-64 object-cover rounded-lg"
-          />
+      {/* Banner with Logo Overlay */}
+      {(data.project.bannerData || (data.project.logoData && data.project.logoPlacement?.startsWith("overlay"))) ? (
+        <div className="mb-8 relative rounded-lg overflow-hidden min-h-[200px]">
+          {data.project.bannerData ? (
+            <img
+              src={`data:${data.project.bannerFileType || "image/png"};base64,${data.project.bannerData}`}
+              alt={`${data.project.name} banner`}
+              className="w-full h-auto max-h-64 object-cover rounded-lg"
+            />
+          ) : (
+            /* Transparent placeholder when no banner but overlay logo exists */
+            <div className="w-full min-h-[200px] bg-transparent rounded-lg" />
+          )}
+          {/* Logo overlay on banner (if placement is "overlay" mode) */}
+          {data.project.logoData && data.project.logoPlacement?.startsWith("overlay") && (
+            <ProjectLogo
+              logoData={data.project.logoData}
+              logoFileType={data.project.logoFileType}
+              logoShape={data.project.logoShape}
+              logoPlacement={data.project.logoPlacement}
+              logoBorder={data.project.logoBorder}
+              className=""
+            />
+          )}
         </div>
-      )}
+      ) : null}
 
       {/* Project Name */}
       <h1 className="text-4xl font-bold text-text-primary mb-6 text-center">

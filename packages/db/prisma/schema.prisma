@@ -31,6 +31,9 @@ model Project {
   logoData               String?
   logoFileName           String?
   logoFileType           String?
+  logoShape              String?
+  logoPlacement          String?
+  logoBorder             String?
   bannerData             String?
   bannerFileName         String?
   bannerFileType         String?
