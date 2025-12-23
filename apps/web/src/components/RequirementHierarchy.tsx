@@ -194,6 +194,8 @@ export default function RequirementHierarchyComponent({
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const hierarchyRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const originalHierarchyDataRef = useRef<{ title: string; description: string } | null>(null);
+  const isUpdatingRef = useRef(false);
   
   // Keep ref in sync with state
   useEffect(() => {
@@ -330,11 +332,31 @@ export default function RequirementHierarchyComponent({
   };
 
   const handleUpdate = async (id: string) => {
+    // Prevent duplicate calls
+    if (isUpdatingRef.current) {
+      return;
+    }
+
     if (!formData.title.trim()) {
       setError("Title is required");
       return;
     }
 
+    // Check if data has actually changed
+    const original = originalHierarchyDataRef.current;
+    const hasChanges = original && (
+      formData.title.trim() !== original.title.trim() ||
+      formData.description.trim() !== (original.description || "").trim()
+    );
+
+    // If no changes, just exit edit mode without API calls
+    if (!hasChanges) {
+      cancelEdit();
+      return;
+    }
+
+    // Set updating flag to prevent duplicate calls
+    isUpdatingRef.current = true;
     setLoading(true);
     setError("");
 
@@ -346,12 +368,14 @@ export default function RequirementHierarchyComponent({
       });
       setEditingId(null);
       setFormData({ title: "", description: "" });
+      originalHierarchyDataRef.current = null;
       onHierarchyUpdate();
     } catch (err: any) {
       console.error("[RequirementHierarchy] Error updating hierarchy:", { projectId, hierarchyId: id, error: err });
       setError(err.message || "Failed to update hierarchy");
     } finally {
       setLoading(false);
+      isUpdatingRef.current = false;
     }
   };
 
@@ -378,10 +402,13 @@ export default function RequirementHierarchyComponent({
 
   const startEdit = (hierarchy: RequirementHierarchyType) => {
     setEditingId(hierarchy.id);
-    setFormData({
+    const initialData = {
       title: hierarchy.title,
       description: hierarchy.description || "",
-    });
+    };
+    setFormData(initialData);
+    // Store original data for change detection
+    originalHierarchyDataRef.current = initialData;
   };
 
   // Auto-focus title input when entering edit mode
@@ -427,6 +454,10 @@ export default function RequirementHierarchyComponent({
         
         // Only exit edit mode if click is truly outside
         if (!isInsideHierarchy) {
+          // Prevent duplicate calls if update is already in progress
+          if (isUpdatingRef.current) {
+            return;
+          }
           // Use ref to get latest formData without causing re-renders
           const currentFormData = formDataRef.current;
           // Save and exit edit mode
@@ -468,6 +499,7 @@ export default function RequirementHierarchyComponent({
   const cancelEdit = () => {
     setEditingId(null);
     setFormData({ title: "", description: "" });
+    originalHierarchyDataRef.current = null;
     setError("");
   };
 
@@ -793,22 +825,8 @@ export default function RequirementHierarchyComponent({
                           }
                         }}
                         onBlur={(e) => {
-                          // Check if focus is moving to another element within the same hierarchy
-                          const relatedTarget = e.relatedTarget as HTMLElement;
-                          if (relatedTarget && isWithinSameHierarchy(h1.id, relatedTarget)) {
-                            return;
-                          }
-                          
-                          // Auto-save on blur if title is not empty
-                          if (formData.title.trim()) {
-                            setTimeout(() => {
-                              const activeElement = document.activeElement;
-                              // Double-check that focus is not still within the hierarchy
-                              if (editingId === h1.id && !isWithinSameHierarchy(h1.id, activeElement)) {
-                                handleUpdate(h1.id);
-                              }
-                            }, 150);
-                          }
+                          // Blur handler removed - save is handled by click-outside handler only
+                          // This prevents duplicate API calls when clicking outside the edit form
                         }}
                         placeholder="Title"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-700 font-medium text-lg"
@@ -825,22 +843,8 @@ export default function RequirementHierarchyComponent({
                           }
                         }}
                         onBlur={(e) => {
-                          // Check if focus is moving to another element within the same hierarchy
-                          const relatedTarget = e.relatedTarget as HTMLElement;
-                          if (relatedTarget && isWithinSameHierarchy(h1.id, relatedTarget)) {
-                            return;
-                          }
-                          
-                          // Auto-save on blur
-                          if (formData.title.trim()) {
-                            setTimeout(() => {
-                              const activeElement = document.activeElement;
-                              // Double-check that focus is not still within the hierarchy
-                              if (editingId === h1.id && !isWithinSameHierarchy(h1.id, activeElement)) {
-                                handleUpdate(h1.id);
-                              }
-                            }, 150);
-                          }
+                          // Blur handler removed - save is handled by click-outside handler only
+                          // This prevents duplicate API calls when clicking outside the edit form
                         }}
                         placeholder="Description (optional)"
                         rows={2}
@@ -1017,22 +1021,8 @@ export default function RequirementHierarchyComponent({
                                       }
                                     }}
                                     onBlur={(e) => {
-                                      // Check if focus is moving to another element within the same hierarchy
-                                      const relatedTarget = e.relatedTarget as HTMLElement;
-                                      if (relatedTarget && isWithinSameHierarchy(h2.id, relatedTarget)) {
-                                        return;
-                                      }
-                                      
-                                      // Auto-save on blur if title is not empty
-                                      if (formData.title.trim()) {
-                                        setTimeout(() => {
-                                          const activeElement = document.activeElement;
-                                          // Double-check that focus is not still within the hierarchy
-                                          if (editingId === h2.id && !isWithinSameHierarchy(h2.id, activeElement)) {
-                                            handleUpdate(h2.id);
-                                          }
-                                        }, 150);
-                                      }
+                                      // Blur handler removed - save is handled by click-outside handler only
+                                      // This prevents duplicate API calls when clicking outside the edit form
                                     }}
                                     placeholder="Title"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-600 font-medium text-base"
@@ -1043,22 +1033,8 @@ export default function RequirementHierarchyComponent({
                                       setFormData({ ...formData, description: e.target.value })
                                     }
                                     onBlur={(e) => {
-                                      // Check if focus is moving to another element within the same hierarchy
-                                      const relatedTarget = e.relatedTarget as HTMLElement;
-                                      if (relatedTarget && isWithinSameHierarchy(h2.id, relatedTarget)) {
-                                        return;
-                                      }
-                                      
-                                      // Auto-save on blur
-                                      if (formData.title.trim()) {
-                                        setTimeout(() => {
-                                          const activeElement = document.activeElement;
-                                          // Double-check that focus is not still within the hierarchy
-                                          if (editingId === h2.id && !isWithinSameHierarchy(h2.id, activeElement)) {
-                                            handleUpdate(h2.id);
-                                          }
-                                        }, 150);
-                                      }
+                                      // Blur handler removed - save is handled by click-outside handler only
+                                      // This prevents duplicate API calls when clicking outside the edit form
                                     }}
                                     placeholder="Description (optional)"
                                     rows={2}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { api, Project, ProjectVendor, VendorStatus } from "@/lib/api";
 import VendorList from "@/components/VendorList";
@@ -21,6 +21,7 @@ export default function VendorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showAddVendorForm, setShowAddVendorForm] = useState(false);
+  const loadingProjectIdRef = useRef<string | null>(null);
 
   // Search across vendor name, org number, email domain, and contacts
   const { searchTerm, setSearchTerm, filteredItems, clearSearch, isSearching } =
@@ -38,29 +39,61 @@ export default function VendorsPage() {
   const loadProject = async () => {
     try {
       const projectData = await api.projects.get(projectId);
-      setProject(projectData);
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setProject(projectData);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to load project");
+      // Only set error if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setError(err.message || "Failed to load project");
+      }
     }
   };
 
   const loadVendors = async () => {
     try {
       const vendorsData = await api.projects.vendors.list(projectId);
-      setVendors(vendorsData);
-      setError("");
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setVendors(vendorsData);
+        setError("");
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to load vendors");
+      // Only set error if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setError(err.message || "Failed to load vendors");
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     if (projectId) {
-      loadProject();
-      loadVendors();
+      // Prevent duplicate calls (React Strict Mode protection)
+      // Only load if we're not already loading this specific projectId
+      if (loadingProjectIdRef.current === projectId) {
+        return;
+      }
+      
+      loadingProjectIdRef.current = projectId;
+      setLoading(true);
+      Promise.all([
+        loadProject(),
+        loadVendors()
+      ]).finally(() => {
+        // Only clear if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          loadingProjectIdRef.current = null;
+        }
+      });
     }
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
   }, [projectId]);
 
   const handleAddVendor = async (data: {

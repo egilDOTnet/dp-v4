@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, Project, Phase, Task } from "@/lib/api";
@@ -22,6 +22,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isCreatingNewTask, setIsCreatingNewTask] = useState(false);
+  const loadingProjectIdRef = useRef<string | null>(null);
 
   // Search functionality for tasks
   const { searchTerm, setSearchTerm, filteredItems: filteredTasks, clearSearch, isSearching } =
@@ -32,21 +33,26 @@ export default function TasksPage() {
   // Display items - use tasks directly if not searching, otherwise use filteredItems
   const displayTasks = isSearching ? filteredTasks : tasks;
 
-  const loadProject = () => {
-    api.projects
-      .get(projectId)
-      .then((data) => {
+  const loadProject = async () => {
+    try {
+      const data = await api.projects.get(projectId);
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
         setProject(data);
-      })
-      .catch((err) => {
+      }
+    } catch (err: any) {
+      // Only set error if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
         setError(err.message || "Failed to load project");
-      });
+      }
+    }
   };
 
-  const loadPhases = () => {
-    api.projects.phases
-      .list(projectId)
-      .then((data) => {
+  const loadPhases = async () => {
+    try {
+      const data = await api.projects.phases.list(projectId);
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
         setPhases(data);
         // If phase parameter is provided in URL, use it
         if (phaseParam && data.some(p => p.id === phaseParam)) {
@@ -60,10 +66,11 @@ export default function TasksPage() {
           const phaseToSelect = firstPhaseWithOpenTasks || data[0];
           setSelectedPhaseId(phaseToSelect.id);
         }
-      })
-      .catch((err) => {
-        console.error("Failed to load phases:", err);
-      });
+      }
+    } catch (err: any) {
+      console.error("Failed to load phases:", err);
+      // Error handling is silent for phases to not block the UI
+    }
   };
 
   const loadTasks = (phaseId: string) => {
@@ -78,10 +85,25 @@ export default function TasksPage() {
   };
 
   useEffect(() => {
+    // Prevent duplicate calls (React Strict Mode protection)
+    if (loadingProjectIdRef.current === projectId) {
+      return;
+    }
+    
+    loadingProjectIdRef.current = projectId;
     setLoading(true);
-    loadProject();
-    loadPhases();
-    setLoading(false);
+    Promise.all([
+      loadProject(),
+      loadPhases()
+    ]).finally(() => {
+      // Only clear if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setLoading(false);
+        loadingProjectIdRef.current = null;
+      }
+    });
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
   }, [projectId]);
 
   useEffect(() => {

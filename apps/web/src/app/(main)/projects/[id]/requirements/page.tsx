@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
@@ -26,6 +26,7 @@ export default function RequirementsPage() {
   const [showMultiDeleteModal, setShowMultiDeleteModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"Approved" | "ForReview" | "New" | "Imported" | null>(null);
   const [filterType, setFilterType] = useState<"Information" | "Mandatory" | "Important" | "Wish" | null>(null);
+  const loadingProjectIdRef = useRef<string | null>(null);
 
   // Search functionality
   const { searchTerm, setSearchTerm, filteredItems: _filteredItems, clearSearch, isSearching } =
@@ -132,8 +133,22 @@ export default function RequirementsPage() {
 
   useEffect(() => {
     if (projectId) {
-      loadData();
+      // Prevent duplicate calls (React Strict Mode protection)
+      // Only load if we're not already loading this specific projectId
+      if (loadingProjectIdRef.current === projectId) {
+        return;
+      }
+      
+      loadingProjectIdRef.current = projectId;
+      loadData().finally(() => {
+        // Only clear if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          loadingProjectIdRef.current = null;
+        }
+      });
     }
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
   }, [projectId]);
 
   const handleHierarchyUpdate = () => {

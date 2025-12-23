@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Project, Phase, DashboardStats } from "@/lib/api";
@@ -19,8 +19,15 @@ export default function ProjectDashboardPage() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const loadingProjectIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Prevent duplicate calls (React Strict Mode protection)
+    if (loadingProjectIdRef.current === projectId) {
+      return;
+    }
+    
+    loadingProjectIdRef.current = projectId;
     setLoading(true);
     Promise.all([
       api.projects.get(projectId),
@@ -28,16 +35,28 @@ export default function ProjectDashboardPage() {
       api.projects.dashboard.getStats(projectId)
     ])
       .then(([projectData, phasesData, statsData]) => {
-        setProject(projectData);
-        setPhases(phasesData);
-        setDashboardStats(statsData);
+        // Only update state if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          setProject(projectData);
+          setPhases(phasesData);
+          setDashboardStats(statsData);
+        }
       })
       .catch((err) => {
-        setError(err.message || "Failed to load project");
+        // Only set error if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          setError(err.message || "Failed to load project");
+        }
       })
       .finally(() => {
-        setLoading(false);
+        // Only update loading state if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          setLoading(false);
+          loadingProjectIdRef.current = null;
+        }
       });
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
   }, [projectId]);
 
   const handlePhaseClick = (phaseId: string) => {

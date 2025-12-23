@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { api, Project, RFP } from "@/lib/api";
 import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner, Breadcrumbs } from "@/components/ui";
@@ -25,35 +25,68 @@ export default function RFPPage() {
   const [about, setAbout] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const loadingProjectIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (projectId) {
-      loadProject();
-      loadRFP();
+      // Prevent duplicate calls (React Strict Mode protection)
+      if (loadingProjectIdRef.current === projectId) {
+        return;
+      }
+      
+      loadingProjectIdRef.current = projectId;
+      Promise.all([
+        loadProject(),
+        loadRFP()
+      ]).finally(() => {
+        // Only clear if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          loadingProjectIdRef.current = null;
+        }
+      });
     }
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
   }, [projectId]);
 
   const loadProject = async () => {
     try {
       const projectData = await api.projects.get(projectId);
-      setProject(projectData);
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setProject(projectData);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to load project");
+      // Only set error if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setError(err.message || "Failed to load project");
+      }
     }
   };
 
   const loadRFP = async () => {
     try {
-      setLoading(true);
-      setError("");
+      if (loadingProjectIdRef.current === projectId) {
+        setLoading(true);
+        setError("");
+      }
       const rfpData = await api.rfp.get(projectId);
-      setRfp(rfpData);
-      setAbout(rfpData.about || "");
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setRfp(rfpData);
+        setAbout(rfpData.about || "");
+      }
     } catch (err: any) {
       console.error("Error loading RFP:", err);
-      setError(err.message || err.error?.message || "Failed to load RFP");
+      // Only set error if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setError(err.message || err.error?.message || "Failed to load RFP");
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setLoading(false);
+      }
     }
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,6 +39,7 @@ export default function ManageProjectPage() {
     logoBorder: "none" as string,
   });
   const [savingLogoConfig, setSavingLogoConfig] = useState(false);
+  const loadingProjectIdRef = useRef<string | null>(null);
 
   const isAdmin =
     user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
@@ -72,54 +73,77 @@ export default function ManageProjectPage() {
       return;
     }
 
+    // Prevent duplicate calls (React Strict Mode protection)
+    // Only load if we're not already loading this specific projectId
+    if (loadingProjectIdRef.current === projectId) {
+      return;
+    }
+
+    loadingProjectIdRef.current = projectId;
+    setLoading(true);
     Promise.all([
       api.projects.get(projectId),
       api.users.getCompanyUsers(),
     ])
       .then(async ([projectData, users]) => {
-        setProject(projectData);
-        setAvailableUsers(users);
-        setFormData({
-          name: projectData.name,
-          type: projectData.type || "",
-          startDate: projectData.startDate
-            ? new Date(projectData.startDate).toISOString().split("T")[0]
-            : getCurrentDate(),
-          endDate: projectData.endDate
-            ? new Date(projectData.endDate).toISOString().split("T")[0]
-            : "",
-        });
-        
-        // If logo exists but config is null, save defaults to database
-        const logoConfig = {
-          logoShape: projectData.logoShape || "rounded-rect",
-          logoPlacement: projectData.logoPlacement || "overlay-bottom-left",
-          logoBorder: projectData.logoBorder || "none",
-        };
-        setLogoConfig(logoConfig);
-        
-        // If logo exists but any config field is null, save defaults
-        if (projectData.logoData && (!projectData.logoShape || !projectData.logoPlacement || !projectData.logoBorder)) {
-          try {
-            await api.projects.updateGraphics(projectId, {
-              logoShape: logoConfig.logoShape,
-              logoPlacement: logoConfig.logoPlacement,
-              logoBorder: logoConfig.logoBorder,
-            });
-            // Reload project to get updated values
-            const updatedProject = await api.projects.get(projectId);
-            setProject(updatedProject);
-          } catch (err) {
-            console.error("Failed to save default logo config:", err);
+        // Only update state if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          setProject(projectData);
+          setAvailableUsers(users);
+          setFormData({
+            name: projectData.name,
+            type: projectData.type || "",
+            startDate: projectData.startDate
+              ? new Date(projectData.startDate).toISOString().split("T")[0]
+              : getCurrentDate(),
+            endDate: projectData.endDate
+              ? new Date(projectData.endDate).toISOString().split("T")[0]
+              : "",
+          });
+          
+          // If logo exists but config is null, save defaults to database
+          const logoConfig = {
+            logoShape: projectData.logoShape || "rounded-rect",
+            logoPlacement: projectData.logoPlacement || "overlay-bottom-left",
+            logoBorder: projectData.logoBorder || "none",
+          };
+          setLogoConfig(logoConfig);
+          
+          // If logo exists but any config field is null, save defaults
+          if (projectData.logoData && (!projectData.logoShape || !projectData.logoPlacement || !projectData.logoBorder)) {
+            try {
+              await api.projects.updateGraphics(projectId, {
+                logoShape: logoConfig.logoShape,
+                logoPlacement: logoConfig.logoPlacement,
+                logoBorder: logoConfig.logoBorder,
+              });
+              // Reload project to get updated values
+              const updatedProject = await api.projects.get(projectId);
+              // Only update if we're still loading the same projectId
+              if (loadingProjectIdRef.current === projectId) {
+                setProject(updatedProject);
+              }
+            } catch (err) {
+              console.error("Failed to save default logo config:", err);
+            }
           }
         }
-        
-        setLoading(false);
       })
       .catch((err) => {
-        setError(err.message || "Failed to load project");
-        setLoading(false);
+        // Only set error if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          setError(err.message || "Failed to load project");
+        }
+      })
+      .finally(() => {
+        // Only update loading state if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          setLoading(false);
+          loadingProjectIdRef.current = null;
+        }
       });
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
   }, [projectId, isAdmin, router]);
 
   const handleSave = async (e: React.FormEvent) => {

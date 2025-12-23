@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api, Project, RFI } from "@/lib/api";
@@ -27,71 +27,109 @@ export default function RFIPage() {
   const [emailText, setEmailText] = useState("");
   const [rfiInformation, setRfiInformation] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (projectId) {
-      loadProject();
-      loadRFI();
-    }
-  }, [projectId]);
+  const loadingProjectIdRef = useRef<string | null>(null);
 
   const loadProject = async () => {
     try {
       const projectData = await api.projects.get(projectId);
-      setProject(projectData);
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setProject(projectData);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to load project");
+      // Only set error if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setError(err.message || "Failed to load project");
+      }
     }
   };
 
   const loadRFI = async () => {
     try {
-      setLoading(true);
-      setError("");
+      // Only set loading state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setLoading(true);
+        setError("");
+      }
       const rfiData = await api.rfi.get(projectId);
       
       // Check if we got valid data
       if (!rfiData || typeof rfiData !== 'object' || !rfiData.id) {
         console.error("Invalid RFI data received:", rfiData);
-        setError("Received invalid RFI data from server. Please refresh the page.");
-        setLoading(false);
+        // Only set error if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          setError("Received invalid RFI data from server. Please refresh the page.");
+          setLoading(false);
+        }
         return;
       }
       
-      setRfi(rfiData);
-      
-      // Set default tab based on published status
-      if (rfiData.isPublished) {
-        setActiveTab("status");
-      } else {
-        setActiveTab("questionnaire");
+      // Only update state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setRfi(rfiData);
+        
+        // Set default tab based on published status
+        if (rfiData.isPublished) {
+          setActiveTab("status");
+        } else {
+          setActiveTab("questionnaire");
+        }
+        
+        // Safely parse dates - handle both string and Date object formats
+        const parseDate = (date: string | Date | null | undefined): string => {
+          if (!date) return "";
+          if (typeof date === "string") {
+            return date.split("T")[0];
+          }
+          if (date instanceof Date) {
+            return date.toISOString().split("T")[0];
+          }
+          return "";
+        };
+        
+        setDeadline(parseDate(rfiData.deadline));
+        setAutoPublishDate(parseDate(rfiData.autoPublishDate));
+        setEmailSubject(rfiData.emailSubject || "");
+        setEmailText(rfiData.emailText || "");
+        setRfiInformation(rfiData.rfiInformation || "");
       }
-      
-      // Safely parse dates - handle both string and Date object formats
-      const parseDate = (date: string | Date | null | undefined): string => {
-        if (!date) return "";
-        if (typeof date === "string") {
-          return date.split("T")[0];
-        }
-        if (date instanceof Date) {
-          return date.toISOString().split("T")[0];
-        }
-        return "";
-      };
-      
-      setDeadline(parseDate(rfiData.deadline));
-      setAutoPublishDate(parseDate(rfiData.autoPublishDate));
-      setEmailSubject(rfiData.emailSubject || "");
-      setEmailText(rfiData.emailText || "");
-      setRfiInformation(rfiData.rfiInformation || "");
     } catch (err: any) {
       console.error("Error loading RFI:", err);
       const errorMessage = err.message || err.error?.message || "Failed to load RFI";
-      setError(errorMessage);
+      // Only set error if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setError(errorMessage);
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if we're still loading the same projectId
+      if (loadingProjectIdRef.current === projectId) {
+        setLoading(false);
+      }
     }
   };
+
+  useEffect(() => {
+    if (projectId) {
+      // Prevent duplicate calls (React Strict Mode protection)
+      // Only load if we're not already loading this specific projectId
+      if (loadingProjectIdRef.current === projectId) {
+        return;
+      }
+      
+      loadingProjectIdRef.current = projectId;
+      Promise.all([
+        loadProject(),
+        loadRFI()
+      ]).finally(() => {
+        // Only clear if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          loadingProjectIdRef.current = null;
+        }
+      });
+    }
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
+  }, [projectId]);
 
   const handleUpdateDeadline = async (newDeadline: string) => {
     try {
