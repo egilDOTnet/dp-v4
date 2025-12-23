@@ -1443,6 +1443,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                 order: { type: "number" },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
+                commentCount: { type: "number" },
               },
             },
             description: "Array of tasks for the phase",
@@ -1515,6 +1516,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                   lastName: true,
                 },
               },
+              _count: {
+                select: {
+                  comments: true,
+                },
+              },
             },
             orderBy: { order: "asc" },
           });
@@ -1543,10 +1549,22 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           
           const ownerMap = new Map(owners.map(o => [o.id, o]));
           
-          // Attach owners to tasks
+          // Fetch comment counts separately
+          const taskIds = tasks.map(t => t.id);
+          const commentCounts = await db.taskComment.groupBy({
+            by: ['taskId'],
+            where: { taskId: { in: taskIds } },
+            _count: true,
+          });
+          const commentCountMap = new Map(commentCounts.map(cc => [cc.taskId, cc._count]));
+          
+          // Attach owners and comment counts to tasks
           tasks = tasks.map((task: any) => ({
             ...task,
             owner: task.ownerId ? ownerMap.get(task.ownerId) || null : null,
+            _count: {
+              comments: commentCountMap.get(task.id) ?? 0,
+            },
           }));
         }
 
@@ -1577,6 +1595,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               order: task.order,
               createdAt: task.createdAt,
               updatedAt: task.updatedAt,
+              commentCount: task._count?.comments ?? 0,
             };
           })
         );

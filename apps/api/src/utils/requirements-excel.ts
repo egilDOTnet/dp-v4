@@ -38,7 +38,7 @@ export async function generateRequirementsExcel(
   
   // Clean worksheet name (Excel has restrictions on sheet names)
   let sheetName = projectInfo.name
-    .replace(/[\\\/\?\*\[\]:]/g, "") // Remove invalid characters
+    .replace(/[\\/:?*[\]]/g, "") // Remove invalid characters
     .trim();
   if (sheetName.length > 31) {
     sheetName = sheetName.substring(0, 31);

@@ -422,7 +422,7 @@ export default function RequirementHierarchyComponent({
   }, [editingId]);
 
   // Helper to check if an element is within the same editing hierarchy
-  const isWithinSameHierarchy = (hierarchyId: string, element: EventTarget | null): boolean => {
+  const _isWithinSameHierarchy = (hierarchyId: string, element: EventTarget | null): boolean => {
     if (!element || !(element instanceof Node)) return false;
     const hierarchyElement = hierarchyRefs.current[hierarchyId];
     if (!hierarchyElement) return false;
@@ -824,7 +824,7 @@ export default function RequirementHierarchyComponent({
                             }
                           }
                         }}
-                        onBlur={(e) => {
+                        onBlur={(_e) => {
                           // Blur handler removed - save is handled by click-outside handler only
                           // This prevents duplicate API calls when clicking outside the edit form
                         }}
@@ -842,7 +842,7 @@ export default function RequirementHierarchyComponent({
                             return;
                           }
                         }}
-                        onBlur={(e) => {
+                        onBlur={(_e) => {
                           // Blur handler removed - save is handled by click-outside handler only
                           // This prevents duplicate API calls when clicking outside the edit form
                         }}
@@ -1020,7 +1020,7 @@ export default function RequirementHierarchyComponent({
                                         }
                                       }
                                     }}
-                                    onBlur={(e) => {
+                                    onBlur={(_e) => {
                                       // Blur handler removed - save is handled by click-outside handler only
                                       // This prevents duplicate API calls when clicking outside the edit form
                                     }}
@@ -1032,7 +1032,7 @@ export default function RequirementHierarchyComponent({
                                     onChange={(e) =>
                                       setFormData({ ...formData, description: e.target.value })
                                     }
-                                    onBlur={(e) => {
+                                    onBlur={(_e) => {
                                       // Blur handler removed - save is handled by click-outside handler only
                                       // This prevents duplicate API calls when clicking outside the edit form
                                     }}

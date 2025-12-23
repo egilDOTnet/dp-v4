@@ -17,8 +17,8 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
   const [vendors, setVendors] = useState<ProjectVendor[]>([]);
   const [unansweredCount, setUnansweredCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isSavingContact, setIsSavingContact] = useState(false);
-  const [isSavingAlternativeContact, setIsSavingAlternativeContact] = useState(false);
+  const [_isSavingContact, setIsSavingContact] = useState(false);
+  const [_isSavingAlternativeContact, setIsSavingAlternativeContact] = useState(false);
 
   // Convert project members to ContactPerson format
   const contactOptions: ContactPerson[] = (project?.members || []).map((member) => ({

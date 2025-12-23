@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { api, Project, Phase, Task } from "@/lib/api";
 import PhaseTimeline from "@/components/PhaseTimeline";
 import TaskList from "@/components/TaskList";

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { api, Project, Phase, DashboardStats } from "@/lib/api";
 import PhaseTimeline from "@/components/PhaseTimeline";
 import VendorWidget from "@/components/VendorWidget";

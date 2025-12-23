@@ -360,6 +360,8 @@ export default function TaskList({
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set());
+  // Track local commentCount overrides (for immediate UI updates before server refresh)
+  const [commentCountOverrides, setCommentCountOverrides] = useState<Record<string, number>>({});
   const [newCommentContent, setNewCommentContent] = useState<Record<string, string>>({});
   const [newCommentNotifyOption, setNewCommentNotifyOption] = useState<Record<string, "task_owner" | "task_owner_mentions" | "all_members" | "none">>({});
   const [loading, setLoading] = useState(false);
@@ -504,6 +506,12 @@ export default function TaskList({
     }
   }, [newlyCreatedTaskId, tasks]);
 
+  // Clear commentCount overrides when task IDs change (to avoid stale overrides)
+  // The server-provided commentCount is the source of truth
+  useEffect(() => {
+    setCommentCountOverrides({});
+  }, [tasks.map(t => t.id).join(',')]);
+
   // Initialize form data for all tasks when they change
   useEffect(() => {
     tasks.forEach((task) => {
@@ -531,58 +539,6 @@ export default function TaskList({
     });
   }, [tasks]);
 
-  // Load comment counts for all tasks when tasks change
-  useEffect(() => {
-    const loadAllCommentCounts = async () => {
-      const tasksToLoad = tasks.filter(
-        (task) => task && task.id && !comments[task.id] && !loadingComments.has(task.id)
-      );
-
-      if (tasksToLoad.length === 0) return;
-
-      // Mark tasks as loading to prevent duplicate requests
-      setLoadingComments((prev) => {
-        const newSet = new Set(prev);
-        tasksToLoad.forEach((task) => newSet.add(task.id));
-        return newSet;
-      });
-
-      // Load comments for all tasks in parallel
-      const loadPromises = tasksToLoad.map(async (task) => {
-        try {
-          const taskComments = await api.projects.phases.tasks.comments.list(
-            projectId,
-            phaseId,
-            task.id
-          );
-          return { taskId: task.id, comments: taskComments };
-        } catch (err) {
-          console.error(`Failed to load comments for task ${task.id}:`, err);
-          return { taskId: task.id, comments: [] };
-        }
-      });
-
-      const results = await Promise.all(loadPromises);
-      
-      // Update comments state with all loaded comments
-      setComments((prev) => {
-        const newComments = { ...prev };
-        results.forEach(({ taskId, comments: taskComments }) => {
-          newComments[taskId] = taskComments;
-        });
-        return newComments;
-      });
-
-      // Clear loading state
-      setLoadingComments((prev) => {
-        const newSet = new Set(prev);
-        tasksToLoad.forEach((task) => newSet.delete(task.id));
-        return newSet;
-      });
-    };
-
-    loadAllCommentCounts();
-  }, [tasks, projectId, phaseId]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "";
@@ -1163,6 +1119,14 @@ export default function TaskList({
         ...prev,
         [taskId]: taskComments,
       }));
+      
+      // Sync commentCount override with actual loaded comments count
+      // This handles cases where the server count might differ from what we had
+      setCommentCountOverrides((prev) => ({
+        ...prev,
+        [taskId]: taskComments.length,
+      }));
+      
       // Only mark as viewed if explicitly requested (when user expands comments)
       if (markAsViewed) {
         setLastViewedComments(taskId);
@@ -1224,6 +1188,12 @@ export default function TaskList({
         [taskId]: [...(prev[taskId] || []), newComment],
       }));
       
+      // Update commentCount override for immediate UI update
+      setCommentCountOverrides((prev) => ({
+        ...prev,
+        [taskId]: (prev[taskId] ?? (tasks.find(t => t.id === taskId)?.commentCount ?? 0)) + 1,
+      }));
+      
       // Update last viewed when comment is created (user sees it immediately)
       setLastViewedComments(taskId);
       
@@ -1251,7 +1221,17 @@ export default function TaskList({
   };
 
   const getCommentCount = (taskId: string): number => {
-    return comments[taskId]?.length || 0;
+    // First check if we have loaded comments (most accurate)
+    if (comments[taskId]) {
+      return comments[taskId].length;
+    }
+    // Check for local override (for immediate UI updates)
+    if (commentCountOverrides[taskId] !== undefined) {
+      return commentCountOverrides[taskId];
+    }
+    // Otherwise use commentCount from task data
+    const task = tasks.find(t => t.id === taskId);
+    return task?.commentCount ?? 0;
   };
 
   // Track last viewed comments timestamp per task

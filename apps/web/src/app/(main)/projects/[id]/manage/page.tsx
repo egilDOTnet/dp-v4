@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, User } from "@/lib/api";
 import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button, ContactPersonSelector, ContactPerson, Breadcrumbs } from "@/components/ui";
@@ -791,7 +790,7 @@ export default function ManageProjectPage() {
                         onClick={async () => {
                           const newShape = "rounded-rect";
                           // Use current project values, not state defaults
-                          const currentShape = project?.logoShape || "rounded-rect";
+                          const _currentShape = project?.logoShape || "rounded-rect";
                           const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
                           const currentBorder = project?.logoBorder || "none";
                           const newConfig = { logoShape: newShape, logoPlacement: currentPlacement, logoBorder: currentBorder };
@@ -831,7 +830,7 @@ export default function ManageProjectPage() {
                         onClick={async () => {
                           const newShape = "circle";
                           // Use current project values, not state defaults
-                          const currentShape = project?.logoShape || "rounded-rect";
+                          const _currentShape = project?.logoShape || "rounded-rect";
                           const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
                           const currentBorder = project?.logoBorder || "none";
                           const newConfig = { logoShape: newShape, logoPlacement: currentPlacement, logoBorder: currentBorder };
@@ -881,7 +880,7 @@ export default function ManageProjectPage() {
                         const newPlacement = e.target.value;
                         // Use current project values, not state defaults
                         const currentShape = project?.logoShape || "rounded-rect";
-                        const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
+                        const _currentPlacement = project?.logoPlacement || "overlay-bottom-left";
                         const currentBorder = project?.logoBorder || "none";
                         const newConfig = { logoShape: currentShape, logoPlacement: newPlacement, logoBorder: currentBorder };
                         setLogoConfig(newConfig);
@@ -932,7 +931,7 @@ export default function ManageProjectPage() {
                           // Use current project values, not state defaults
                           const currentShape = project?.logoShape || "rounded-rect";
                           const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
-                          const currentBorder = project?.logoBorder || "none";
+                          const _currentBorder = project?.logoBorder || "none";
                           const newConfig = { logoShape: currentShape, logoPlacement: currentPlacement, logoBorder: newBorder };
                           setLogoConfig(newConfig);
                           setSavingLogoConfig(true);
@@ -968,7 +967,7 @@ export default function ManageProjectPage() {
                           // Use current project values, not state defaults
                           const currentShape = project?.logoShape || "rounded-rect";
                           const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
-                          const currentBorder = project?.logoBorder || "none";
+                          const _currentBorder = project?.logoBorder || "none";
                           const newConfig = { logoShape: currentShape, logoPlacement: currentPlacement, logoBorder: newBorder };
                           setLogoConfig(newConfig);
                           setSavingLogoConfig(true);
@@ -1004,7 +1003,7 @@ export default function ManageProjectPage() {
                           // Use current project values, not state defaults
                           const currentShape = project?.logoShape || "rounded-rect";
                           const currentPlacement = project?.logoPlacement || "overlay-bottom-left";
-                          const currentBorder = project?.logoBorder || "none";
+                          const _currentBorder = project?.logoBorder || "none";
                           const newConfig = { logoShape: currentShape, logoPlacement: currentPlacement, logoBorder: newBorder };
                           setLogoConfig(newConfig);
                           setSavingLogoConfig(true);

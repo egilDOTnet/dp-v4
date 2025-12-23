@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api, Project, RFI } from "@/lib/api";
 import QuestionList from "@/components/QuestionList";
