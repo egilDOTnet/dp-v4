@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import ExcelJS from "exceljs";
 import { db } from "@dp/db";
 import { authenticate, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
@@ -2844,8 +2845,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         const filename = `${projectName}-requirements-${dateStr}.${format}`;
 
         if (format === "xlsx") {
-          // Export to Excel
-          const XLSX = await import("xlsx");
+          // Export to Excel using ExcelJS
+          const workbook = new ExcelJS.Workbook();
+          const worksheet = workbook.addWorksheet("Requirements");
+
           const headers = [
             "Level 1 Number ID",
             "Level 1 Name",
@@ -2859,44 +2862,49 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
             "Requirement Status",
           ];
 
-          const data = rows.map((row) => [
-            row.level1Number,
-            row.level1Name,
-            row.level1Description,
-            row.level2Number,
-            row.level2Name,
-            row.level2Description,
-            row.requirementId,
-            row.requirementDescription,
-            row.requirementType,
-            row.requirementStatus,
-          ]);
+          // Set column widths
+          worksheet.getColumn(1).width = 15; // Level 1 Number ID
+          worksheet.getColumn(2).width = 30; // Level 1 Name
+          worksheet.getColumn(3).width = 40; // Level 1 Description
+          worksheet.getColumn(4).width = 15; // Level 2 Number ID
+          worksheet.getColumn(5).width = 30; // Level 2 Name
+          worksheet.getColumn(6).width = 40; // Level 2 Description
+          worksheet.getColumn(7).width = 15; // Requirement ID
+          worksheet.getColumn(8).width = 50; // Requirement Description
+          worksheet.getColumn(9).width = 20; // Requirement Type
+          worksheet.getColumn(10).width = 20; // Requirement Status
 
-          const wb = XLSX.utils.book_new();
-          const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+          // Add header row
+          const headerRow = worksheet.getRow(1);
+          headers.forEach((header, index) => {
+            const cell = headerRow.getCell(index + 1);
+            cell.value = header;
+            cell.font = { bold: true };
+          });
 
-          ws["!cols"] = [
-            { wch: 15 },
-            { wch: 30 },
-            { wch: 40 },
-            { wch: 15 },
-            { wch: 30 },
-            { wch: 40 },
-            { wch: 15 },
-            { wch: 50 },
-            { wch: 20 },
-            { wch: 20 },
-          ];
-
-          XLSX.utils.book_append_sheet(wb, ws, "Requirements");
+          // Add data rows
+          rows.forEach((row, rowIndex) => {
+            const dataRow = worksheet.getRow(rowIndex + 2);
+            dataRow.getCell(1).value = row.level1Number;
+            dataRow.getCell(2).value = row.level1Name;
+            dataRow.getCell(3).value = row.level1Description;
+            dataRow.getCell(4).value = row.level2Number;
+            dataRow.getCell(5).value = row.level2Name;
+            dataRow.getCell(6).value = row.level2Description;
+            dataRow.getCell(7).value = row.requirementId;
+            dataRow.getCell(8).value = row.requirementDescription;
+            dataRow.getCell(9).value = row.requirementType;
+            dataRow.getCell(10).value = row.requirementStatus;
+          });
 
           // Generate buffer
-          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+          const buffer = await workbook.xlsx.writeBuffer();
+          const excelBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 
           reply
             .type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             .header("Content-Disposition", `attachment; filename="${filename}"`)
-            .send(buffer);
+            .send(excelBuffer);
         } else {
           // Export to CSV
           const headers = [
@@ -3485,7 +3493,7 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         });
 
         // Generate Excel
-        const excelBuffer = generateRequirementsExcel(
+        const excelBuffer = await generateRequirementsExcel(
           { name: project.name },
           requirements as any
         );

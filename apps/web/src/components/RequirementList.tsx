@@ -227,13 +227,30 @@ export default function RequirementList({
   // Handle click outside to exit edit mode
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
+      const target = event.target as HTMLElement;
+      
+      // Check if click is on an editable element (textarea, select, input)
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.tagName === 'INPUT')) {
+        // Check if this editable element belongs to a requirement that's being edited
+        const clickedRequirementId = Object.keys(requirementRefs.current).find((reqId) => {
+          const ref = requirementRefs.current[reqId];
+          return ref && ref.contains(target);
+        });
+        
+        // If clicking on an editable element within an editing requirement, don't exit edit mode
+        if (clickedRequirementId && editingFields[clickedRequirementId]) {
+          return;
+        }
+      }
       
       // Check if click is outside any requirement container
       let clickedInsideRequirement = false;
-      Object.values(requirementRefs.current).forEach((ref) => {
+      let clickedRequirementId: string | undefined;
+      
+      Object.entries(requirementRefs.current).forEach(([reqId, ref]) => {
         if (ref && ref.contains(target)) {
           clickedInsideRequirement = true;
+          clickedRequirementId = reqId;
         }
       });
 
@@ -243,6 +260,11 @@ export default function RequirementList({
         if (newRequirementRef && newRequirementRef.contains(target)) {
           clickedInsideRequirement = true;
         }
+      }
+
+      // If clicking inside a requirement that's being edited, don't exit edit mode
+      if (clickedInsideRequirement && clickedRequirementId && editingFields[clickedRequirementId]) {
+        return;
       }
 
       if (!clickedInsideRequirement) {
@@ -742,6 +764,8 @@ export default function RequirementList({
                             onChange={(e) =>
                               updateFormField(requirement.id, "description", e.target.value)
                             }
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
                             onFocus={() => handleFieldFocus(requirement.id, "description")}
                             onBlur={(e) => handleFieldBlur(requirement.id, "description", e)}
                             onKeyDown={(e) => {
@@ -774,6 +798,8 @@ export default function RequirementList({
                                 updateFormField(requirement.id, "type", newType);
                                 handleFieldSave(requirement.id, "type", newType);
                               }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
                               onFocus={() => handleFieldFocus(requirement.id, "type")}
                               onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
                               className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
@@ -796,6 +822,8 @@ export default function RequirementList({
                                 updateFormField(requirement.id, "status", newStatus);
                                 handleFieldSave(requirement.id, "status", newStatus);
                               }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => e.stopPropagation()}
                               onFocus={() => handleFieldFocus(requirement.id, "status")}
                               onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
                               className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
@@ -1243,6 +1271,8 @@ export default function RequirementList({
                                   onChange={(e) =>
                                     updateFormField(requirement.id, "description", e.target.value)
                                   }
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
                                   onFocus={() => handleFieldFocus(requirement.id, "description")}
                                   onBlur={(e) => handleFieldBlur(requirement.id, "description", e)}
                                   onKeyDown={(e) => {
@@ -1269,6 +1299,8 @@ export default function RequirementList({
                                       updateFormField(requirement.id, "type", newType);
                                       handleFieldSave(requirement.id, "type", newType);
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
                                     onFocus={() => handleFieldFocus(requirement.id, "type")}
                                     onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
                                     className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
@@ -1291,6 +1323,8 @@ export default function RequirementList({
                                       updateFormField(requirement.id, "status", newStatus);
                                       handleFieldSave(requirement.id, "status", newStatus);
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
                                     onFocus={() => handleFieldFocus(requirement.id, "status")}
                                     onBlur={(e) => handleFieldBlur(requirement.id, "status", e)}
                                     className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}

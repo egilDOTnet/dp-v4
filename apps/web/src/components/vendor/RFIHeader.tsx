@@ -42,16 +42,16 @@ export function RFIHeader({
 
       {/* Banner with Logo Overlay */}
       {(bannerData || (logoData && logoPlacement?.startsWith("overlay"))) ? (
-        <div className="mb-8 relative rounded-lg overflow-hidden min-h-[200px]">
+        <div className="mb-8 relative rounded-lg overflow-hidden h-64">
           {bannerData ? (
             <img
               src={`data:${bannerFileType || "image/png"};base64,${bannerData}`}
               alt={`${projectName} banner`}
-              className="w-full h-auto max-h-64 object-contain rounded-lg"
+              className="w-full h-full object-cover rounded-lg"
             />
           ) : (
             /* Transparent placeholder when no banner but overlay logo exists */
-            <div className="w-full min-h-[200px] bg-transparent rounded-lg" />
+            <div className="w-full h-full bg-transparent rounded-lg" />
           )}
           {/* Logo overlay on banner (if placement is "overlay" mode) */}
           {logoData && logoPlacement?.startsWith("overlay") && (

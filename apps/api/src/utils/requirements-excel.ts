@@ -1,15 +1,5 @@
+import ExcelJS from "exceljs";
 import { Requirement, RequirementHierarchy } from "@prisma/client";
-
-// Try to use xlsx-js-style for formatting support, fall back to regular xlsx
-let XLSX: any;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  XLSX = require("xlsx-js-style");
-} catch {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  XLSX = require("xlsx");
-  console.warn("xlsx-js-style not found, using xlsx (formatting will be limited)");
-}
 
 interface RequirementWithHierarchy extends Requirement {
   hierarchy: RequirementHierarchy & {
@@ -22,34 +12,126 @@ interface ProjectInfo {
 }
 
 /**
+ * Convert hex color to ExcelJS ARGB format
+ * @param hex - Hex color string (e.g., "#3D85C6" or "3D85C6")
+ * @returns ARGB string (e.g., "FF3D85C6")
+ */
+function hexToArgb(hex: string): string {
+  // Remove # if present
+  const cleanHex = hex.replace("#", "");
+  // Add alpha channel (FF = fully opaque)
+  return `FF${cleanHex.toUpperCase()}`;
+}
+
+/**
  * Generate an Excel file for requirements following the template format
  * @param projectInfo - Project information
  * @param requirements - Array of approved requirements with hierarchy information
  * @returns Excel file buffer
  */
-export function generateRequirementsExcel(
+export async function generateRequirementsExcel(
   projectInfo: ProjectInfo,
   requirements: RequirementWithHierarchy[]
-): Buffer {
+): Promise<Buffer> {
   // Create a new workbook
-  const workbook = XLSX.utils.book_new();
+  const workbook = new ExcelJS.Workbook();
+  
+  // Clean worksheet name (Excel has restrictions on sheet names)
+  let sheetName = projectInfo.name
+    .replace(/[\\\/\?\*\[\]:]/g, "") // Remove invalid characters
+    .trim();
+  if (sheetName.length > 31) {
+    sheetName = sheetName.substring(0, 31);
+  }
+  if (sheetName.length === 0) {
+    sheetName = "Requirements";
+  }
+  
+  const worksheet = workbook.addWorksheet(sheetName);
 
-  // Create worksheet data array
-  const worksheetData: any[][] = [];
+  // Set column widths
+  worksheet.getColumn(1).width = 12; // Column A: Req. #
+  worksheet.getColumn(2).width = 80; // Column B: Requirement
+  worksheet.getColumn(3).width = 15; // Column C: Priority
+  worksheet.getColumn(4).width = 15; // Column D: Answer
+  worksheet.getColumn(5).width = 80; // Column E: Description
+  worksheet.getColumn(6).width = 20; // Column F: Reference
 
-  // Row 1: Project name in column B
-  worksheetData.push([null, projectInfo.name]);
+  // Row 1: Project name in column B, "Unanswered:" label in column D
+  const row1 = worksheet.getRow(1);
+  row1.getCell(2).value = projectInfo.name;
+  row1.getCell(2).font = { bold: true, size: 24 };
+  row1.getCell(2).alignment = { horizontal: "left", vertical: "top" };
+  
+  // Add "Unanswered:" label in D1
+  row1.getCell(4).value = "Unanswered:";
+  row1.getCell(4).font = { size: 11 };
+  row1.getCell(4).alignment = { horizontal: "center", vertical: "bottom" };
 
-  // Row 2: Empty
-  worksheetData.push([null, null, null, null, null, null]);
+  // Row 2: Empty (skip)
 
-  // Row 3: Section headers (will be merged)
-  // A: "Customer requirements" (will merge A-C), D: "Vendor response" (will merge D-F)
-  worksheetData.push(["Customer requirements", null, null, "Vendor response", null, null]);
+  // Row 3: Section headers (merged cells)
+  const row3 = worksheet.getRow(3);
+  
+  // Merge A-C for "Customer requirements"
+  worksheet.mergeCells(3, 1, 3, 3);
+  const customerReqCell = row3.getCell(1);
+  customerReqCell.value = "Customer requirements";
+  customerReqCell.font = { bold: true, size: 14 };
+  customerReqCell.alignment = { horizontal: "center", vertical: "top" };
+  customerReqCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: hexToArgb("CFE2F3") },
+  };
+  // Apply background to merged cells
+  for (let col = 1; col <= 3; col++) {
+    const cell = row3.getCell(col);
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: hexToArgb("CFE2F3") },
+    };
+    cell.alignment = { horizontal: "center", vertical: "top" };
+  }
+
+  // Merge D-F for "Vendor response"
+  worksheet.mergeCells(3, 4, 3, 6);
+  const vendorRespCell = row3.getCell(4);
+  vendorRespCell.value = "Vendor response";
+  vendorRespCell.font = { bold: true, size: 14 };
+  vendorRespCell.alignment = { horizontal: "center", vertical: "top" };
+  vendorRespCell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: hexToArgb("D9EAD3") },
+  };
+  // Apply background to merged cells
+  for (let col = 4; col <= 6; col++) {
+    const cell = row3.getCell(col);
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: hexToArgb("D9EAD3") },
+    };
+    cell.alignment = { horizontal: "center", vertical: "top" };
+  }
 
   // Row 4: Column headers
-  // A: "Req. #", B: "Requirement", C: "Priority", D: "Answer", E: "Description", F: "Reference"
-  worksheetData.push(["Req. #", "Requirement", "Priority", "Answer", "Description", "Reference"]);
+  const row4 = worksheet.getRow(4);
+  const headerLabels = ["Req. #", "Requirement", "Priority", "Answer", "Description", "Reference"];
+  for (let col = 1; col <= 6; col++) {
+    const headerCell = row4.getCell(col);
+    headerCell.value = headerLabels[col - 1];
+    const bgColor = col <= 3 ? "3D85C6" : "6AA84F"; // A-C: blue, D-F: green
+    headerCell.font = { bold: true, color: { argb: hexToArgb("FFFFFF") } };
+    headerCell.alignment = { horizontal: "left", vertical: "top" };
+    headerCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: hexToArgb(bgColor) },
+    };
+  }
 
   // Organize requirements by hierarchy
   const hierarchyMap = new Map<string, RequirementWithHierarchy[]>();
@@ -85,31 +167,75 @@ export function generateRequirementsExcel(
   // Convert to array and sort by order
   const level1Hierarchies = Array.from(level1HierarchyMap.values()).sort((a, b) => a.order - b.order);
 
-  // Track row types for formatting (using row indices in final worksheet)
+  // Track row types for formatting and data validation
   const rowTypes: Map<number, "hierarchy" | "blank" | "description" | "requirement"> = new Map();
   // Track hierarchy levels (1 or 2) for font sizing
   const hierarchyLevels: Map<number, 1 | 2> = new Map();
+  // Track requirement row numbers for data validation
+  const requirementRowNumbers: number[] = [];
+
+  // Current row index (starting at row 5, which is index 5 in ExcelJS)
+  let currentRow = 5;
 
   // Build worksheet data starting at row 5
   level1Hierarchies.forEach((level1, level1Index) => {
     // Add blank row before new level 1 hierarchy (except first)
     if (level1Index > 0) {
-      worksheetData.push([null, null, null, null, null, null]);
-      rowTypes.set(worksheetData.length - 1, "blank");
+      const blankRow = worksheet.getRow(currentRow);
+      for (let col = 1; col <= 6; col++) {
+        const cell = blankRow.getCell(col);
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: hexToArgb("F5F5F5") },
+        };
+        cell.alignment = { horizontal: "left", vertical: "top" };
+      }
+      rowTypes.set(currentRow, "blank");
+      currentRow++;
     }
 
     // Level 1 hierarchy (column B only)
-    const level1Row: any[] = [null, level1.title, null, null, null, null];
-    worksheetData.push(level1Row);
-    const level1RowIndex = worksheetData.length - 1;
-    rowTypes.set(level1RowIndex, "hierarchy");
-    hierarchyLevels.set(level1RowIndex, 1);
+    const level1Row = worksheet.getRow(currentRow);
+    level1Row.getCell(2).value = level1.title;
+    for (let col = 1; col <= 6; col++) {
+      const cell = level1Row.getCell(col);
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: hexToArgb("F5F5F5") },
+      };
+      cell.alignment = { horizontal: "left", vertical: "top" };
+      if (col === 2) {
+        // Column B: bold and wrap text with appropriate font size
+        cell.font = { bold: true, size: 16 };
+        cell.alignment = { ...cell.alignment, wrapText: true };
+      }
+    }
+    rowTypes.set(currentRow, "hierarchy");
+    hierarchyLevels.set(currentRow, 1);
+    currentRow++;
 
     // Level 1 description (column B only) if exists
     if (level1.description) {
-      const level1DescRow: any[] = [null, level1.description, null, null, null, null];
-      worksheetData.push(level1DescRow);
-      rowTypes.set(worksheetData.length - 1, "description");
+      const level1DescRow = worksheet.getRow(currentRow);
+      level1DescRow.getCell(2).value = level1.description;
+      for (let col = 1; col <= 6; col++) {
+        const cell = level1DescRow.getCell(col);
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: hexToArgb("F5F5F5") },
+        };
+        cell.alignment = { horizontal: "left", vertical: "top" };
+        if (col === 2) {
+          // Column B: italic, wrap text
+          cell.font = { size: 11, italic: true };
+          cell.alignment = { ...cell.alignment, wrapText: true };
+        }
+      }
+      rowTypes.set(currentRow, "description");
+      currentRow++;
     }
 
     // Get level 2 hierarchies for this level 1
@@ -124,22 +250,61 @@ export function generateRequirementsExcel(
     level2Hierarchies.forEach((level2, level2Index) => {
       // Add blank row before new level 2 hierarchy (except first)
       if (level2Index > 0) {
-        worksheetData.push([null, null, null, null, null, null]);
-        rowTypes.set(worksheetData.length - 1, "blank");
+        const blankRow = worksheet.getRow(currentRow);
+        for (let col = 1; col <= 6; col++) {
+          const cell = blankRow.getCell(col);
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: hexToArgb("F5F5F5") },
+          };
+          cell.alignment = { horizontal: "left", vertical: "top" };
+        }
+        rowTypes.set(currentRow, "blank");
+        currentRow++;
       }
 
       // Level 2 hierarchy (column B only)
-      const level2Row: any[] = [null, level2.title, null, null, null, null];
-      worksheetData.push(level2Row);
-      const level2RowIndex = worksheetData.length - 1;
-      rowTypes.set(level2RowIndex, "hierarchy");
-      hierarchyLevels.set(level2RowIndex, 2);
+      const level2Row = worksheet.getRow(currentRow);
+      level2Row.getCell(2).value = level2.title;
+      for (let col = 1; col <= 6; col++) {
+        const cell = level2Row.getCell(col);
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: hexToArgb("F5F5F5") },
+        };
+        cell.alignment = { horizontal: "left", vertical: "top" };
+        if (col === 2) {
+          // Column B: bold and wrap text with appropriate font size
+          cell.font = { bold: true, size: 14 };
+          cell.alignment = { ...cell.alignment, wrapText: true };
+        }
+      }
+      rowTypes.set(currentRow, "hierarchy");
+      hierarchyLevels.set(currentRow, 2);
+      currentRow++;
 
       // Level 2 description (column B only) if exists
       if (level2.description) {
-        const level2DescRow: any[] = [null, level2.description, null, null, null, null];
-        worksheetData.push(level2DescRow);
-        rowTypes.set(worksheetData.length - 1, "description");
+        const level2DescRow = worksheet.getRow(currentRow);
+        level2DescRow.getCell(2).value = level2.description;
+        for (let col = 1; col <= 6; col++) {
+          const cell = level2DescRow.getCell(col);
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: hexToArgb("F5F5F5") },
+          };
+          cell.alignment = { horizontal: "left", vertical: "top" };
+          if (col === 2) {
+            // Column B: italic, wrap text
+            cell.font = { size: 11, italic: true };
+            cell.alignment = { ...cell.alignment, wrapText: true };
+          }
+        }
+        rowTypes.set(currentRow, "description");
+        currentRow++;
       }
 
       // Get requirements for this level 2 hierarchy
@@ -148,16 +313,54 @@ export function generateRequirementsExcel(
 
       // Add requirement rows
       level2Requirements.forEach((req) => {
-        const reqRow: any[] = [
-          req.number, // Column A: Requirement number
-          req.description, // Column B: Requirement description only
-          req.type, // Column C: Priority/Type
-          "", // Column D: Answer
-          "", // Column E: Description
-          "", // Column F: Reference
-        ];
-        worksheetData.push(reqRow);
-        rowTypes.set(worksheetData.length - 1, "requirement");
+        const reqRow = worksheet.getRow(currentRow);
+        reqRow.getCell(1).value = req.number; // Column A: Requirement number
+        reqRow.getCell(2).value = req.description; // Column B: Requirement description
+        reqRow.getCell(3).value = req.type; // Column C: Priority/Type
+        reqRow.getCell(4).value = ""; // Column D: Answer
+        reqRow.getCell(5).value = ""; // Column E: Description
+        reqRow.getCell(6).value = ""; // Column F: Reference
+
+        // Format requirement row
+        // Column A: Requirement number
+        const cellA = reqRow.getCell(1);
+        if (cellA.value !== null && cellA.value !== undefined && cellA.value !== "") {
+          cellA.font = { size: 11 };
+          cellA.alignment = { horizontal: "left", vertical: "top" };
+        }
+
+        // Column B: Requirement description
+        const cellB = reqRow.getCell(2);
+        if (cellB.value !== null && cellB.value !== undefined && cellB.value !== "") {
+          cellB.font = { size: 11 };
+          cellB.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+        }
+
+        // Column C: Priority/Type
+        const cellC = reqRow.getCell(3);
+        if (cellC.value !== null && cellC.value !== undefined && cellC.value !== "") {
+          cellC.font = { size: 11 };
+          cellC.alignment = { horizontal: "left", vertical: "top" };
+        }
+
+        // Column D: Answer (will have data validation)
+        const cellD = reqRow.getCell(4);
+        cellD.font = { size: 11 };
+        cellD.alignment = { horizontal: "center", vertical: "top" };
+
+        // Column E: Description
+        const cellE = reqRow.getCell(5);
+        cellE.font = { size: 11 };
+        cellE.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+
+        // Column F: Reference
+        const cellF = reqRow.getCell(6);
+        cellF.font = { size: 11 };
+        cellF.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+
+        rowTypes.set(currentRow, "requirement");
+        requirementRowNumbers.push(currentRow);
+        currentRow++;
       });
     });
 
@@ -170,226 +373,113 @@ export function generateRequirementsExcel(
     if (level1Requirements.length > 0) {
       // Add blank row if there were level 2 hierarchies
       if (level2Hierarchies.length > 0) {
-        worksheetData.push([null, null, null, null, null, null]);
-        rowTypes.set(worksheetData.length - 1, "blank");
+        const blankRow = worksheet.getRow(currentRow);
+        for (let col = 1; col <= 6; col++) {
+          const cell = blankRow.getCell(col);
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: hexToArgb("F5F5F5") },
+          };
+          cell.alignment = { horizontal: "left", vertical: "top" };
+        }
+        rowTypes.set(currentRow, "blank");
+        currentRow++;
       }
 
       level1Requirements.forEach((req) => {
-        const reqRow: any[] = [
-          req.number, // Column A: Requirement number
-          req.description, // Column B: Requirement description only
-          req.type, // Column C: Priority/Type
-          "", // Column D: Answer
-          "", // Column E: Description
-          "", // Column F: Reference
-        ];
-        worksheetData.push(reqRow);
-        rowTypes.set(worksheetData.length - 1, "requirement");
+        const reqRow = worksheet.getRow(currentRow);
+        reqRow.getCell(1).value = req.number; // Column A: Requirement number
+        reqRow.getCell(2).value = req.description; // Column B: Requirement description
+        reqRow.getCell(3).value = req.type; // Column C: Priority/Type
+        reqRow.getCell(4).value = ""; // Column D: Answer
+        reqRow.getCell(5).value = ""; // Column E: Description
+        reqRow.getCell(6).value = ""; // Column F: Reference
+
+        // Format requirement row (same as above)
+        // Column A: Requirement number
+        const cellA = reqRow.getCell(1);
+        if (cellA.value !== null && cellA.value !== undefined && cellA.value !== "") {
+          cellA.font = { size: 11 };
+          cellA.alignment = { horizontal: "left", vertical: "top" };
+        }
+
+        // Column B: Requirement description
+        const cellB = reqRow.getCell(2);
+        if (cellB.value !== null && cellB.value !== undefined && cellB.value !== "") {
+          cellB.font = { size: 11 };
+          cellB.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+        }
+
+        // Column C: Priority/Type
+        const cellC = reqRow.getCell(3);
+        if (cellC.value !== null && cellC.value !== undefined && cellC.value !== "") {
+          cellC.font = { size: 11 };
+          cellC.alignment = { horizontal: "left", vertical: "top" };
+        }
+
+        // Column D: Answer (will have data validation)
+        const cellD = reqRow.getCell(4);
+        cellD.font = { size: 11 };
+        cellD.alignment = { horizontal: "center", vertical: "top" };
+
+        // Column E: Description
+        const cellE = reqRow.getCell(5);
+        cellE.font = { size: 11 };
+        cellE.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+
+        // Column F: Reference
+        const cellF = reqRow.getCell(6);
+        cellF.font = { size: 11 };
+        cellF.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+
+        rowTypes.set(currentRow, "requirement");
+        requirementRowNumbers.push(currentRow);
+        currentRow++;
       });
     }
   });
 
-  // Create worksheet from data
-  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-
-  // Set column widths
-  worksheet["!cols"] = [
-    { wch: 12 }, // Column A: Req. #
-    { wch: 80 }, // Column B: Requirement
-    { wch: 15 }, // Column C: Priority
-    { wch: 15 }, // Column D: Answer
-    { wch: 80 }, // Column E: Description (same width as column B)
-    { wch: 20 }, // Column F: Reference
-  ];
-
-  // Get the range of the worksheet
-  const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
-
-  // Helper function to ensure cell exists and has style object
-  const ensureCellStyle = (row: number, col: number) => {
-    const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
-    if (!worksheet[cellRef]) {
-      // Only create empty cell if it doesn't exist
-      worksheet[cellRef] = { t: "s", v: "" };
-    }
-    if (!worksheet[cellRef].s) {
-      worksheet[cellRef].s = {};
-    }
-    return worksheet[cellRef];
-  };
-
-  // Format row 1 (project name) - bold, larger font
-  const projectNameCell = ensureCellStyle(0, 1);
-  projectNameCell.v = projectInfo.name;
-  projectNameCell.t = "s";
-  projectNameCell.s = {
-    font: { bold: true, sz: 24 },
-    alignment: { horizontal: "left", vertical: "top" },
-  };
-
-  // Format row 3 (section headers) - merge cells and apply formatting
-  // Merge A-C for "Customer requirements"
-  const customerReqCell = ensureCellStyle(2, 0); // A3 (start of merge)
-  customerReqCell.v = "Customer requirements";
-  customerReqCell.t = "s";
-  customerReqCell.s = {
-    font: { bold: true, sz: 14 },
-    alignment: { horizontal: "center", vertical: "top" },
-    fill: { fgColor: { rgb: "CFE2F3" } },
-  };
-  // Set merge range for A3:C3
-  if (!worksheet["!merges"]) worksheet["!merges"] = [];
-  worksheet["!merges"].push({ s: { r: 2, c: 0 }, e: { r: 2, c: 2 } });
-  // Apply background to all merged cells
-  for (let col = 0; col < 3; col++) {
-    const cell = ensureCellStyle(2, col);
-    cell.s.fill = { fgColor: { rgb: "CFE2F3" } };
-    cell.s.alignment = { horizontal: "center", vertical: "top" };
-  }
-
-  // Merge D-F for "Vendor response"
-  const vendorRespCell = ensureCellStyle(2, 3); // D3 (start of merge)
-  vendorRespCell.v = "Vendor response";
-  vendorRespCell.t = "s";
-  vendorRespCell.s = {
-    font: { bold: true, sz: 14 },
-    alignment: { horizontal: "center", vertical: "top" },
-    fill: { fgColor: { rgb: "D9EAD3" } },
-  };
-  // Set merge range for D3:F3
-  worksheet["!merges"].push({ s: { r: 2, c: 3 }, e: { r: 2, c: 5 } });
-  // Apply background to all merged cells
-  for (let col = 3; col < 6; col++) {
-    const cell = ensureCellStyle(2, col);
-    cell.s.fill = { fgColor: { rgb: "D9EAD3" } };
-    cell.s.alignment = { horizontal: "center", vertical: "top" };
-  }
-
-  // Format row 4 (column headers) - bold for all columns A-F, white text
-  // Columns A-C: Background #3D85C6, Columns D-F: Background #6AA84F
-  const headerLabels = ["Req. #", "Requirement", "Priority", "Answer", "Description", "Reference"];
-  for (let col = 0; col < 6; col++) {
-    const headerCell = ensureCellStyle(3, col);
-    headerCell.v = headerLabels[col];
-    headerCell.t = "s";
-    const bgColor = col < 3 ? "3D85C6" : "6AA84F"; // A-C: blue, D-F: green
-    headerCell.s = {
-      font: { bold: true, color: { rgb: "FFFFFF" } }, // White text
-      alignment: { horizontal: "left", vertical: "top" },
-      fill: { fgColor: { rgb: bgColor } },
-    };
-  }
-
-  // Format all data rows (starting from row 5, index 4)
-  for (let row = 4; row <= range.e.r; row++) {
-    const rowType = rowTypes.get(row);
-    
-    if (rowType === "hierarchy") {
-      // Hierarchy rows: background color in all columns A-F, bold text in column B
-      // Use same background as blank rows (#F5F5F5)
-      const hierarchyLevel = hierarchyLevels.get(row) || 1;
-      const fontSize = hierarchyLevel === 1 ? 16 : 14;
-      for (let col = 0; col < 6; col++) {
-        const cell = ensureCellStyle(row, col);
-        cell.s.fill = { fgColor: { rgb: "F5F5F5" } };
-        cell.s.alignment = { horizontal: "left", vertical: "top" };
-        if (col === 1) {
-          // Column B: bold and wrap text with appropriate font size
-          cell.s.font = { bold: true, sz: fontSize };
-          cell.s.alignment = { ...cell.s.alignment, wrapText: true };
-        }
-      }
-    } else if (rowType === "blank") {
-      // Blank rows: background color in all columns A-F
-      for (let col = 0; col < 6; col++) {
-        const cell = ensureCellStyle(row, col);
-        cell.s.fill = { fgColor: { rgb: "F5F5F5" } };
-        cell.s.alignment = { horizontal: "left", vertical: "top" };
-      }
-    } else if (rowType === "description") {
-      // Description rows: background color in all columns A-F, italic and wrap text in column B
-      for (let col = 0; col < 6; col++) {
-        const cell = ensureCellStyle(row, col);
-        cell.s.fill = { fgColor: { rgb: "F5F5F5" } };
-        cell.s.alignment = { horizontal: "left", vertical: "top" };
-        if (col === 1) {
-          // Column B: italic, wrap text
-          cell.s.alignment = { ...cell.s.alignment, wrapText: true };
-          cell.s.font = { sz: 11, italic: true };
-        }
-      }
-    } else if (rowType === "requirement") {
-      // Requirement rows: format all columns
-      // Column A: Requirement number
-      const cellA = ensureCellStyle(row, 0);
-      if (cellA.v !== null && cellA.v !== undefined && cellA.v !== "") {
-        cellA.s.font = { sz: 11 };
-        cellA.s.alignment = { horizontal: "left", vertical: "top" };
-      }
-
-      // Column B: Requirement description
-      const cellB = ensureCellStyle(row, 1);
-      if (cellB.v !== null && cellB.v !== undefined && cellB.v !== "") {
-        cellB.s.font = { sz: 11 };
-        cellB.s.alignment = { horizontal: "left", vertical: "top", wrapText: true };
-      }
-
-      // Column C: Priority/Type
-      const cellC = ensureCellStyle(row, 2);
-      if (cellC.v !== null && cellC.v !== undefined && cellC.v !== "") {
-        cellC.s.font = { sz: 11 };
-        cellC.s.alignment = { horizontal: "left", vertical: "top" };
-      }
-
-      // Column D: Answer
-      const cellD = ensureCellStyle(row, 3);
-      cellD.s.font = { sz: 11 };
-      cellD.s.alignment = { horizontal: "center", vertical: "top" };
-
-      // Column E: Description
-      const cellE = ensureCellStyle(row, 4);
-      cellE.s.font = { sz: 11 };
-      cellE.s.alignment = { horizontal: "left", vertical: "top", wrapText: true };
-
-      // Column F: Reference
-      const cellF = ensureCellStyle(row, 5);
-      cellF.s.font = { sz: 11 };
-      cellF.s.alignment = { horizontal: "left", vertical: "top", wrapText: true };
-    }
+  // Add formula in D2 to count blank cells in column D (from D5 down) where column A has a requirement number
+  // Formula: COUNTIFS counts rows where A is not empty AND D is empty
+  const lastRow = currentRow - 1; // Last row that was populated
+  if (lastRow >= 5) {
+    const cellD2 = worksheet.getRow(2).getCell(4); // Column D, Row 2
+    cellD2.value = { formula: `COUNTIFS(A5:A${lastRow},"<>",D5:D${lastRow},"")` };
+    cellD2.font = { size: 11 };
+    cellD2.alignment = { horizontal: "center", vertical: "top" };
   }
 
   // Add data validation for column D (Yes/No/Partial) - only for requirement rows
-  const requirementRowIndices = Array.from(rowTypes.entries())
-    .filter(([_, type]) => type === "requirement")
-    .map(([row, _]) => row);
-
-  if (requirementRowIndices.length > 0) {
-    const firstReqRow = Math.min(...requirementRowIndices);
-    const lastReqRow = Math.max(...requirementRowIndices);
-    
-    // Create data validation range (Column D)
-    const dataValidationRange = XLSX.utils.encode_range({
-      s: { r: firstReqRow, c: 3 }, // Column D (0-indexed: 3)
-      e: { r: lastReqRow, c: 3 },
+  if (requirementRowNumbers.length > 0) {
+    // Apply data validation to each requirement row's column D
+    // ExcelJS list validation: formula should be a string with quoted comma-separated values
+    requirementRowNumbers.forEach((rowNum) => {
+      const cell = worksheet.getRow(rowNum).getCell(4); // Column D
+      cell.dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: ['"Yes,No,Partial"'],
+        showInputMessage: true,
+        showErrorMessage: true,
+      };
     });
-
-  // Add data validation to worksheet
-  // For xlsx-js-style, the format should be:
-  worksheet["!dataValidation"] = [{
-    sqref: dataValidationRange,
-    type: "list",
-    formula1: "Yes,No,Partial", // Comma-separated values without extra quotes
-    allowBlank: true,
-    showInputMessage: true,
-    showErrorMessage: true,
-  }];
   }
 
-  // Add worksheet to workbook
-  const sheetName = projectInfo.name.length > 31 ? projectInfo.name.substring(0, 31) : projectInfo.name;
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-
   // Generate buffer
-  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-  return buffer;
+  try {
+    const buffer = await workbook.xlsx.writeBuffer();
+    // writeBuffer returns Buffer in Node.js, but handle both Buffer and ArrayBuffer
+    if (Buffer.isBuffer(buffer)) {
+      return buffer;
+    }
+    // If it's an ArrayBuffer, convert to Buffer
+    if (buffer instanceof ArrayBuffer) {
+      return Buffer.from(buffer);
+    }
+    // Fallback: convert to Buffer
+    return Buffer.from(buffer as any);
+  } catch (error) {
+    throw new Error(`Failed to generate Excel buffer: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
