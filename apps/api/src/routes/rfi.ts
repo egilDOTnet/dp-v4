@@ -617,6 +617,22 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         });
       }
 
+      // Check that at least one vendor is marked to receive RFI
+      const vendorsWithRFIFlag = await db.projectVendor.findMany({
+        where: {
+          projectId,
+          vendor: {
+            shallReceiveRFI: true,
+          },
+        },
+      });
+
+      if (vendorsWithRFIFlag.length === 0) {
+        return reply.status(400).send({
+          error: "At least one vendor must be marked as 'shall receive RFI' before publishing",
+        });
+      }
+
       // Use publishing service to publish RFI
       const { publishRFI } = await import("../services/publishing");
       await publishRFI(rfi.id, projectId, fastify);
@@ -2227,9 +2243,13 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
       const vendorIds = projectVendors.map(pv => pv.vendorId);
 
       // Fetch all vendors with their contact persons in one query
+      // Only include vendors marked as shallReceiveRFI
       // Use select instead of include to ensure proper JSON serialization
       const vendors = await db.vendor.findMany({
-        where: { id: { in: vendorIds } },
+        where: {
+          id: { in: vendorIds },
+          shallReceiveRFI: true,
+        },
         select: {
           id: true,
           name: true,

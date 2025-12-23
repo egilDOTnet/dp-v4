@@ -70,9 +70,14 @@ export async function publishRFI(
     return; // Skip vendor response creation and email sending
   }
 
-  // Get all project vendors with main contacts
+  // Get all project vendors with main contacts that should receive RFI
   const projectVendors = await db.projectVendor.findMany({
-    where: { projectId },
+    where: {
+      projectId,
+      vendor: {
+        shallReceiveRFI: true,
+      },
+    },
     include: {
       vendor: {
         include: {
@@ -245,9 +250,14 @@ export async function publishRFP(
     return; // Skip vendor response creation and email sending
   }
 
-  // Get all project vendors with main contacts
+  // Get all project vendors with main contacts that should receive RFP
   const projectVendors = await db.projectVendor.findMany({
-    where: { projectId },
+    where: {
+      projectId,
+      vendor: {
+        shallReceiveRFP: true,
+      },
+    },
     include: {
       vendor: {
         include: {

@@ -49,7 +49,7 @@ export async function apiRequest<T>(
     });
 
     if (!response.ok) {
-      let errorData: ApiError;
+      let errorData: ApiError & { brregName?: string; [key: string]: any };
       try {
         errorData = await response.json();
       } catch {
@@ -59,7 +59,11 @@ export async function apiRequest<T>(
       const errorMessage = errorData.message 
         ? `${errorData.error || "Request failed"}: ${errorData.message}`
         : (errorData.error || "Request failed");
-      throw new Error(errorMessage);
+      const error = new Error(errorMessage);
+      // Attach the full error data to the error object for access in catch blocks
+      (error as any).response = errorData;
+      (error as any).status = response.status;
+      throw error;
     }
 
     // Handle 204 No Content responses (no body to parse)
@@ -293,6 +297,9 @@ export const api = {
           name: string;
           organizationNumber?: string;
           emailDomain?: string;
+          shallReceiveRFI?: boolean;
+          shallReceiveRFP?: boolean;
+          shallReceiveShortlist?: boolean;
           additionalData?: any;
           status?: VendorStatus;
         }
@@ -319,6 +326,9 @@ export const api = {
           name?: string;
           organizationNumber?: string;
           emailDomain?: string;
+          shallReceiveRFI?: boolean;
+          shallReceiveRFP?: boolean;
+          shallReceiveShortlist?: boolean;
           additionalData?: any;
         }
       ) =>
@@ -1548,6 +1558,9 @@ export interface Vendor {
   name: string;
   organizationNumber: string | null;
   emailDomain: string | null;
+  shallReceiveRFI: boolean;
+  shallReceiveRFP: boolean;
+  shallReceiveShortlist: boolean;
   additionalData: any;
   createdAt: string;
   updatedAt: string;

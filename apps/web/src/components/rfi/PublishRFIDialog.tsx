@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, RFP, RFPScheduleItem, ProjectVendor } from "@/lib/api";
+import { api, RFI, ProjectVendor } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -12,63 +12,50 @@ import {
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/FormField";
 
-interface PublishRFPDialogProps {
+interface PublishRFIDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
-  rfp: RFP;
+  rfi: RFI;
   onConfirm: () => void;
 }
 
-export function PublishRFPDialog({
+export function PublishRFIDialog({
   open,
   onOpenChange,
   projectId,
-  rfp,
+  rfi,
   onConfirm,
-}: PublishRFPDialogProps) {
+}: PublishRFIDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [scheduleItems, setScheduleItems] = useState<RFPScheduleItem[]>([]);
-  const [vendorsWithRFPFlag, setVendorsWithRFPFlag] = useState(0);
+  const [vendorsWithRFIFlag, setVendorsWithRFIFlag] = useState(0);
 
   useEffect(() => {
     if (open && projectId) {
-      loadScheduleItems();
+      loadVendors();
     }
   }, [open, projectId]);
 
-  const loadScheduleItems = async () => {
+  const loadVendors = async () => {
     try {
       setLoading(true);
-      const [items, vendorsData] = await Promise.all([
-        api.rfp.schedule.list(projectId),
-        api.projects.vendors.list(projectId),
-      ]);
-      setScheduleItems(items);
-      // Count vendors marked as shallReceiveRFP
-      const count = vendorsData.filter((pv) => pv.vendor.shallReceiveRFP).length;
-      setVendorsWithRFPFlag(count);
+      const vendorsData = await api.projects.vendors.list(projectId);
+      // Count vendors marked as shallReceiveRFI
+      const count = vendorsData.filter((pv) => pv.vendor.shallReceiveRFI).length;
+      setVendorsWithRFIFlag(count);
     } catch (err: any) {
-      console.error("Error loading schedule items:", err);
+      console.error("Error loading vendors:", err);
     } finally {
       setLoading(false);
     }
   };
 
   // Validate requirements
-  const hasContactPerson = rfp.contactPersonId !== null;
-  
-  // Check required schedule dates (skip StartDate as it will be set automatically)
-  const requiredItems = scheduleItems.filter(
-    (item) => item.isRequired && item.type !== "StartDate"
-  );
-  const missingDates = requiredItems.filter((item) => !item.date);
-  const allDatesSet = missingDates.length === 0;
+  const hasDeadline = rfi.deadline !== null;
+  const hasQuestions = rfi.questions && rfi.questions.length > 0;
+  const hasVendorsWithRFIFlag = vendorsWithRFIFlag > 0;
 
-  // Check that at least one vendor is marked to receive RFP
-  const hasVendorsWithRFPFlag = vendorsWithRFPFlag > 0;
-
-  const canPublish = hasContactPerson && allDatesSet && hasVendorsWithRFPFlag;
+  const canPublish = hasDeadline && hasQuestions && hasVendorsWithRFIFlag;
 
   const handleConfirm = () => {
     onConfirm();
@@ -79,9 +66,9 @@ export function PublishRFPDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Publish RFP</DialogTitle>
+          <DialogTitle>Publish RFI</DialogTitle>
           <DialogDescription>
-            Publishing the RFP will set the start date to the current time. Make sure all requirements are met before publishing.
+            Publishing the RFI will send it to all vendors marked as 'shall receive RFI'. Make sure all requirements are met before publishing.
           </DialogDescription>
         </DialogHeader>
 
@@ -92,87 +79,68 @@ export function PublishRFPDialog({
           </div>
         ) : (
           <div className="space-y-4 py-4">
-            {/* Contact Person Status */}
-            {hasContactPerson ? (
+            {/* Deadline Status */}
+            {hasDeadline ? (
               <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
                 <p className="text-sm text-green-800 dark:text-green-200 font-medium mb-1">
-                  ✓ Main contact person assigned
-                </p>
-                {rfp.contactPerson && (
-                  <p className="text-xs text-green-700 dark:text-green-300">
-                    {rfp.contactPerson.name || 
-                     `${rfp.contactPerson.firstName || ""} ${rfp.contactPerson.lastName || ""}`.trim() || 
-                     rfp.contactPerson.email}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-1">
-                  Main contact person not assigned
-                </p>
-                <p className="text-xs text-red-700 dark:text-red-300">
-                  A main contact person must be assigned before publishing the RFP.
-                </p>
-              </div>
-            )}
-
-            {/* Required Dates Status */}
-            {allDatesSet ? (
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                <p className="text-sm text-green-800 dark:text-green-200 font-medium mb-1">
-                  ✓ All required dates are set
+                  ✓ Deadline is set
                 </p>
                 <p className="text-xs text-green-700 dark:text-green-300">
-                  {requiredItems.length} required date{requiredItems.length !== 1 ? "s" : ""} configured.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-2">
-                  Missing required dates
-                </p>
-                <p className="text-xs text-red-700 dark:text-red-300 mb-2">
-                  The following required dates must be set before publishing:
-                </p>
-                <ul className="text-xs text-red-700 dark:text-red-300 list-disc list-inside space-y-1">
-                  {missingDates.map((item) => (
-                    <li key={item.id}>{item.description}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Vendors with RFP Flag Status */}
-            {hasVendorsWithRFPFlag ? (
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                <p className="text-sm text-green-800 dark:text-green-200 font-medium mb-1">
-                  ✓ At least one vendor marked as 'shall receive RFP'
-                </p>
-                <p className="text-xs text-green-700 dark:text-green-300">
-                  {vendorsWithRFPFlag} vendor{vendorsWithRFPFlag !== 1 ? "s" : ""} {vendorsWithRFPFlag === 1 ? "is" : "are"} marked to receive the RFP.
+                  Deadline: {new Date(rfi.deadline!).toLocaleDateString()}
                 </p>
               </div>
             ) : (
               <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
                 <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-1">
-                  No vendors marked as 'shall receive RFP'
+                  Deadline not set
                 </p>
                 <p className="text-xs text-red-700 dark:text-red-300">
-                  At least one vendor must be marked as 'shall receive RFP' before publishing the RFP.
+                  A deadline must be set before publishing the RFI.
                 </p>
               </div>
             )}
 
-            {/* Info Box */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-1">
-                Important Note
-              </p>
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                Publishing the RFP this way instead of letting it auto-publish at the given start date, will set the start date to the current time.
-              </p>
-            </div>
+            {/* Questions Status */}
+            {hasQuestions ? (
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-800 dark:text-green-200 font-medium mb-1">
+                  ✓ At least one question exists
+                </p>
+                <p className="text-xs text-green-700 dark:text-green-300">
+                  {rfi.questions?.length || 0} question{(rfi.questions?.length || 0) !== 1 ? "s" : ""} configured.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-1">
+                  No questions added
+                </p>
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  At least one question must be added before publishing the RFI.
+                </p>
+              </div>
+            )}
+
+            {/* Vendors with RFI Flag Status */}
+            {hasVendorsWithRFIFlag ? (
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-800 dark:text-green-200 font-medium mb-1">
+                  ✓ At least one vendor marked as 'shall receive RFI'
+                </p>
+                <p className="text-xs text-green-700 dark:text-green-300">
+                  {vendorsWithRFIFlag} vendor{vendorsWithRFIFlag !== 1 ? "s" : ""} {vendorsWithRFIFlag === 1 ? "is" : "are"} marked to receive the RFI.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-1">
+                  No vendors marked as 'shall receive RFI'
+                </p>
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  At least one vendor must be marked as 'shall receive RFI' before publishing the RFI.
+                </p>
+              </div>
+            )}
 
             {/* Success Message */}
             {canPublish && (
@@ -181,7 +149,7 @@ export function PublishRFPDialog({
                   Ready to publish
                 </p>
                 <p className="text-xs text-text-secondary">
-                  All requirements are met. You can proceed with publishing the RFP.
+                  All requirements are met. You can proceed with publishing the RFI.
                 </p>
               </div>
             )}
@@ -201,7 +169,7 @@ export function PublishRFPDialog({
             onClick={handleConfirm}
             disabled={loading || !canPublish}
           >
-            Publish RFP
+            Publish RFI
           </Button>
         </DialogFooter>
       </DialogContent>

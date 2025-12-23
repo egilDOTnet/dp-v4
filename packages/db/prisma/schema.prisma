@@ -249,6 +249,9 @@ model Vendor {
   name               String
   organizationNumber String?
   emailDomain        String?
+  shallReceiveRFI    Boolean  @default(false)
+  shallReceiveRFP    Boolean  @default(false)
+  shallReceiveShortlist Boolean @default(false)
   additionalData     Json?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

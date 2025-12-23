@@ -84,7 +84,9 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
         api.rfp.questions.list(projectId, "unanswered"),
         api.rfp.schedule.list(projectId),
       ]);
-      setVendors(vendorsData);
+      // Filter vendors to only show those marked as shallReceiveRFP
+      const filteredVendors = vendorsData.filter((pv) => pv.vendor.shallReceiveRFP);
+      setVendors(filteredVendors);
       setUnansweredCount(questionsData.length);
       setScheduleItems(scheduleData);
     } catch (err: any) {
@@ -304,7 +306,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
         <CardBody>
           <h2 className="text-xl font-semibold mb-4">Vendors</h2>
           {vendors.length === 0 ? (
-            <p className="text-text-secondary">No vendors added to this project yet.</p>
+            <p className="text-text-secondary">Only vendors marked as 'shall receive RFP' will appear here.</p>
           ) : (
             <Table>
               <TableHeader>

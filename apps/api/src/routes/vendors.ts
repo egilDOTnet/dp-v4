@@ -28,7 +28,7 @@ interface BrregSearchResponse {
   _embedded?: {
     enheter: BrregEntity[];
   };
-  page: {
+  page?: {
     size: number;
     totalElements: number;
     totalPages: number;
@@ -139,14 +139,53 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
         const response = await fetch(searchUrl);
 
         if (!response.ok) {
-          request.log.error(`Brreg API error: ${response.status} ${response.statusText}`);
+          let errorBody: string | undefined;
+          try {
+            errorBody = await response.text();
+          } catch {
+            // Ignore if we can't read the body
+          }
+          request.log.error(
+            {
+              status: response.status,
+              statusText: response.statusText,
+              url: searchUrl,
+              errorBody,
+            },
+            "Brreg API error"
+          );
           return reply.status(502).send({ error: "Failed to search company registry" });
         }
 
-        const data = await response.json() as BrregSearchResponse;
-        
+        let data: BrregSearchResponse;
+        try {
+          data = await response.json() as BrregSearchResponse;
+        } catch (jsonError: unknown) {
+          const responseText = await response.text().catch(() => "Unable to read response");
+          request.log.error(
+            {
+              err: jsonError,
+              responseText: responseText.substring(0, 500), // Limit log size
+              url: searchUrl,
+            },
+            "Failed to parse brreg.no API response as JSON"
+          );
+          return reply.status(502).send({ error: "Invalid response from company registry" });
+        }
+
+        // Validate response structure
+        if (!data || typeof data !== "object") {
+          request.log.error(
+            { data, url: searchUrl },
+            "Invalid response structure from brreg.no API"
+          );
+          return reply.status(502).send({ error: "Invalid response from company registry" });
+        }
+
         // Transform the response to a simpler format
-        const results = data._embedded?.enheter.map((entity) => ({
+        // Handle cases where _embedded might be missing
+        const entities = data._embedded?.enheter || [];
+        const results = entities.map((entity) => ({
           organizationNumber: entity.organisasjonsnummer,
           name: entity.navn,
           organizationForm: entity.organisasjonsform?.beskrivelse || null,
@@ -160,14 +199,27 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
             : null,
           website: entity.hjemmeside || null,
           industry: entity.naeringskode1?.beskrivelse || null,
-        })) || [];
+        }));
+
+        // Safely access page.totalElements with fallback
+        const total = data.page?.totalElements ?? results.length;
 
         return reply.send({
           results,
-          total: data.page.totalElements,
+          total,
         });
       } catch (error: unknown) {
-        request.log.error({ err: error }, "Error searching brreg.no");
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        request.log.error(
+          {
+            err: error,
+            errorMessage,
+            errorStack,
+            query,
+          },
+          "Error searching brreg.no"
+        );
         return reply.status(500).send({ error: "Internal server error" });
       }
     }

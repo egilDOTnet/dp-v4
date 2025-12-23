@@ -10,11 +10,18 @@ interface VendorFormProps {
     name: string;
     organizationNumber: string | null;
     emailDomain: string | null;
+    shallReceiveRFI?: boolean;
+    shallReceiveRFP?: boolean;
+    shallReceiveShortlist?: boolean;
+    status?: VendorStatus;
   };
   onSubmit: (data: {
     name: string;
     organizationNumber?: string;
     emailDomain?: string;
+    shallReceiveRFI?: boolean;
+    shallReceiveRFP?: boolean;
+    shallReceiveShortlist?: boolean;
     additionalData?: any;
     status?: VendorStatus;
   }) => Promise<void>;
@@ -36,6 +43,10 @@ export default function VendorForm({
   const [formData, setFormData] = useState({
     organizationNumber: existingVendor?.organizationNumber || "",
     emailDomain: existingVendor?.emailDomain || "",
+    shallReceiveRFI: existingVendor?.shallReceiveRFI ?? false,
+    shallReceiveRFP: existingVendor?.shallReceiveRFP ?? false,
+    shallReceiveShortlist: existingVendor?.shallReceiveShortlist ?? false,
+    status: existingVendor?.status || "Pending",
   });
   const [additionalData, setAdditionalData] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -235,8 +246,14 @@ export default function VendorForm({
         organizationNumber:
           cleanOrgNumber.length === 9 ? cleanOrgNumber : undefined,
         emailDomain: formData.emailDomain || undefined,
+        // Only include checkboxes and status when adding (not editing)
+        ...(existingVendor ? {} : {
+          shallReceiveRFI: formData.shallReceiveRFI,
+          shallReceiveRFP: formData.shallReceiveRFP,
+          shallReceiveShortlist: formData.shallReceiveShortlist,
+          status: formData.status,
+        }),
         additionalData: additionalData || undefined,
-        status: "Pending",
       });
     } catch (err: any) {
       setError(err.message || "Failed to save vendor");
@@ -412,6 +429,84 @@ export default function VendorForm({
           Optional - The email domain for this company
         </p>
       </div>
+
+      {/* Checkboxes and Status - only show when adding (not editing) */}
+      {!existingVendor && (
+        <>
+          <div className="flex gap-6">
+            <div className="flex items-center">
+              <input
+                id="shallReceiveRFI"
+                type="checkbox"
+                checked={formData.shallReceiveRFI}
+                onChange={(e) =>
+                  setFormData({ ...formData, shallReceiveRFI: e.target.checked })
+                }
+                className="w-4 h-4 accent-primary-600 cursor-pointer"
+              />
+              <label htmlFor="shallReceiveRFI" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                RFI?
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="shallReceiveRFP"
+                type="checkbox"
+                checked={formData.shallReceiveRFP}
+                onChange={(e) =>
+                  setFormData({ ...formData, shallReceiveRFP: e.target.checked })
+                }
+                className="w-4 h-4 accent-primary-600 cursor-pointer"
+              />
+              <label htmlFor="shallReceiveRFP" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                RFP?
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                id="shallReceiveShortlist"
+                type="checkbox"
+                checked={formData.shallReceiveShortlist}
+                onChange={(e) =>
+                  setFormData({ ...formData, shallReceiveShortlist: e.target.checked })
+                }
+                className="w-4 h-4 accent-primary-600 cursor-pointer"
+              />
+              <label htmlFor="shallReceiveShortlist" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                Short?
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="status"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              Status
+            </label>
+            <select
+              id="status"
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({ ...formData, status: e.target.value as VendorStatus })
+              }
+              className="w-full px-3 py-2 border border-border-primary bg-background-tertiary text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="Pending">Pending</option>
+              <option value="RFI_Received">RFI Received</option>
+              <option value="RFI_Started">RFI Started</option>
+              <option value="RFI_Answered">RFI Answered</option>
+              <option value="RFP_Received">RFP Received</option>
+              <option value="RFP_Answered">RFP Answered</option>
+              <option value="RFP_Rejected">RFP Rejected</option>
+              <option value="Shortlisted">Shortlisted</option>
+              <option value="Lost">Lost</option>
+              <option value="Won">Won</option>
+            </select>
+          </div>
+        </>
+      )}
 
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">

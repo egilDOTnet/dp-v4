@@ -418,6 +418,22 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           });
         }
 
+        // Check that at least one vendor is marked to receive RFP
+        const vendorsWithRFPFlag = await db.projectVendor.findMany({
+          where: {
+            projectId,
+            vendor: {
+              shallReceiveRFP: true,
+            },
+          },
+        });
+
+        if (vendorsWithRFPFlag.length === 0) {
+          return reply.status(400).send({
+            error: "At least one vendor must be marked as 'shall receive RFP' before publishing",
+          });
+        }
+
         // Verify user permissions: must be company admin, main contact, or alternative contact
         const isCompanyAdmin = user.role === "CompanyAdministrator" || user.role === "GlobalAdministrator";
         const isMainContact = rfp.contactPersonId === user.userId;

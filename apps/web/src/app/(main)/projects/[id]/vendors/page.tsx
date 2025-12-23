@@ -51,17 +51,17 @@ export default function VendorsPage() {
     }
   };
 
-  const loadVendors = async () => {
+  const loadVendors = async (forceUpdate = false) => {
     try {
       const vendorsData = await api.projects.vendors.list(projectId);
-      // Only update state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Update state if we're still loading the same projectId, or if forceUpdate is true
+      if (forceUpdate || loadingProjectIdRef.current === projectId) {
         setVendors(vendorsData);
         setError("");
       }
     } catch (err: any) {
-      // Only set error if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Only set error if we're still loading the same projectId, or if forceUpdate is true
+      if (forceUpdate || loadingProjectIdRef.current === projectId) {
         setError(err.message || "Failed to load vendors");
       }
     } finally {
@@ -100,19 +100,26 @@ export default function VendorsPage() {
     name: string;
     organizationNumber?: string;
     emailDomain?: string;
+    shallReceiveRFI?: boolean;
+    shallReceiveRFP?: boolean;
+    shallReceiveShortlist?: boolean;
     additionalData?: any;
     status?: VendorStatus;
   }) => {
     await api.projects.vendors.create(projectId, data);
-    await loadVendors();
+    // Force update to refresh the list immediately
+    await loadVendors(true);
   };
 
   const handleUpdateVendor = async (
     vendorId: string,
     data: {
-      name: string;
+      name?: string;
       organizationNumber?: string;
       emailDomain?: string;
+      shallReceiveRFI?: boolean;
+      shallReceiveRFP?: boolean;
+      shallReceiveShortlist?: boolean;
       additionalData?: any;
       status?: VendorStatus;
     }
@@ -120,16 +127,26 @@ export default function VendorsPage() {
     const vendor = vendors.find((pv) => pv.vendor.id === vendorId);
     if (vendor) {
       const hasDetailsChanged =
-        data.name !== vendor.vendor.name ||
-        data.organizationNumber !==
-          (vendor.vendor.organizationNumber || undefined) ||
-        data.emailDomain !== (vendor.vendor.emailDomain || undefined);
+        (data.name !== undefined && data.name !== vendor.vendor.name) ||
+        (data.organizationNumber !== undefined &&
+          data.organizationNumber !== (vendor.vendor.organizationNumber || undefined)) ||
+        (data.emailDomain !== undefined &&
+          data.emailDomain !== (vendor.vendor.emailDomain || undefined)) ||
+        (data.shallReceiveRFI !== undefined &&
+          data.shallReceiveRFI !== vendor.vendor.shallReceiveRFI) ||
+        (data.shallReceiveRFP !== undefined &&
+          data.shallReceiveRFP !== vendor.vendor.shallReceiveRFP) ||
+        (data.shallReceiveShortlist !== undefined &&
+          data.shallReceiveShortlist !== vendor.vendor.shallReceiveShortlist);
 
       if (hasDetailsChanged) {
         await api.projects.vendors.updateDetails(projectId, vendorId, {
           name: data.name,
           organizationNumber: data.organizationNumber,
           emailDomain: data.emailDomain,
+          shallReceiveRFI: data.shallReceiveRFI,
+          shallReceiveRFP: data.shallReceiveRFP,
+          shallReceiveShortlist: data.shallReceiveShortlist,
           additionalData: data.additionalData,
         });
       }
@@ -141,12 +158,14 @@ export default function VendorsPage() {
       }
     }
 
-    await loadVendors();
+    // Force update to refresh the list immediately
+    await loadVendors(true);
   };
 
   const handleStatusChange = async (vendorId: string, status: VendorStatus) => {
     await api.projects.vendors.update(projectId, vendorId, { status });
-    await loadVendors();
+    // Force update to refresh the list immediately
+    await loadVendors(true);
   };
 
   const handleDeleteVendor = async (vendorId: string) => {
@@ -156,7 +175,8 @@ export default function VendorsPage() {
       return;
     }
     await api.projects.vendors.delete(projectId, vendorId);
-    await loadVendors();
+    // Force update to refresh the list immediately
+    await loadVendors(true);
   };
 
   const handleAddContact = async (
@@ -169,7 +189,8 @@ export default function VendorsPage() {
     }
   ) => {
     await api.projects.vendors.contacts.create(projectId, vendorId, data);
-    await loadVendors();
+    // Force update to refresh the list immediately
+    await loadVendors(true);
   };
 
   const handleEditContact = async (
@@ -188,12 +209,14 @@ export default function VendorsPage() {
       contactId,
       data
     );
-    await loadVendors();
+    // Force update to refresh the list immediately
+    await loadVendors(true);
   };
 
   const handleDeleteContact = async (vendorId: string, contactId: string) => {
     await api.projects.vendors.contacts.delete(projectId, vendorId, contactId);
-    await loadVendors();
+    // Force update to refresh the list immediately
+    await loadVendors(true);
   };
 
   const breadcrumbItems = [

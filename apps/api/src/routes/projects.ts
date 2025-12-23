@@ -3721,6 +3721,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                     name: { type: "string" },
                     organizationNumber: { type: "string", nullable: true },
                     emailDomain: { type: "string", nullable: true },
+                    shallReceiveRFI: { type: "boolean" },
+                    shallReceiveRFP: { type: "boolean" },
+                    shallReceiveShortlist: { type: "boolean" },
                     additionalData: { type: "object", nullable: true },
                     contacts: {
                       type: "array",
@@ -3856,6 +3859,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                 name: pv.vendor.name,
                 organizationNumber: pv.vendor.organizationNumber,
                 emailDomain: pv.vendor.emailDomain,
+                shallReceiveRFI: pv.vendor.shallReceiveRFI,
+                shallReceiveRFP: pv.vendor.shallReceiveRFP,
+                shallReceiveShortlist: pv.vendor.shallReceiveShortlist,
                 additionalData: pv.vendor.additionalData || null,
                 contacts,
               },
@@ -3957,6 +3963,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                   name: { type: "string" },
                   organizationNumber: { type: "string", nullable: true },
                   emailDomain: { type: "string", nullable: true },
+                  shallReceiveRFI: { type: "boolean" },
+                  shallReceiveRFP: { type: "boolean" },
+                  shallReceiveShortlist: { type: "boolean" },
                   additionalData: { type: "object", nullable: true },
                   contacts: {
                     type: "array",
@@ -4016,6 +4025,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           name: string;
           organizationNumber?: string;
           emailDomain?: string;
+          shallReceiveRFI?: boolean;
+          shallReceiveRFP?: boolean;
+          shallReceiveShortlist?: boolean;
           additionalData?: any;
           status?: string;
         };
@@ -4073,7 +4085,13 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               return reply.status(400).send({
                 error: "Organization number not found in brreg.no. Please enter a valid Norwegian organization number or remove it.",
               });
+            } else if (brregValidation.brregName) {
+              // If name doesn't match but we have brregName, automatically use the brreg name
+              // This ensures the vendor name matches the official registry
+              request.body.name = brregValidation.brregName;
+              // Continue with the creation using the correct name from brreg
             } else {
+              // Other validation errors (e.g., network error)
               return reply.status(400).send({
                 error: brregValidation.error || "Invalid organization number",
                 brregName: brregValidation.brregName,
@@ -4103,9 +4121,38 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               name: request.body.name,
               organizationNumber: cleanOrgNumber || null,
               emailDomain: request.body.emailDomain || null,
+              shallReceiveRFI: request.body.shallReceiveRFI ?? false,
+              shallReceiveRFP: request.body.shallReceiveRFP ?? false,
+              shallReceiveShortlist: request.body.shallReceiveShortlist ?? false,
               additionalData: request.body.additionalData || null,
             },
           });
+        } else {
+          // Update existing vendor flags if provided
+          const vendorUpdateData: {
+            shallReceiveRFI?: boolean;
+            shallReceiveRFP?: boolean;
+            shallReceiveShortlist?: boolean;
+          } = {};
+          if (request.body.shallReceiveRFI !== undefined) {
+            vendorUpdateData.shallReceiveRFI = request.body.shallReceiveRFI;
+          }
+          if (request.body.shallReceiveRFP !== undefined) {
+            vendorUpdateData.shallReceiveRFP = request.body.shallReceiveRFP;
+          }
+          if (request.body.shallReceiveShortlist !== undefined) {
+            vendorUpdateData.shallReceiveShortlist = request.body.shallReceiveShortlist;
+          }
+          if (Object.keys(vendorUpdateData).length > 0) {
+            await db.vendor.update({
+              where: { id: vendor.id },
+              data: vendorUpdateData,
+            });
+            // Refresh vendor data
+            vendor = await db.vendor.findUnique({
+              where: { id: vendor.id },
+            })!;
+          }
         }
       }
 
@@ -4222,6 +4269,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           name: projectVendor.vendor.name,
           organizationNumber: projectVendor.vendor.organizationNumber,
           emailDomain: projectVendor.vendor.emailDomain,
+          shallReceiveRFI: projectVendor.vendor.shallReceiveRFI,
+          shallReceiveRFP: projectVendor.vendor.shallReceiveRFP,
+          shallReceiveShortlist: projectVendor.vendor.shallReceiveShortlist,
           additionalData: projectVendor.vendor.additionalData,
           contacts: projectVendor.vendor.VendorContactPerson.map((contact) => ({
             id: contact.id,
@@ -4314,6 +4364,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                   name: { type: "string" },
                   organizationNumber: { type: "string", nullable: true },
                   emailDomain: { type: "string", nullable: true },
+                  shallReceiveRFI: { type: "boolean" },
+                  shallReceiveRFP: { type: "boolean" },
+                  shallReceiveShortlist: { type: "boolean" },
                   additionalData: { type: "object", nullable: true },
                   contacts: {
                     type: "array",
@@ -4374,6 +4427,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           name?: string;
           organizationNumber?: string;
           emailDomain?: string;
+          shallReceiveRFI?: boolean;
+          shallReceiveRFP?: boolean;
+          shallReceiveShortlist?: boolean;
           additionalData?: any;
         };
       }>,
@@ -4420,6 +4476,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         name?: string;
         organizationNumber?: string | null;
         emailDomain?: string | null;
+        shallReceiveRFI?: boolean;
+        shallReceiveRFP?: boolean;
+        shallReceiveShortlist?: boolean;
         additionalData?: any;
       } = {};
 
@@ -4453,13 +4512,19 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               return reply.status(400).send({
                 error: "Organization number not found in brreg.no. Please enter a valid Norwegian organization number or remove it.",
               });
+            } else if (brregValidation.brregName) {
+              // If name doesn't match but we have brregName, automatically update the name
+              updateData.name = brregValidation.brregName;
+              // Continue with the update using the correct name from brreg
             } else {
+              // Other validation errors (e.g., network error)
               return reply.status(400).send({
                 error: brregValidation.error || "Invalid organization number",
                 brregName: brregValidation.brregName,
               });
             }
           }
+          // If valid is true, name already matches, no update needed
         }
 
         updateData.organizationNumber = cleanOrgNumber;
@@ -4467,6 +4532,18 @@ export default async function projectRoutes(fastify: FastifyInstance) {
 
       if (request.body.emailDomain !== undefined) {
         updateData.emailDomain = request.body.emailDomain || null;
+      }
+
+      if (request.body.shallReceiveRFI !== undefined) {
+        updateData.shallReceiveRFI = request.body.shallReceiveRFI;
+      }
+
+      if (request.body.shallReceiveRFP !== undefined) {
+        updateData.shallReceiveRFP = request.body.shallReceiveRFP;
+      }
+
+      if (request.body.shallReceiveShortlist !== undefined) {
+        updateData.shallReceiveShortlist = request.body.shallReceiveShortlist;
       }
 
       if (request.body.additionalData !== undefined) {
@@ -4568,6 +4645,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           name: updatedProjectVendor!.vendor.name,
           organizationNumber: updatedProjectVendor!.vendor.organizationNumber,
           emailDomain: updatedProjectVendor!.vendor.emailDomain,
+          shallReceiveRFI: updatedProjectVendor!.vendor.shallReceiveRFI,
+          shallReceiveRFP: updatedProjectVendor!.vendor.shallReceiveRFP,
+          shallReceiveShortlist: updatedProjectVendor!.vendor.shallReceiveShortlist,
           additionalData: updatedProjectVendor!.vendor.additionalData,
           contacts: updatedProjectVendor!.vendor.VendorContactPerson.map((contact) => ({
             id: contact.id,
@@ -4642,6 +4722,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                   name: { type: "string" },
                   organizationNumber: { type: "string", nullable: true },
                   emailDomain: { type: "string", nullable: true },
+                  shallReceiveRFI: { type: "boolean" },
+                  shallReceiveRFP: { type: "boolean" },
+                  shallReceiveShortlist: { type: "boolean" },
                   additionalData: { type: "object", nullable: true },
                   contacts: {
                     type: "array",
@@ -4750,6 +4833,9 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           name: projectVendor.vendor.name,
           organizationNumber: projectVendor.vendor.organizationNumber,
           emailDomain: projectVendor.vendor.emailDomain,
+          shallReceiveRFI: projectVendor.vendor.shallReceiveRFI,
+          shallReceiveRFP: projectVendor.vendor.shallReceiveRFP,
+          shallReceiveShortlist: projectVendor.vendor.shallReceiveShortlist,
           additionalData: projectVendor.vendor.additionalData,
           contacts: projectVendor.vendor.VendorContactPerson.map((contact) => ({
             id: contact.id,

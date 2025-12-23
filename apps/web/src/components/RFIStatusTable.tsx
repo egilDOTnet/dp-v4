@@ -125,7 +125,7 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
   if (responses.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
-        <p>No vendors have been sent the RFI yet.</p>
+        <p>No vendors marked as 'shall receive RFI' have been sent the RFI yet.</p>
       </div>
     );
   }

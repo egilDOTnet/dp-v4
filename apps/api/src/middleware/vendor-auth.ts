@@ -106,6 +106,13 @@ export async function verifyRFPAccess(
             where: {
               vendorId: vendorContact.vendorId,
             },
+            include: {
+              vendor: {
+                select: {
+                  shallReceiveRFP: true,
+                },
+              },
+            },
           },
         },
       },
@@ -123,6 +130,12 @@ export async function verifyRFPAccess(
   // Check if vendor is linked to project
   if (rfp.project.ProjectVendor.length === 0) {
     return reply.status(403).send({ error: "Vendor does not have access to this RFP" });
+  }
+
+  // Check if vendor is marked to receive RFP
+  const projectVendor = rfp.project.ProjectVendor[0];
+  if (!projectVendor.vendor.shallReceiveRFP) {
+    return reply.status(403).send({ error: "Vendor is not marked to receive RFP" });
   }
 
   // Attach RFP to request for use in route handlers

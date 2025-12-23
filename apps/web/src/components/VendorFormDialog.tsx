@@ -54,6 +54,7 @@ export function VendorFormDialog({
   const [deleting, setDeleting] = useState(false);
   const [lookingUpOrgNumber, setLookingUpOrgNumber] = useState(false);
   const [brregName, setBrregName] = useState<string | null>(null);
+  const [originalCompanyName, setOriginalCompanyName] = useState<string>("");
   
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const orgNumberLookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,11 +68,13 @@ export function VendorFormDialog({
     if (open) {
       if (existingVendor) {
         setCompanyName(existingVendor.name);
+        setOriginalCompanyName(existingVendor.name);
         setOrganizationNumber(existingVendor.organizationNumber || "");
         setEmailDomain(existingVendor.emailDomain || "");
         setCompanySelected(true);
       } else {
         setCompanyName("");
+        setOriginalCompanyName("");
         setOrganizationNumber("");
         setEmailDomain("");
         setCompanySelected(false);
@@ -92,7 +95,24 @@ export function VendorFormDialog({
   // Search brreg.no when user types
   useEffect(() => {
     if (!open) return;
-    if (companySelected || companyName.length < 2) {
+    
+    // Don't search if name is too short
+    if (companyName.length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    // Check if name has changed from original (when editing)
+    const nameChanged = originalCompanyName && companyName !== originalCompanyName;
+    
+    // Search should trigger if:
+    // 1. Company is not selected (new vendor or user cleared selection), OR
+    // 2. Name has changed from original (when editing - allows search even if companySelected is still true)
+    // This ensures search works in edit mode when user changes the name
+    const shouldSearch = !companySelected || nameChanged;
+    
+    if (!shouldSearch) {
       setSearchResults([]);
       setShowResults(false);
       return;
@@ -107,9 +127,13 @@ export function VendorFormDialog({
       try {
         const response = await api.vendors.search(companyName);
         setSearchResults(response.results);
+        // Show results if we should be searching
+        // (company not selected OR name changed from original)
         setShowResults(true);
       } catch (err: any) {
         console.error("Search error:", err);
+        setSearchResults([]);
+        setShowResults(false);
       } finally {
         setSearching(false);
       }
@@ -120,7 +144,7 @@ export function VendorFormDialog({
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [companyName, companySelected, open]);
+  }, [companyName, companySelected, open, originalCompanyName]);
 
   // Lookup organization number in brreg
   useEffect(() => {
@@ -142,7 +166,8 @@ export function VendorFormDialog({
         const details = await api.vendors.getBrregData(cleanOrgNumber);
         setBrregName(details.name);
         
-        if (existingVendor && companyName !== details.name) {
+        // Always update company name to match brreg when org number is found
+        if (companyName !== details.name) {
           setCompanyName(details.name);
           setCompanySelected(true);
         }
@@ -215,9 +240,36 @@ export function VendorFormDialog({
     if (error) setError("");
     if (companySelected) {
       setCompanySelected(false);
-      setOrganizationNumber("");
-      setAdditionalData(null);
+      // Only clear org number if we're not editing (new vendor)
+      // When editing, keep the org number so we can validate against it
+      if (!existingVendor) {
+        setOrganizationNumber("");
+        setAdditionalData(null);
+      }
     }
+  };
+
+  const handleCompanyNameBlur = async () => {
+    // When blurring, if there's an org number, validate the name against it
+    const cleanOrgNumber = organizationNumber.replace(/\D/g, "");
+    if (cleanOrgNumber.length === 9 && companyName.trim()) {
+      try {
+        const details = await api.vendors.getBrregData(cleanOrgNumber);
+        // If the name doesn't match brreg, update it
+        if (companyName.trim() !== details.name) {
+          setCompanyName(details.name);
+          setBrregName(details.name);
+          setCompanySelected(true);
+        }
+      } catch (err: any) {
+        // Org number not found or other error - that's okay, user can continue
+        console.error("Error validating name against org number:", err);
+      }
+    }
+    // Hide search results when blurring (unless clicking on a result)
+    setTimeout(() => {
+      setShowResults(false);
+    }, 200);
   };
 
   const handleSubmit = useCallback(async () => {
@@ -250,7 +302,18 @@ export function VendorFormDialog({
       });
       onClose();
     } catch (err: any) {
-      setError(err.message || "Failed to save vendor");
+      // Handle brreg validation errors - if backend returns brregName, update the name automatically
+      const brregName = err.response?.brregName;
+      if (brregName) {
+        setCompanyName(brregName);
+        setBrregName(brregName);
+        setCompanySelected(true);
+        setError(
+          `Company name automatically updated to match brreg.no: "${brregName}". Please review and save again.`
+        );
+      } else {
+        setError(err.message || "Failed to save vendor");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -326,6 +389,7 @@ export function VendorFormDialog({
                       setShowResults(true);
                     }
                   }}
+                  onBlur={handleCompanyNameBlur}
                   placeholder="Type company name (searches Norwegian companies)"
                   hasError={!companyName.trim() && !!error}
                 />

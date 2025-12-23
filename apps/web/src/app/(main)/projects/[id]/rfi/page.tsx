@@ -8,6 +8,7 @@ import RFIStatusTable from "@/components/RFIStatusTable";
 import QuestionResponseSummary from "@/components/QuestionResponseSummary";
 import WysiwygEditor from "@/components/WysiwygEditor";
 import { HeroBanner, Breadcrumbs } from "@/components/ui";
+import { PublishRFIDialog } from "@/components/rfi/PublishRFIDialog";
 
 type TabType = "email" | "rfi-info" | "questionnaire" | "status";
 
@@ -26,6 +27,7 @@ export default function RFIPage() {
   const [emailText, setEmailText] = useState("");
   const [rfiInformation, setRfiInformation] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const loadingProjectIdRef = useRef<string | null>(null);
 
   const loadProject = async () => {
@@ -202,10 +204,6 @@ export default function RFIPage() {
   };
 
   const handlePublish = async () => {
-    if (!deadline) {
-      setError("Deadline is required before publishing");
-      return;
-    }
     setIsPublishing(true);
     try {
       await api.rfi.publish(projectId);
@@ -414,11 +412,10 @@ export default function RFIPage() {
               </button>
             ) : (
               <button
-                onClick={handlePublish}
-                disabled={isPublishing || !deadline || !rfi?.questions || rfi.questions.length === 0}
-                className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                onClick={() => setIsPublishDialogOpen(true)}
+                className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
               >
-                {isPublishing ? "Publishing..." : "Publish"}
+                Publish
               </button>
             )}
           </div>
@@ -536,6 +533,17 @@ export default function RFIPage() {
           </div>
         )}
       </div>
+
+      {/* Publish Dialog */}
+      {rfi && (
+        <PublishRFIDialog
+          open={isPublishDialogOpen}
+          onOpenChange={setIsPublishDialogOpen}
+          projectId={projectId}
+          rfi={rfi}
+          onConfirm={handlePublish}
+        />
+      )}
     </div>
   );
 }
