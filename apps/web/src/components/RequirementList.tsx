@@ -224,50 +224,94 @@ export default function RequirementList({
     };
   }, []);
 
+  // Add native event listeners to editable elements to stop propagation
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      e.stopPropagation();
+    };
+
+    // Find all editable elements within requirement containers that are being edited
+    Object.entries(requirementRefs.current).forEach(([reqId, ref]) => {
+      if (ref && editingFields[reqId]) {
+        const textareas = ref.querySelectorAll('textarea');
+        const selects = ref.querySelectorAll('select');
+        const inputs = ref.querySelectorAll('input');
+        
+        textareas.forEach((el) => {
+          el.addEventListener('mousedown', handleMouseDown, true);
+        });
+        selects.forEach((el) => {
+          el.addEventListener('mousedown', handleMouseDown, true);
+        });
+        inputs.forEach((el) => {
+          el.addEventListener('mousedown', handleMouseDown, true);
+        });
+      }
+    });
+
+    // Cleanup
+    return () => {
+      Object.entries(requirementRefs.current).forEach(([reqId, ref]) => {
+        if (ref && editingFields[reqId]) {
+          const textareas = ref.querySelectorAll('textarea');
+          const selects = ref.querySelectorAll('select');
+          const inputs = ref.querySelectorAll('input');
+          
+          textareas.forEach((el) => {
+            el.removeEventListener('mousedown', handleMouseDown, true);
+          });
+          selects.forEach((el) => {
+            el.removeEventListener('mousedown', handleMouseDown, true);
+          });
+          inputs.forEach((el) => {
+            el.removeEventListener('mousedown', handleMouseDown, true);
+          });
+        }
+      });
+    };
+  }, [editingFields]);
+
   // Handle click outside to exit edit mode
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
+      if (!target) return;
       
-      // Check if click is on an editable element (textarea, select, input)
-      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.tagName === 'INPUT')) {
-        // Check if this editable element belongs to a requirement that's being edited
-        const clickedRequirementId = Object.keys(requirementRefs.current).find((reqId) => {
-          const ref = requirementRefs.current[reqId];
-          return ref && ref.contains(target);
-        });
+      // Check if click is inside any requirement container that's being edited
+      let clickedInsideEditingRequirement = false;
+      
+      // Check all requirement refs
+      for (const [reqId, ref] of Object.entries(requirementRefs.current)) {
+        if (!ref) continue;
         
-        // If clicking on an editable element within an editing requirement, don't exit edit mode
-        if (clickedRequirementId && editingFields[clickedRequirementId]) {
-          return;
+        // Check if target is inside this requirement container
+        // Use both contains and checking if target is the ref itself
+        const isInside = ref === target || ref.contains(target);
+        
+        if (isInside) {
+          // If this requirement is being edited, don't exit edit mode
+          if (editingFields[reqId]) {
+            clickedInsideEditingRequirement = true;
+            break;
+          }
         }
       }
-      
-      // Check if click is outside any requirement container
-      let clickedInsideRequirement = false;
-      let clickedRequirementId: string | undefined;
-      
-      Object.entries(requirementRefs.current).forEach(([reqId, ref]) => {
-        if (ref && ref.contains(target)) {
-          clickedInsideRequirement = true;
-          clickedRequirementId = reqId;
-        }
-      });
 
       // Also check if clicking on the create form
       if (isCreatingNew) {
         const newRequirementRef = requirementRefs.current["__new__"];
-        if (newRequirementRef && newRequirementRef.contains(target)) {
-          clickedInsideRequirement = true;
+        if (newRequirementRef && (newRequirementRef === target || newRequirementRef.contains(target))) {
+          clickedInsideEditingRequirement = true;
         }
       }
 
       // If clicking inside a requirement that's being edited, don't exit edit mode
-      if (clickedInsideRequirement && clickedRequirementId && editingFields[clickedRequirementId]) {
+      if (clickedInsideEditingRequirement) {
         return;
       }
 
-      if (!clickedInsideRequirement) {
+      // Only exit edit mode if clicking completely outside all requirement containers
+      if (Object.keys(editingFields).length > 0) {
         // Save any pending changes before exiting edit mode
         Object.entries(editingFields).forEach(([requirementId, fields]) => {
           const data = formData[requirementId];
@@ -1691,3 +1735,4 @@ export default function RequirementList({
     </div>
   );
 }
+

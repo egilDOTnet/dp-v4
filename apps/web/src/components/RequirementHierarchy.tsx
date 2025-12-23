@@ -394,6 +394,14 @@ export default function RequirementHierarchyComponent({
     }
   }, [editingId]);
 
+  // Helper to check if an element is within the same editing hierarchy
+  const isWithinSameHierarchy = (hierarchyId: string, element: EventTarget | null): boolean => {
+    if (!element || !(element instanceof Node)) return false;
+    const hierarchyElement = hierarchyRefs.current[hierarchyId];
+    if (!hierarchyElement) return false;
+    return hierarchyElement.contains(element);
+  };
+
   // Handle click outside to save and exit edit mode
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -402,7 +410,23 @@ export default function RequirementHierarchyComponent({
       // Check if click is outside the editing hierarchy
       if (editingId) {
         const hierarchyElement = hierarchyRefs.current[editingId];
-        if (hierarchyElement && !hierarchyElement.contains(target)) {
+        if (!hierarchyElement) return;
+        
+        // Check if target is inside the hierarchy element
+        // Walk up the DOM tree to be sure
+        let currentElement: Node | null = target;
+        let isInsideHierarchy = false;
+        
+        while (currentElement && currentElement !== document.body) {
+          if (currentElement === hierarchyElement || hierarchyElement.contains(currentElement)) {
+            isInsideHierarchy = true;
+            break;
+          }
+          currentElement = currentElement.parentNode;
+        }
+        
+        // Only exit edit mode if click is truly outside
+        if (!isInsideHierarchy) {
           // Use ref to get latest formData without causing re-renders
           const currentFormData = formDataRef.current;
           // Save and exit edit mode
@@ -418,8 +442,13 @@ export default function RequirementHierarchyComponent({
     };
 
     if (editingId) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Add a small delay to ensure refs are set after render
+      const timeoutId = setTimeout(() => {
+        document.addEventListener("mousedown", handleClickOutside);
+      }, 0);
+      
       return () => {
+        clearTimeout(timeoutId);
         document.removeEventListener("mousedown", handleClickOutside);
       };
     }
@@ -720,15 +749,14 @@ export default function RequirementHierarchyComponent({
           return (
             <SortableHierarchyItem key={h1.id} hierarchy={h1}>
             {({ attributes, listeners }) => (
-            <div
-              ref={(el) => {
-                if (isEditing) {
-                  hierarchyRefs.current[h1.id] = el;
-                }
-              }}
-            >
+            <div>
               {isEditing ? (
-                <div className="border-2 border-primary-700 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden">
+                <div 
+                  ref={(el) => {
+                    hierarchyRefs.current[h1.id] = el;
+                  }}
+                  className="border-2 border-primary-700 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden"
+                >
                   {/* Left side: Number - same as view mode */}
                   <div 
                     className="bg-primary-700 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
@@ -764,11 +792,19 @@ export default function RequirementHierarchyComponent({
                             }
                           }
                         }}
-                        onBlur={() => {
+                        onBlur={(e) => {
+                          // Check if focus is moving to another element within the same hierarchy
+                          const relatedTarget = e.relatedTarget as HTMLElement;
+                          if (relatedTarget && isWithinSameHierarchy(h1.id, relatedTarget)) {
+                            return;
+                          }
+                          
                           // Auto-save on blur if title is not empty
                           if (formData.title.trim()) {
                             setTimeout(() => {
-                              if (editingId === h1.id) {
+                              const activeElement = document.activeElement;
+                              // Double-check that focus is not still within the hierarchy
+                              if (editingId === h1.id && !isWithinSameHierarchy(h1.id, activeElement)) {
                                 handleUpdate(h1.id);
                               }
                             }, 150);
@@ -788,11 +824,19 @@ export default function RequirementHierarchyComponent({
                             return;
                           }
                         }}
-                        onBlur={() => {
+                        onBlur={(e) => {
+                          // Check if focus is moving to another element within the same hierarchy
+                          const relatedTarget = e.relatedTarget as HTMLElement;
+                          if (relatedTarget && isWithinSameHierarchy(h1.id, relatedTarget)) {
+                            return;
+                          }
+                          
                           // Auto-save on blur
                           if (formData.title.trim()) {
                             setTimeout(() => {
-                              if (editingId === h1.id) {
+                              const activeElement = document.activeElement;
+                              // Double-check that focus is not still within the hierarchy
+                              if (editingId === h1.id && !isWithinSameHierarchy(h1.id, activeElement)) {
                                 handleUpdate(h1.id);
                               }
                             }, 150);
@@ -932,15 +976,15 @@ export default function RequirementHierarchyComponent({
                           return (
                             <SortableHierarchyItem key={h2.id} hierarchy={h2}>
                         {({ attributes, listeners }) => (
-                        <div
-                          ref={(el) => {
-                            if (isEditing2) {
-                              hierarchyRefs.current[h2.id] = el;
-                            }
-                          }}
-                        >
+                        <div>
                           {isEditing2 ? (
-                            <div className="border-2 border-primary-600 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden" style={{ marginLeft: '3.5rem' }}>
+                            <div 
+                              ref={(el) => {
+                                hierarchyRefs.current[h2.id] = el;
+                              }}
+                              className="border-2 border-primary-600 rounded-lg bg-background-tertiary flex items-stretch overflow-hidden" 
+                              style={{ marginLeft: '3.5rem' }}
+                            >
                               {/* Left side: Number - same as view mode */}
                               <div 
                                 className="bg-primary-600 text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg"
@@ -972,11 +1016,19 @@ export default function RequirementHierarchyComponent({
                                         }
                                       }
                                     }}
-                                    onBlur={() => {
+                                    onBlur={(e) => {
+                                      // Check if focus is moving to another element within the same hierarchy
+                                      const relatedTarget = e.relatedTarget as HTMLElement;
+                                      if (relatedTarget && isWithinSameHierarchy(h2.id, relatedTarget)) {
+                                        return;
+                                      }
+                                      
                                       // Auto-save on blur if title is not empty
                                       if (formData.title.trim()) {
                                         setTimeout(() => {
-                                          if (editingId === h2.id) {
+                                          const activeElement = document.activeElement;
+                                          // Double-check that focus is not still within the hierarchy
+                                          if (editingId === h2.id && !isWithinSameHierarchy(h2.id, activeElement)) {
                                             handleUpdate(h2.id);
                                           }
                                         }, 150);
@@ -990,11 +1042,19 @@ export default function RequirementHierarchyComponent({
                                     onChange={(e) =>
                                       setFormData({ ...formData, description: e.target.value })
                                     }
-                                    onBlur={() => {
+                                    onBlur={(e) => {
+                                      // Check if focus is moving to another element within the same hierarchy
+                                      const relatedTarget = e.relatedTarget as HTMLElement;
+                                      if (relatedTarget && isWithinSameHierarchy(h2.id, relatedTarget)) {
+                                        return;
+                                      }
+                                      
                                       // Auto-save on blur
                                       if (formData.title.trim()) {
                                         setTimeout(() => {
-                                          if (editingId === h2.id) {
+                                          const activeElement = document.activeElement;
+                                          // Double-check that focus is not still within the hierarchy
+                                          if (editingId === h2.id && !isWithinSameHierarchy(h2.id, activeElement)) {
                                             handleUpdate(h2.id);
                                           }
                                         }, 150);
