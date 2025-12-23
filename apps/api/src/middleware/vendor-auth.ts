@@ -7,6 +7,7 @@ export interface VendorContactPayload {
   email: string;
   isMainContact: boolean;
   type: "vendor-contact";
+  impersonated?: boolean;
 }
 
 export interface VendorContactRequest extends FastifyRequest {
@@ -127,4 +128,5 @@ export async function verifyRFPAccess(
   // Attach RFP to request for use in route handlers
   (request as any).rfp = rfp;
 }
+
 

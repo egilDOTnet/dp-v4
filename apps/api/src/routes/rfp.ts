@@ -566,6 +566,143 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
   );
 
   /**
+   * Impersonate a vendor contact for testing purposes
+   * Only available to project admins and company administrators
+   */
+  fastify.post<{
+    Params: { id: string; contactPersonId: string };
+  }>(
+    "/:id/rfp/impersonate/:contactPersonId",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Generate a vendor contact token for impersonation. Only available to project members or company administrators.",
+        tags: ["rfp"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "contactPersonId"],
+          properties: {
+            id: { type: "string", description: "Project ID" },
+            contactPersonId: { type: "string", description: "Vendor contact person ID" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              token: { type: "string", description: "Vendor contact impersonation token" },
+              contactPerson: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string" },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                  isMainContact: { type: "boolean" },
+                  vendor: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      name: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: { type: "object", properties: { error: { type: "string" } } },
+          401: { type: "object", properties: { error: { type: "string" } } },
+          403: { type: "object", properties: { error: { type: "string" } } },
+          404: { type: "object", properties: { error: { type: "string" } } },
+          500: { type: "object", properties: { error: { type: "string" }, message: { type: "string" } } },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        const contactPersonId = request.params.contactPersonId;
+        
+        if (!request.user) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
+
+        // Verify project access using middleware
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        const user = getUser(request);
+        
+        // Check if user is admin (CompanyAdministrator or GlobalAdministrator)
+        // verifyProjectAccess already checks for project member or admin, so we're good
+        // But we want to restrict to admins only for impersonation
+        const isAdmin = user.role === "CompanyAdministrator" || user.role === "GlobalAdministrator";
+        if (!isAdmin) {
+          return reply.status(403).send({ error: "Only administrators can impersonate vendor contacts" });
+        }
+
+        // Verify contact person exists and belongs to a vendor in this project
+        const contactPerson = await db.vendorContactPerson.findUnique({
+          where: { id: contactPersonId },
+          include: {
+            vendor: {
+              include: {
+                ProjectVendor: {
+                  where: {
+                    projectId,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!contactPerson) {
+          return reply.status(404).send({ error: "Vendor contact not found" });
+        }
+
+        // Verify the vendor is linked to this project
+        if (contactPerson.vendor.ProjectVendor.length === 0) {
+          return reply.status(403).send({ error: "Vendor contact does not belong to a vendor in this project" });
+        }
+
+        // Generate vendor contact token with impersonated flag
+        // Set expiration to 24 hours for impersonation tokens
+        const token = fastify.jwt.sign({
+          contactPersonId: contactPerson.id,
+          vendorId: contactPerson.vendorId,
+          email: contactPerson.email,
+          isMainContact: contactPerson.isMainContact,
+          type: "vendor-contact",
+          impersonated: true,
+        } as any, { expiresIn: "24h" });
+
+        return reply.send({
+          token,
+          contactPerson: {
+            id: contactPerson.id,
+            email: contactPerson.email,
+            firstName: contactPerson.firstName,
+            lastName: contactPerson.lastName,
+            isMainContact: contactPerson.isMainContact,
+            vendor: {
+              id: contactPerson.vendor.id,
+              name: contactPerson.vendor.name,
+            },
+          },
+        });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in POST /:id/rfp/impersonate/:contactPersonId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
    * Send RFP to vendors
    */
   fastify.post<{

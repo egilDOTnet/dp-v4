@@ -12,10 +12,11 @@ interface PortalHeaderProps {
   contactPerson: VendorContactPerson | null;
   onLogout?: () => void;
   isPreviewMode?: boolean;
+  isImpersonating?: boolean;
   projectId?: string | null;
 }
 
-export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, projectId }: PortalHeaderProps) {
+export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, isImpersonating = false, projectId }: PortalHeaderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const previewToken = useMemo(() => searchParams?.get("preview"), [searchParams]);
@@ -86,7 +87,26 @@ export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, p
   };
 
   const handleBackToProject = () => {
-    if (projectId) {
+    // If impersonating, restore admin token first
+    if (isImpersonating && projectId) {
+      const adminToken = sessionStorage.getItem('adminToken');
+      if (adminToken) {
+        // Remove impersonation token first
+        localStorage.removeItem("token");
+        // Restore admin token
+        localStorage.setItem("token", adminToken);
+        // Clean up sessionStorage
+        sessionStorage.removeItem('adminToken');
+        sessionStorage.removeItem('impersonateProjectId');
+        // Use window.location.href to force full page reload so AuthContext re-initializes
+        window.location.href = `/projects/${projectId}/rfp`;
+      } else {
+        console.warn("No admin token found in sessionStorage. Clearing token and redirecting.");
+        localStorage.removeItem("token");
+        sessionStorage.removeItem('impersonateProjectId');
+        window.location.href = `/projects/${projectId}/rfp`;
+      }
+    } else if (projectId) {
       router.push(`/projects/${projectId}/rfp`);
     } else {
       router.push("/dashboard");
@@ -121,8 +141,31 @@ export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, p
     return "/portal/rfp";
   };
 
+  const getImpersonationName = () => {
+    if (contactPerson?.firstName && contactPerson?.lastName) {
+      return `${contactPerson.firstName} ${contactPerson.lastName}`;
+    }
+    if (contactPerson?.firstName) {
+      return contactPerson.firstName;
+    }
+    if (contactPerson?.lastName) {
+      return contactPerson.lastName;
+    }
+    return contactPerson?.email || "Unknown";
+  };
+
   return (
     <header className="border-b border-border-primary bg-background-tertiary shadow-sm transition-colors">
+      {/* Notice banner */}
+      {(isImpersonating || isPreviewMode) && (
+        <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-b border-yellow-200 dark:border-yellow-700">
+          <div className="container mx-auto px-4 py-2">
+            <p className="text-center text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+              {isImpersonating ? `Impersonating ${getImpersonationName()}` : "Preview mode"}
+            </p>
+          </div>
+        </div>
+      )}
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Logo href={getLogoHref()} height={36} />
         {shouldShowMenu && (
@@ -170,7 +213,7 @@ export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, p
 
                 {/* Navigation items */}
                 <div className="py-1">
-                  {isPreviewMode ? (
+                  {(isPreviewMode || isImpersonating) ? (
                     <>
                       <button
                         onClick={() => {
@@ -280,4 +323,5 @@ export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, p
     </header>
   );
 }
+
 

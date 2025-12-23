@@ -794,6 +794,13 @@ export const api = {
       apiRequest<{ token: string }>(`/api/projects/${projectId}/rfp/preview-token`, {
         method: "POST",
       }),
+    impersonate: (projectId: string, contactPersonId: string) =>
+      apiRequest<{ token: string; contactPerson: VendorContactPerson }>(
+        `/api/projects/${projectId}/rfp/impersonate/${contactPersonId}`,
+        {
+          method: "POST",
+        }
+      ),
     send: (projectId: string) =>
       apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfp/send`, {
         method: "POST",
@@ -1526,6 +1533,7 @@ export interface VendorContactPerson {
   lastName: string;
   email: string;
   isMainContact: boolean;
+  lastLoggedIn: string | null;
   createdAt: string;
   updatedAt: string;
 }

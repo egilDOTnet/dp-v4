@@ -3817,6 +3817,18 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           },
         });
 
+        // Get all contact emails to fetch User records for lastLoggedIn
+        const contactEmails = projectVendors.flatMap(
+          (pv) => pv.vendor?.VendorContactPerson?.map((c) => c.email) || []
+        );
+
+        const users = await db.user.findMany({
+          where: { email: { in: contactEmails } },
+          select: { email: true, lastLoggedIn: true },
+        });
+
+        const userMap = new Map(users.map((u) => [u.email, u.lastLoggedIn]));
+
         return reply.send(
           projectVendors.map((pv) => {
             const contacts = pv.vendor?.VendorContactPerson
@@ -3826,6 +3838,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                   lastName: contact.lastName,
                   email: contact.email,
                   isMainContact: contact.isMainContact,
+                  lastLoggedIn: userMap.get(contact.email) || null,
                   createdAt: contact.createdAt,
                   updatedAt: contact.updatedAt,
                 }))

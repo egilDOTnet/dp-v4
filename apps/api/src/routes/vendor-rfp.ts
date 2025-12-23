@@ -199,6 +199,12 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: "Invalid password" });
       }
 
+      // Update last logged in timestamp
+      await db.user.update({
+        where: { id: user.id },
+        data: { lastLoggedIn: new Date() },
+      });
+
       // Create JWT token with vendor contact context
       const token = fastify.jwt.sign({
         contactPersonId: contactPerson.id,
@@ -446,6 +452,12 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
 
         // Remove magic link from store
         vendorMagicLinks.delete(token);
+
+        // Update last logged in timestamp (this is their first login when setting password)
+        await db.user.update({
+          where: { id: user.id },
+          data: { lastLoggedIn: new Date() },
+        });
 
         // Create JWT token with vendor contact context
         const jwtToken = fastify.jwt.sign({

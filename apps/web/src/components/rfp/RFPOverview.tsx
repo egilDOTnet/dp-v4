@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { api, RFP, ProjectVendor, Project } from "@/lib/api";
-import { Card, CardBody, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, ContactPersonSelector, ContactPerson } from "@/components/ui";
+import { Card, CardBody, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, ContactPersonSelector, ContactPerson, Button } from "@/components/ui";
 import { formatISODateTime } from "@/lib/utils";
 
 interface RFPOverviewProps {
@@ -14,11 +16,16 @@ interface RFPOverviewProps {
 }
 
 export default function RFPOverview({ projectId, rfp, project, onTabChange, onRfpUpdate }: RFPOverviewProps) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [vendors, setVendors] = useState<ProjectVendor[]>([]);
   const [unansweredCount, setUnansweredCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [_isSavingContact, setIsSavingContact] = useState(false);
   const [_isSavingAlternativeContact, setIsSavingAlternativeContact] = useState(false);
+  const [impersonatingContactId, setImpersonatingContactId] = useState<string | null>(null);
+
+  const isAdmin = user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
 
   // Convert project members to ContactPerson format
   const contactOptions: ContactPerson[] = (project?.members || []).map((member) => ({
@@ -130,6 +137,48 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
     }
   };
 
+  const handleImpersonate = async (contactPersonId: string) => {
+    if (!isAdmin) return;
+    
+    try {
+      setImpersonatingContactId(contactPersonId);
+      
+      // Store the current admin token before replacing it
+      // Verify we have a token and user is admin before proceeding
+      const adminToken = localStorage.getItem("token");
+      if (!adminToken) {
+        alert("No admin token found. Please log in again.");
+        return;
+      }
+      
+      // Verify the token is valid by checking user
+      if (!user || (user.role !== "CompanyAdministrator" && user.role !== "GlobalAdministrator")) {
+        alert("Invalid admin session. Please log in again.");
+        return;
+      }
+      
+      // Save admin token before making the impersonation call
+      sessionStorage.setItem('adminToken', adminToken);
+      
+      const result = await api.rfp.impersonate(projectId, contactPersonId);
+      
+      // Store the impersonation token
+      localStorage.setItem("token", result.token);
+      
+      // Store projectId in sessionStorage for navigation back
+      sessionStorage.setItem('impersonateProjectId', projectId);
+      
+      // Use router.push for smoother navigation (keeps React state)
+      router.push("/portal/rfp?impersonate=true");
+    } catch (err: any) {
+      console.error("Error impersonating vendor contact:", err);
+      // Clean up saved admin token on error
+      sessionStorage.removeItem('adminToken');
+      alert(err.message || "Failed to impersonate vendor contact. Please try again.");
+      setImpersonatingContactId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-8">
@@ -220,12 +269,15 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
                 <TableRow>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Main Contact</TableHead>
+                  <TableHead>Last Logged In</TableHead>
                   <TableHead>Status</TableHead>
+                  {isAdmin && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {vendors.map((pv) => {
                   const mainContact = pv.vendor.contacts?.find((c) => c.isMainContact);
+                  const isImpersonating = impersonatingContactId === mainContact?.id;
                   return (
                     <TableRow key={pv.id}>
                       <TableCell className="font-medium">{pv.vendor.name}</TableCell>
@@ -235,8 +287,31 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
                           : "No main contact"}
                       </TableCell>
                       <TableCell>
+                        {mainContact?.lastLoggedIn
+                          ? formatISODateTime(mainContact.lastLoggedIn)
+                          : mainContact
+                          ? "Never"
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
                         <Badge>{pv.status}</Badge>
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          {mainContact ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleImpersonate(mainContact.id)}
+                              disabled={isImpersonating}
+                            >
+                              {isImpersonating ? "Impersonating..." : "Impersonate"}
+                            </Button>
+                          ) : (
+                            <span className="text-text-secondary text-sm">No contact</span>
+                          )}
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}
