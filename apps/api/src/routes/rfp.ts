@@ -429,56 +429,9 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Check if all required dates are set (except StartDate which will be set to current time)
-        const requiredItems = await db.rFPScheduleItem.findMany({
-          where: {
-            rfpId: rfp.id,
-            isRequired: true,
-          },
-        });
-
-        const missingDates: string[] = [];
-        for (const item of requiredItems) {
-          // Skip StartDate as it will be set to current time
-          if (item.type !== "StartDate" && !item.date) {
-            missingDates.push(item.description);
-          }
-        }
-
-        if (missingDates.length > 0) {
-          return reply.status(400).send({
-            error: "All required dates must be set before publishing",
-            message: `Missing dates: ${missingDates.join(", ")}`,
-          });
-        }
-
-        // Get start date item
-        const startDateItem = requiredItems.find((item) => item.type === "StartDate");
-        if (!startDateItem) {
-          return reply.status(400).send({
-            error: "Start date schedule item not found",
-          });
-        }
-
-        // Set start date to current time
-        const currentTime = new Date();
-
-        // Update start date schedule item
-        await db.rFPScheduleItem.update({
-          where: { id: startDateItem.id },
-          data: {
-            date: currentTime,
-          },
-        });
-
-        // Update RFP status and publish date
-        await db.rFP.update({
-          where: { projectId },
-          data: {
-            status: "Published",
-            publishDate: currentTime,
-          },
-        });
+        // Use publishing service to publish RFP
+        const { publishRFP } = await import("../services/publishing");
+        await publishRFP(rfp.id, projectId, fastify);
 
         return reply.send({ success: true });
       } catch (error: any) {
@@ -694,6 +647,77 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         });
       } catch (error: any) {
         request.log.error({ err: error }, "Error in POST /:id/rfp/impersonate/:contactPersonId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Unpublish RFP
+   */
+  fastify.post<{
+    Params: { id: string };
+  }>(
+    "/:id/rfp/unpublish",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Unpublish RFP",
+        tags: ["rfp"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string", description: "Project ID" },
+          },
+        },
+        response: {
+          200: { type: "object", properties: { success: { type: "boolean" } } },
+          400: { type: "object", properties: { error: { type: "string" } } },
+          401: { type: "object", properties: { error: { type: "string" } } },
+          403: { type: "object", properties: { error: { type: "string" } } },
+          404: { type: "object", properties: { error: { type: "string" } } },
+          500: { type: "object", properties: { error: { type: "string" }, message: { type: "string" } } },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        const rfp = await db.rFP.findUnique({
+          where: { projectId },
+        });
+
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        // Verify user permissions: must be company admin, main contact, or alternative contact
+        const user = getUser(request);
+        const isCompanyAdmin = user.role === "CompanyAdministrator" || user.role === "GlobalAdministrator";
+        const isMainContact = rfp.contactPersonId === user.userId;
+        const isAlternativeContact = rfp.alternativeContactPersonId === user.userId;
+
+        if (!isCompanyAdmin && !isMainContact && !isAlternativeContact) {
+          return reply.status(403).send({
+            error: "Only company administrators, main contact person, or alternative contact can unpublish the RFP",
+          });
+        }
+
+        // Use publishing service to unpublish RFP
+        const { unpublishRFP } = await import("../services/publishing");
+        await unpublishRFP(rfp.id);
+
+        return reply.send({ success: true });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in POST /:id/rfp/unpublish");
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "An unexpected error occurred",

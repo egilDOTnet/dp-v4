@@ -107,6 +107,22 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
     }
   };
 
+  const formatVendorStatus = (status: string): string => {
+    const statusLabels: Record<string, string> = {
+      Pending: "Pending",
+      RFI_Received: "RFI Received",
+      RFI_Started: "RFI Started",
+      RFI_Answered: "RFI Answered",
+      RFP_Received: "RFP Received",
+      RFP_Answered: "RFP Answered",
+      RFP_Rejected: "RFP Rejected",
+      Shortlisted: "Shortlisted",
+      Lost: "Lost",
+      Won: "Won",
+    };
+    return statusLabels[status] || status;
+  };
+
 
   const handleContactPersonChange = async (person: ContactPerson | null) => {
     setIsSavingContact(true);
@@ -320,7 +336,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
                           : "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge>{pv.status}</Badge>
+                        <Badge>{formatVendorStatus(pv.status)}</Badge>
                       </TableCell>
                       {isAdmin && (
                         <TableCell>

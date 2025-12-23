@@ -10,7 +10,7 @@ interface RFPChangelogProps {
   rfp: RFP;
 }
 
-export default function RFPChangelog({ projectId, rfp: _rfp }: RFPChangelogProps) {
+export default function RFPChangelog({ projectId, rfp }: RFPChangelogProps) {
   const [entries, setEntries] = useState<RFPChangelogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingFields, setEditingFields] = useState<Set<string>>(new Set());
@@ -199,6 +199,13 @@ export default function RFPChangelog({ projectId, rfp: _rfp }: RFPChangelogProps
 
   return (
     <div className="space-y-4">
+      {rfp?.status === "Draft" && (
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+          <p className="text-sm text-blue-800">
+            <strong>Note:</strong> When the RFP is published, all existing changelog entries will be deleted so vendors only see changes made after publishing.
+          </p>
+        </div>
+      )}
       <Card>
         <CardHeader>
           <h2 className="text-xl font-semibold text-text-primary">Changelog</h2>

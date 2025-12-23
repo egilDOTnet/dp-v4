@@ -3616,7 +3616,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       });
 
       let rfiStatus: "planning" | "ongoing" | "finished" = "planning";
-      if (rfi?.isPublished && rfi.deadline) {
+      if (rfi?.status === "Published" && rfi.deadline) {
         const deadline = new Date(rfi.deadline);
         const now = new Date();
         if (now > deadline) {
@@ -3624,7 +3624,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         } else {
           rfiStatus = "ongoing";
         }
-      } else if (rfi?.isPublished) {
+      } else if (rfi?.status === "Published") {
         rfiStatus = "ongoing";
       }
 

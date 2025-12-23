@@ -148,10 +148,10 @@ export default function RFIStatusTable({ projectId }: RFIStatusTableProps) {
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Sent At
+                RFI Sent
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Answered At
+                RFI Answered
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Magic Link

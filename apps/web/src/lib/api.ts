@@ -790,6 +790,10 @@ export const api = {
       apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfp/publish`, {
         method: "POST",
       }),
+    unpublish: (projectId: string) =>
+      apiRequest<{ success: boolean }>(`/api/projects/${projectId}/rfp/unpublish`, {
+        method: "POST",
+      }),
     getPreviewToken: (projectId: string) =>
       apiRequest<{ token: string }>(`/api/projects/${projectId}/rfp/preview-token`, {
         method: "POST",
@@ -1073,7 +1077,7 @@ export const api = {
             emailText: string | null;
             rfiInformation: string | null;
             deadline: string | null;
-            isPublished: boolean;
+            status: string;
             publishedAt: string | null;
             unpublishedAt: string | null;
             questions: Array<{
@@ -1636,7 +1640,7 @@ export interface RFI {
   rfiInformation: string;
   deadline: string | null;
   autoPublishDate: string | null;
-  isPublished: boolean;
+  status: RFIStatus;
   publishedAt: string | null;
   unpublishedAt: string | null;
   createdAt: string;
@@ -1702,7 +1706,9 @@ export interface DashboardStats {
   };
 }
 
-export type RFPStatus = "Draft" | "Published" | "Closed";
+export type RFIStatus = "Draft" | "Published" | "Unpublished";
+
+export type RFPStatus = "Draft" | "Published" | "Unpublished" | "Closed";
 
 export type RFPScheduleItemType =
   | "StartDate"

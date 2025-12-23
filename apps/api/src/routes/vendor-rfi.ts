@@ -71,7 +71,7 @@ async function validateMagicLinkToken(
         emailText: true,
         rfiInformation: true,
         deadline: true,
-        isPublished: true,
+        status: true,
         publishedAt: true,
         unpublishedAt: true,
         questions: {
@@ -265,7 +265,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
 
           // Check RFI status - allow preview mode (unpublished RFIs) for testing
           // Preview tokens are only generated for project members, so this is safe
-          if (!rfi.isPublished) {
+          if (rfi.status !== "Published") {
             // Allow preview mode - don't block unpublished RFIs
             // This enables preview functionality for project members
           } else if (rfi.deadline && new Date(rfi.deadline) < new Date()) {
@@ -354,7 +354,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
 
           // Check RFI status - allow preview mode (unpublished RFIs) for testing
           // Preview tokens are only generated for project members, so this is safe
-          if (!rfi.isPublished) {
+          if (rfi.status !== "Published") {
             // Allow preview mode - don't block unpublished RFIs
             // This enables preview functionality for project members
           } else if (rfi.deadline && new Date(rfi.deadline) < new Date()) {
@@ -582,7 +582,7 @@ export default async function vendorRFIRoutes(fastify: FastifyInstance) {
           // Check RFI status - allow preview mode (unpublished RFIs) for testing
           // Preview tokens are only generated for project members, so this is safe
           // Check if deadline has passed (only for published RFIs)
-          const deadlinePassed = rfi.isPublished && rfi.deadline && new Date(rfi.deadline) < new Date();
+          const deadlinePassed = rfi.status === "Published" && rfi.deadline && new Date(rfi.deadline) < new Date();
 
           // Get existing responses if any
           const dbAny = db as any;

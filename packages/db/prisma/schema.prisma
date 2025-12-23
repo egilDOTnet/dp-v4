@@ -323,9 +323,16 @@ enum NotificationType {
   TASK_COMMENT
 }
 
+enum RFIStatus {
+  Draft
+  Published
+  Unpublished
+}
+
 enum RFPStatus {
   Draft
   Published
+  Unpublished
   Closed
 }
 
@@ -362,7 +369,7 @@ model RFI {
   rfiInformationTemplateId String?
   deadline                 DateTime?
   autoPublishDate          DateTime?
-  isPublished              Boolean   @default(false)
+  status                   RFIStatus @default(Draft)
   publishedAt              DateTime?
   unpublishedAt            DateTime?
   createdAt                DateTime  @default(now())
@@ -377,6 +384,7 @@ model RFI {
   @@index([projectId])
   @@index([emailTemplateId])
   @@index([rfiInformationTemplateId])
+  @@index([autoPublishDate])
 }
 
 model RFIQuestion {
@@ -539,6 +547,7 @@ model RFPScheduleItem {
 
   @@index([rfpId])
   @@index([rfpId, order])
+  @@index([type, date])
 }
 
 model RFPDocument {

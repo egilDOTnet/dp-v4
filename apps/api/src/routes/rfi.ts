@@ -91,7 +91,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
             rfiInformationTemplateId: true,
             deadline: true,
             autoPublishDate: true,
-            isPublished: true,
+            status: true,
             publishedAt: true,
             unpublishedAt: true,
             createdAt: true,
@@ -617,27 +617,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Validate at least 1 question exists
-      const dbAny = db as any;
-      const questionCount = await dbAny.rFIQuestion.count({
-        where: { rfiId: rfi.id },
-      });
-
-      if (questionCount === 0) {
-        return reply.status(400).send({
-          error: "At least 1 question must be added before publishing",
-        });
-      }
-
-      // Publish RFI
-      await db.rFI.update({
-        where: { projectId },
-        data: {
-          isPublished: true,
-          publishedAt: new Date(),
-          unpublishedAt: null,
-        },
-      });
+      // Use publishing service to publish RFI
+      const { publishRFI } = await import("../services/publishing");
+      await publishRFI(rfi.id, projectId, fastify);
 
         return reply.send({ success: true });
       } catch (error: any) {
@@ -735,14 +717,9 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      // Unpublish RFI
-      await db.rFI.update({
-        where: { projectId },
-        data: {
-          isPublished: false,
-          unpublishedAt: new Date(),
-        },
-      });
+      // Use publishing service to unpublish RFI
+      const { unpublishRFI } = await import("../services/publishing");
+      await unpublishRFI(rfi.id);
 
         return reply.send({ success: true });
       } catch (error: any) {
@@ -2669,7 +2646,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      if (!rfi.isPublished) {
+      if (rfi.status !== "Published") {
         return reply.status(400).send({
           error: "RFI must be published before sending to vendors",
         });
@@ -2872,7 +2849,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "RFI not found" });
       }
 
-      if (!rfi.isPublished) {
+      if (rfi.status !== "Published") {
         return reply.status(400).send({
           error: "RFI must be published before resending to vendors",
         });

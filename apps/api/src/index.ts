@@ -89,6 +89,10 @@ const start = async () => {
     const port = Number(process.env.PORT) || 3001;
     await fastify.listen({ port, host: "0.0.0.0" });
     console.log(`Server listening on port ${port}`);
+
+    // Start background scheduler for RFI/RFP publishing
+    const { startScheduler } = await import("./services/scheduler");
+    startScheduler(fastify);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

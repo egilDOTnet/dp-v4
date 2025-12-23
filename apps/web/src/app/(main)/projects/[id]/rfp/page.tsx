@@ -66,27 +66,33 @@ export default function RFPPage() {
     }
   };
 
-  const loadRFP = async () => {
+  const loadRFP = async (skipLoadingState = false) => {
     try {
-      if (loadingProjectIdRef.current === projectId) {
+      const isInitialLoad = loadingProjectIdRef.current === projectId;
+      if (!skipLoadingState && isInitialLoad) {
         setLoading(true);
         setError("");
       }
       const rfpData = await api.rfp.get(projectId);
-      // Only update state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Always update state when:
+      // 1. Not during initial load (loadingProjectIdRef.current is null after initial load)
+      // 2. Or during initial load for the correct project (to prevent race conditions)
+      const shouldUpdate = !loadingProjectIdRef.current || loadingProjectIdRef.current === projectId;
+      if (shouldUpdate) {
         setRfp(rfpData);
         setAbout(rfpData.about || "");
       }
     } catch (err: any) {
       console.error("Error loading RFP:", err);
-      // Only set error if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Always set error when not during initial load or during initial load for correct project
+      const shouldUpdate = !loadingProjectIdRef.current || loadingProjectIdRef.current === projectId;
+      if (shouldUpdate) {
         setError(err.message || err.error?.message || "Failed to load RFP");
       }
     } finally {
-      // Only update loading state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Only update loading state for initial load
+      const isInitialLoad = loadingProjectIdRef.current === projectId;
+      if (!skipLoadingState && isInitialLoad) {
         setLoading(false);
       }
     }
@@ -136,6 +142,27 @@ export default function RFPPage() {
       setError("");
     } catch (err: any) {
       setError(err.message || err.error?.message || "Failed to publish RFP");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to unpublish? No more RFP responses can be received."
+      )
+    ) {
+      return;
+    }
+    setIsPublishing(true);
+    try {
+      await api.rfp.unpublish(projectId);
+      // Reload RFP data to update status and UI
+      await loadRFP(true); // Skip loading state to avoid UI flicker
+      setError("");
+    } catch (err: any) {
+      setError(err.message || err.error?.message || "Failed to unpublish RFP");
     } finally {
       setIsPublishing(false);
     }
@@ -238,7 +265,15 @@ export default function RFPPage() {
               >
                 Preview
               </button>
-              {rfp?.status !== "Published" && (
+              {rfp?.status === "Published" ? (
+                <button
+                  onClick={handleUnpublish}
+                  disabled={isPublishing}
+                  className="px-4 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isPublishing ? "Unpublishing..." : "Unpublish"}
+                </button>
+              ) : (
                 <button
                   onClick={handlePublish}
                   disabled={isPublishing}

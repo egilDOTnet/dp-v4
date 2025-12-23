@@ -43,10 +43,10 @@ export default function RFIPage() {
     }
   };
 
-  const loadRFI = async () => {
+  const loadRFI = async (skipLoadingState = false) => {
     try {
-      // Only set loading state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      const isInitialLoad = loadingProjectIdRef.current === projectId;
+      if (!skipLoadingState && isInitialLoad) {
         setLoading(true);
         setError("");
       }
@@ -55,20 +55,25 @@ export default function RFIPage() {
       // Check if we got valid data
       if (!rfiData || typeof rfiData !== 'object' || !rfiData.id) {
         console.error("Invalid RFI data received:", rfiData);
-        // Only set error if we're still loading the same projectId
-        if (loadingProjectIdRef.current === projectId) {
+        const shouldUpdate = !loadingProjectIdRef.current || loadingProjectIdRef.current === projectId;
+        if (shouldUpdate) {
           setError("Received invalid RFI data from server. Please refresh the page.");
-          setLoading(false);
+          if (isInitialLoad) {
+            setLoading(false);
+          }
         }
         return;
       }
       
-      // Only update state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Always update state when:
+      // 1. Not during initial load (loadingProjectIdRef.current is null after initial load)
+      // 2. Or during initial load for the correct project (to prevent race conditions)
+      const shouldUpdate = !loadingProjectIdRef.current || loadingProjectIdRef.current === projectId;
+      if (shouldUpdate) {
         setRfi(rfiData);
         
         // Set default tab based on published status
-        if (rfiData.isPublished) {
+        if (rfiData.status === "Published") {
           setActiveTab("status");
         } else {
           setActiveTab("questionnaire");
@@ -95,13 +100,15 @@ export default function RFIPage() {
     } catch (err: any) {
       console.error("Error loading RFI:", err);
       const errorMessage = err.message || err.error?.message || "Failed to load RFI";
-      // Only set error if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Always set error when not during initial load or during initial load for correct project
+      const shouldUpdate = !loadingProjectIdRef.current || loadingProjectIdRef.current === projectId;
+      if (shouldUpdate) {
         setError(errorMessage);
       }
     } finally {
-      // Only update loading state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Only update loading state for initial load
+      const isInitialLoad = loadingProjectIdRef.current === projectId;
+      if (!skipLoadingState && isInitialLoad) {
         setLoading(false);
       }
     }
@@ -224,7 +231,8 @@ export default function RFIPage() {
     setIsPublishing(true);
     try {
       await api.rfi.unpublish(projectId);
-      await loadRFI();
+      // Reload RFI data to update status and UI
+      await loadRFI(true); // Skip loading state to avoid UI flicker
       setError("");
     } catch (err: any) {
       setError(err.message || "Failed to unpublish RFI");
@@ -345,7 +353,7 @@ export default function RFIPage() {
             >
               Questionnaire
             </button>
-            {rfi?.isPublished && (
+            {rfi?.status === "Published" && (
               <button
                 onClick={() => setActiveTab("status")}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -361,7 +369,7 @@ export default function RFIPage() {
 
           {/* Action buttons on the right */}
           <div className="flex items-end gap-3 pb-2">
-            {!rfi?.isPublished && (
+            {(rfi?.status === "Draft" || rfi?.status === "Unpublished") && (
               <div className="flex flex-col">
                 <label htmlFor="autoPublishDate" className="text-xs text-gray-600 mb-1">
                   Auto-publish date
@@ -396,7 +404,7 @@ export default function RFIPage() {
             >
               Preview
             </button>
-            {rfi?.isPublished ? (
+            {rfi?.status === "Published" ? (
               <button
                 onClick={handleUnpublish}
                 disabled={isPublishing}
