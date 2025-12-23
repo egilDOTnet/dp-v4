@@ -24,11 +24,12 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
                 id: { type: "string" },
                 type: {
                   type: "string",
-                  enum: ["TASK_COMMENT", "TASK_MENTION"],
+                  enum: ["TASK_COMMENT", "TASK_MENTION", "RFP_QUESTION"],
                   description: "Notification type",
                 },
                 taskId: { type: "string", nullable: true },
                 commentId: { type: "string", nullable: true },
+                rfpQuestionId: { type: "string", nullable: true },
                 read: { type: "boolean" },
                 createdAt: { type: "string", format: "date-time" },
                 task: {
@@ -56,6 +57,28 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
                     name: { type: "string", nullable: true },
                     firstName: { type: "string", nullable: true },
                     lastName: { type: "string", nullable: true },
+                  },
+                },
+                rfpQuestion: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    rfpId: { type: "string" },
+                    rfp: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        projectId: { type: "string" },
+                        project: {
+                          type: "object",
+                          properties: {
+                            id: { type: "string" },
+                            name: { type: "string" },
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -96,6 +119,20 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
               },
             },
           },
+          rfpQuestion: {
+            include: {
+              rfp: {
+                include: {
+                  project: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           mentionedBy: {
             select: {
               id: true,
@@ -118,6 +155,7 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
           type: notification.type,
           taskId: notification.taskId,
           commentId: notification.commentId,
+          rfpQuestionId: notification.rfpQuestionId,
           read: notification.read,
           createdAt: notification.createdAt,
           task: notification.task && notification.task.phase && notification.task.phase.Project
@@ -128,6 +166,20 @@ export default async function notificationRoutes(fastify: FastifyInstance) {
                 project: {
                   id: notification.task.phase.Project.id,
                   name: notification.task.phase.Project.name,
+                },
+              }
+            : null,
+          rfpQuestion: notification.rfpQuestion && notification.rfpQuestion.rfp && notification.rfpQuestion.rfp.project
+            ? {
+                id: notification.rfpQuestion.id,
+                rfpId: notification.rfpQuestion.rfpId,
+                rfp: {
+                  id: notification.rfpQuestion.rfp.id,
+                  projectId: notification.rfpQuestion.rfp.projectId,
+                  project: {
+                    id: notification.rfpQuestion.rfp.project.id,
+                    name: notification.rfpQuestion.rfp.project.name,
+                  },
                 },
               }
             : null,

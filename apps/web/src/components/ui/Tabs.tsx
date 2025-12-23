@@ -66,7 +66,7 @@ export const TabsList: React.FC<TabsListProps> = ({
 }) => {
   return (
     <div
-      className={`flex border-b border-border-primary ${className}`}
+      className={`flex ${className}`}
       role="tablist"
     >
       {children}

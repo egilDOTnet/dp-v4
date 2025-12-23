@@ -42,6 +42,8 @@ interface TaskListProps {
   isCreatingNewTaskExternal?: boolean;
   /** Callback when internal isCreatingNewTask state changes */
   onIsCreatingNewTaskChange?: (value: boolean) => void;
+  /** Task ID to scroll to when component loads */
+  scrollToTaskId?: string | null;
 }
 
 type FilterType = "all" | "completed" | "remaining";
@@ -336,6 +338,7 @@ export default function TaskList({
   hideNewTaskButton = false,
   isCreatingNewTaskExternal,
   onIsCreatingNewTaskChange,
+  scrollToTaskId,
 }: TaskListProps) {
   const [filter, setFilter] = useState<FilterType>("remaining");
   const [isCreatingNewTaskInternal, setIsCreatingNewTaskInternal] = useState(false);
@@ -1543,6 +1546,7 @@ export default function TaskList({
                   >
                     {({ attributes, listeners }) => (
                     <div
+                      id={`task-${task.id}`}
                       ref={(el) => {
                         taskRefs.current[task.id] = el;
                       }}
@@ -2123,6 +2127,7 @@ export default function TaskList({
                   >
                     {({ attributes: _attributes, listeners: _listeners }) => (
                     <div
+                      id={`task-${task.id}`}
                       ref={(el) => {
                         taskRefs.current[task.id] = el;
                       }}

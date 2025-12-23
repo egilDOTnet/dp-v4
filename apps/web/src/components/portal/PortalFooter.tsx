@@ -13,7 +13,7 @@ export function PortalFooter() {
               href="https://dynamic.as"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-text-primary transition-colors underline"
+              className="hover:text-text-primary transition-colors underline cursor-pointer"
             >
               Dynamic AS
             </a>
@@ -23,4 +23,5 @@ export function PortalFooter() {
     </footer>
   );
 }
+
 

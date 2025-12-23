@@ -33,7 +33,7 @@ export function Logo({
 
   if (href) {
     return (
-      <Link href={href} className={`flex items-center ${className}`}>
+      <Link href={href} className={`flex items-center cursor-pointer ${className}`}>
         {logoContent}
       </Link>
     );

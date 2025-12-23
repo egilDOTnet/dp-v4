@@ -197,11 +197,13 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
       
       const result = await api.rfp.impersonate(projectId, contactPersonId);
       
-      // Store the impersonation token
+      // Store the impersonation token in both localStorage and sessionStorage (for reload persistence)
       localStorage.setItem("token", result.token);
+      sessionStorage.setItem('impersonationToken', result.token);
       
-      // Store projectId in sessionStorage for navigation back
+      // Store projectId and impersonation state in sessionStorage for navigation back and reload persistence
       sessionStorage.setItem('impersonateProjectId', projectId);
+      sessionStorage.setItem('isImpersonating', 'true');
       
       // Use router.push for smoother navigation (keeps React state)
       router.push("/portal/rfp?impersonate=true");

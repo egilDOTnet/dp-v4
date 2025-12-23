@@ -248,7 +248,7 @@ export function DismissibleBanner({
         <div className="flex justify-end mt-4">
           <button
             onClick={handleDismiss}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-medium text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors cursor-pointer ${
               variant === "hero"
                 ? "bg-accent-600 hover:bg-accent-700 focus:ring-accent-500"
                 : "bg-primary-600 hover:bg-primary-700 focus:ring-primary-500"

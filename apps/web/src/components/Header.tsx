@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { Logo } from "@/components/Logo";
 import { api, Notification } from "@/lib/api";
 import { UserAvatar } from "./UserAvatar";
+import { formatDateTimeISO } from "@/lib/date-utils";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -24,12 +25,10 @@ export function Header() {
   useEffect(() => {
     if (user) {
       loadNotifications();
-      loadUnreadCount();
       
       // Poll for new notifications every 30 seconds
       const interval = setInterval(() => {
         loadNotifications();
-        loadUnreadCount();
       }, 30000);
       
       return () => clearInterval(interval);
@@ -52,22 +51,14 @@ export function Header() {
     try {
       const data = await api.notifications.list();
       setNotifications(data);
+      // Calculate unread count from the notifications array
+      const unread = data.filter(n => !n.read).length;
+      setUnreadCount(unread);
       console.log("Loaded notifications:", data.length, data);
     } catch (err: any) {
       console.error("Failed to load notifications:", err);
       // Set empty array on error to prevent stale data
       setNotifications([]);
-    }
-  };
-
-  const loadUnreadCount = async () => {
-    try {
-      const data = await api.notifications.getUnreadCount();
-      setUnreadCount(data.count);
-      console.log("Unread count:", data.count);
-    } catch (err: any) {
-      console.error("Failed to load unread count:", err);
-      // Set to 0 on error
       setUnreadCount(0);
     }
   };
@@ -76,26 +67,29 @@ export function Header() {
     try {
       await api.notifications.markAllRead();
       await loadNotifications();
-      await loadUnreadCount();
     } catch (err) {
       console.error("Failed to mark all as read:", err);
     }
   };
 
   const handleNotificationClick = async (notification: Notification) => {
-    if (!notification.taskId || !notification.task) return;
-    
     // Mark as read
     try {
       await api.notifications.markRead(notification.id);
       await loadNotifications();
-      await loadUnreadCount();
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
     }
     
-    // Navigate to task
-    router.push(`/projects/${notification.task.project.id}/tasks?phase=${notification.task.phaseId}`);
+    // Navigate based on notification type
+    if (notification.type === "RFP_QUESTION" && notification.rfpQuestion) {
+      // Navigate to RFP questions page with question ID to scroll to it
+      router.push(`/projects/${notification.rfpQuestion.rfp.project.id}/rfp?question=${notification.rfpQuestionId}`);
+    } else if (notification.taskId && notification.task) {
+      // Navigate to task with task ID to scroll to it
+      router.push(`/projects/${notification.task.project.id}/tasks?phase=${notification.task.phaseId}&task=${notification.taskId}`);
+    }
+    
     setShowNotifications(false);
   };
 
@@ -206,15 +200,12 @@ export function Header() {
                             ? `${notification.mentionedBy.firstName} ${notification.mentionedBy.lastName}`
                             : notification.mentionedBy.firstName || notification.mentionedBy.lastName || notification.mentionedBy.name || notification.mentionedBy.email
                           : "Someone";
-                        const date = new Date(notification.createdAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        });
+                        const date = formatDateTimeISO(notification.createdAt);
                         const text =
                           notification.type === "TASK_MENTION"
                             ? `${displayName} mentioned you in a comment`
+                            : notification.type === "RFP_QUESTION"
+                            ? "A vendor asked a question about an RFP"
                             : `${displayName} commented on a task`;
                         
                         return (
@@ -225,18 +216,22 @@ export function Header() {
                               !notification.read ? "bg-primary-50/50" : ""
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-text-primary">{text}</p>
-                                {notification.task && (
-                                  <p className="text-xs text-text-secondary mt-1 truncate">
-                                    {notification.task.name}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-text-primary">{text}</p>
+                              {(notification.task || notification.rfpQuestion) && (
+                                <div className="flex items-center justify-between gap-2 mt-1">
+                                  <p className="text-xs text-text-secondary truncate">
+                                    {notification.task
+                                      ? notification.task.name
+                                      : notification.rfpQuestion
+                                      ? `${notification.rfpQuestion.rfp.project.name} - RFP`
+                                      : ""}
                                   </p>
-                                )}
-                              </div>
-                              <div className="flex-shrink-0 text-xs text-text-secondary">
-                                {date}
-                              </div>
+                                  <p className="text-xs text-text-secondary flex-shrink-0">
+                                    {date}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                             {!notification.read && (
                               <div className="mt-2 h-0.5 w-full bg-primary-600" />

@@ -1221,7 +1221,7 @@ export const api = {
           method: "POST",
           body: JSON.stringify({ token, password }),
         }),
-      me: () => apiRequest<{ contactPerson: VendorContactPerson }>("/api/vendor-rfp/auth/me"),
+      me: () => apiRequest<{ contactPerson: VendorContactPerson; mainContact: { id: string; firstName: string; lastName: string; email: string } | null }>("/api/vendor-rfp/auth/me"),
     },
     rfps: {
       list: () => apiRequest<RFPListItem[]>("/api/vendor-rfp/rfps"),
@@ -1258,6 +1258,48 @@ export const api = {
         }>(`/api/vendor-rfp/rfps/${rfpId}/participate`, {
           method: "POST",
         }),
+      decline: (rfpId: string, note?: string) =>
+        apiRequest<{
+          id: string;
+          status: RFPVendorResponseStatus;
+        }>(`/api/vendor-rfp/rfps/${rfpId}/decline`, {
+          method: "POST",
+          body: JSON.stringify({ note }),
+        }),
+      downloadRequirementsPdf: async (rfpId: string): Promise<Blob> => {
+        const token = typeof window !== "undefined"
+          ? localStorage.getItem("token")
+          : null;
+        const apiUrl = getApiUrlRuntime();
+        const response = await fetch(`${apiUrl}/api/vendor-rfp/rfps/${rfpId}/requirements/pdf`, {
+          method: "GET",
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+          throw new Error(errorData.message || errorData.error || "Failed to download PDF");
+        }
+        return response.blob();
+      },
+      downloadRequirementsExcel: async (rfpId: string): Promise<Blob> => {
+        const token = typeof window !== "undefined"
+          ? localStorage.getItem("token")
+          : null;
+        const apiUrl = getApiUrlRuntime();
+        const response = await fetch(`${apiUrl}/api/vendor-rfp/rfps/${rfpId}/requirements/excel`, {
+          method: "GET",
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: `Request failed with status ${response.status}` }));
+          throw new Error(errorData.message || errorData.error || "Failed to download Excel");
+        }
+        return response.blob();
+      },
       askQuestion: (rfpId: string, question: string) =>
         apiRequest<{
           id: string;
@@ -1442,9 +1484,10 @@ export interface Comment {
 
 export interface Notification {
   id: string;
-  type: "TASK_MENTION" | "TASK_COMMENT";
+  type: "TASK_MENTION" | "TASK_COMMENT" | "RFP_QUESTION";
   taskId: string | null;
   commentId: string | null;
+  rfpQuestionId: string | null;
   read: boolean;
   createdAt: string;
   task: {
@@ -1454,6 +1497,18 @@ export interface Notification {
     project: {
       id: string;
       name: string;
+    };
+  } | null;
+  rfpQuestion: {
+    id: string;
+    rfpId: string;
+    rfp: {
+      id: string;
+      projectId: string;
+      project: {
+        id: string;
+        name: string;
+      };
     };
   } | null;
   mentionedBy: {
@@ -1990,6 +2045,7 @@ export interface RFPDetail extends RFPListItem {
     status: RFPVendorResponseStatus;
     participatedAt: string | null;
     proposalSubmittedAt: string | null;
+    declineNote: string | null;
     proposalFiles: RFPProposalFile[];
   } | null;
 }

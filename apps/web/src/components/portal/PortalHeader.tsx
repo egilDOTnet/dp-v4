@@ -91,20 +91,31 @@ export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, i
     if (isImpersonating && projectId) {
       const adminToken = sessionStorage.getItem('adminToken');
       if (adminToken) {
-        // Remove impersonation token first
-        localStorage.removeItem("token");
-        // Restore admin token
-        localStorage.setItem("token", adminToken);
-        // Clean up sessionStorage
+        // Clean up impersonation state from sessionStorage first
+        sessionStorage.removeItem('isImpersonating');
+        sessionStorage.removeItem('impersonationToken');
         sessionStorage.removeItem('adminToken');
         sessionStorage.removeItem('impersonateProjectId');
+        
+        // Remove impersonation token from localStorage
+        localStorage.removeItem("token");
+        
+        // Restore admin token to localStorage
+        localStorage.setItem("token", adminToken);
+        
         // Use window.location.href to force full page reload so AuthContext re-initializes
+        // This ensures the admin token is set before AuthContext checks for authentication
         window.location.href = `/projects/${projectId}/rfp`;
       } else {
         console.warn("No admin token found in sessionStorage. Clearing token and redirecting.");
-        localStorage.removeItem("token");
+        // Clean up all impersonation state
+        sessionStorage.removeItem('isImpersonating');
+        sessionStorage.removeItem('impersonationToken');
+        sessionStorage.removeItem('adminToken');
         sessionStorage.removeItem('impersonateProjectId');
-        window.location.href = `/projects/${projectId}/rfp`;
+        localStorage.removeItem("token");
+        // Redirect to login since we don't have the admin token
+        window.location.href = "/login";
       }
     } else if (projectId) {
       router.push(`/projects/${projectId}/rfp`);
@@ -142,16 +153,23 @@ export function PortalHeader({ contactPerson, onLogout, isPreviewMode = false, i
   };
 
   const getImpersonationName = () => {
-    if (contactPerson?.firstName && contactPerson?.lastName) {
-      return `${contactPerson.firstName} ${contactPerson.lastName}`;
+    // Try to get name from contactPerson if available
+    if (contactPerson) {
+      if (contactPerson.firstName && contactPerson.lastName) {
+        return `${contactPerson.firstName} ${contactPerson.lastName}`;
+      }
+      if (contactPerson.firstName) {
+        return contactPerson.firstName;
+      }
+      if (contactPerson.lastName) {
+        return contactPerson.lastName;
+      }
+      if (contactPerson.email) {
+        return contactPerson.email;
+      }
     }
-    if (contactPerson?.firstName) {
-      return contactPerson.firstName;
-    }
-    if (contactPerson?.lastName) {
-      return contactPerson.lastName;
-    }
-    return contactPerson?.email || "Unknown";
+    // Fallback: try to get from localStorage/sessionStorage or show generic message
+    return "vendor contact";
   };
 
   return (

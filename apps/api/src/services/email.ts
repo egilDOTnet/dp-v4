@@ -40,6 +40,26 @@ interface RFP {
   // Add other RFP fields as needed for email
 }
 
+interface User {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+}
+
+interface RFPQuestion {
+  id: string;
+  question: string;
+  rfpId: string;
+  rfp: {
+    projectId: string;
+    project: {
+      name: string;
+    };
+  };
+}
+
 /**
  * Send RFI email to vendor contact
  */
@@ -160,6 +180,67 @@ export async function sendRFPEmail(
     console.log(`RFP email sent to ${toEmail}`);
   } catch (error) {
     console.error(`Failed to send RFP email to ${toEmail}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Send RFP question notification email to project contact
+ */
+export async function sendRFPQuestionEmail(
+  user: User,
+  rfpQuestion: RFPQuestion
+): Promise<void> {
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000";
+  const projectUrl = `${baseUrl}/projects/${rfpQuestion.rfp.projectId}/rfp`;
+
+  const subject = `New RFP Question: ${rfpQuestion.rfp.project.name}`;
+  const emailBody = `A vendor has posted a new question for the RFP "${rfpQuestion.rfp.project.name}":\n\n"${rfpQuestion.question}"\n\nPlease review and answer the question:\n${projectUrl}`;
+
+  const toEmail = user.email;
+  const toName = user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
+
+  if (isDevelopment) {
+    // Log email details in development
+    console.log("\n📧 RFP Question Email (DEV MODE - Not Sent):");
+    console.log(`To: ${toName} <${toEmail}>`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Body:\n${emailBody}`);
+    console.log(`Project Link: ${projectUrl}\n`);
+    return;
+  }
+
+  // Send via AWS SES in production
+  if (!sesClient) {
+    throw new Error("SES client not initialized. Check AWS credentials.");
+  }
+
+  const fromEmail = process.env.AWS_SES_FROM_EMAIL || "noreply@example.com";
+  
+  try {
+    const command = new SendEmailCommand({
+      Source: fromEmail,
+      Destination: {
+        ToAddresses: [toEmail],
+      },
+      Message: {
+        Subject: {
+          Data: subject,
+          Charset: "UTF-8",
+        },
+        Body: {
+          Text: {
+            Data: emailBody,
+            Charset: "UTF-8",
+          },
+        },
+      },
+    });
+
+    await sesClient.send(command);
+    console.log(`RFP question email sent to ${toEmail}`);
+  } catch (error) {
+    console.error(`Failed to send RFP question email to ${toEmail}:`, error);
     throw error;
   }
 }

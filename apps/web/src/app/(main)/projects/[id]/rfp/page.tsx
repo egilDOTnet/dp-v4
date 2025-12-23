@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { api, Project, RFP } from "@/lib/api";
 import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner, Breadcrumbs } from "@/components/ui";
 import RFPOverview from "@/components/rfp/RFPOverview";
@@ -17,6 +17,7 @@ type TabType = "overview" | "about" | "schedule" | "documents" | "changelog" | "
 
 export default function RFPPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [rfp, setRfp] = useState<RFP | null>(null);
@@ -28,6 +29,15 @@ export default function RFPPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const loadingProjectIdRef = useRef<string | null>(null);
+  
+  // Check for question query parameter to navigate to specific question
+  useEffect(() => {
+    const questionId = searchParams.get("question");
+    if (questionId && rfp) {
+      // Switch to Q&A tab
+      setActiveTab("qa");
+    }
+  }, [searchParams, rfp]);
 
   useEffect(() => {
     if (projectId) {
@@ -331,7 +341,7 @@ export default function RFPPage() {
           </TabsContent>
 
           <TabsContent value="qa">
-            <RFPQuestions projectId={projectId} rfp={rfp} />
+            <RFPQuestions projectId={projectId} rfp={rfp} scrollToQuestionId={searchParams.get("question")} />
           </TabsContent>
 
           <TabsContent value="announcements">

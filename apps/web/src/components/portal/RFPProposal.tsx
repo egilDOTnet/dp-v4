@@ -298,7 +298,7 @@ export function RFPProposal({ rfpId, rfp: _rfp, contactPerson, onReload, isPrevi
                         </div>
                         <button
                           onClick={() => handleDeleteFile(file.id)}
-                          className="ml-4 text-red-600 hover:text-red-700 text-sm"
+                          className="ml-4 text-red-600 hover:text-red-700 text-sm cursor-pointer"
                         >
                           Delete
                         </button>
@@ -349,4 +349,5 @@ export function RFPProposal({ rfpId, rfp: _rfp, contactPerson, onReload, isPrevi
     </>
   );
 }
+
 

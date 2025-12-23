@@ -81,7 +81,7 @@ export default function RFPListPage() {
         <p className="text-red-600 mb-4">{error}</p>
         <button
           onClick={loadRFPs}
-          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors cursor-pointer"
         >
           Retry
         </button>
@@ -105,7 +105,7 @@ export default function RFPListPage() {
       <h1 className="text-3xl font-bold text-text-primary mb-8">Ongoing RFPs</h1>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {rfps.map((rfp) => (
-          <Link key={rfp.id} href={`/portal/rfp/${rfp.id}`}>
+          <Link key={rfp.id} href={`/portal/rfp/${rfp.id}`} className="cursor-pointer">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
               <CardBody>
                 <div className="flex items-start justify-between mb-4">

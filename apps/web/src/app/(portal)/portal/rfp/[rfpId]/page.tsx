@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api, RFPDetail, VendorContactPerson } from "@/lib/api";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { Button } from "@/components/ui/FormField";
+import { Button, Textarea } from "@/components/ui/FormField";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui";
 import { HeroBanner } from "@/components/HeroBanner";
 import { RFPInformation } from "@/components/portal/RFPInformation";
 import { RFPQuestions } from "@/components/portal/RFPQuestions";
@@ -23,9 +24,12 @@ export default function RFPDetailPage() {
 
   const [rfp, setRfp] = useState<RFPDetail | null>(null);
   const [contactPerson, setContactPerson] = useState<VendorContactPerson | null>(null);
+  const [mainContact, setMainContact] = useState<{ id: string; firstName: string; lastName: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showParticipateModal, setShowParticipateModal] = useState(false);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [declineNote, setDeclineNote] = useState("");
   const [activeTab, setActiveTab] = useState("information");
   const [dismissedBanner, setDismissedBanner] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -57,6 +61,7 @@ export default function RFPDetailPage() {
         ]);
         setRfp(rfpData);
         setContactPerson(contactData.contactPerson);
+        setMainContact(contactData.mainContact);
 
         // Set initial tab based on participation status
         if (rfpData.vendorResponse?.status === "Participating" || rfpData.vendorResponse?.status === "ProposalSubmitted") {
@@ -82,6 +87,17 @@ export default function RFPDetailPage() {
     }
   };
 
+  const handleDecline = async (note: string) => {
+    try {
+      await api.vendorRfp.rfps.decline(rfpId, note);
+      await loadData(); // Reload to get updated status
+      setShowParticipateModal(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to decline participation");
+      console.error("Failed to decline participation:", err);
+    }
+  };
+
   const isParticipating =
     rfp?.vendorResponse?.status === "Participating" ||
     rfp?.vendorResponse?.status === "ProposalSubmitted";
@@ -90,7 +106,10 @@ export default function RFPDetailPage() {
     !isPreviewMode &&
     contactPerson?.isMainContact &&
     rfp?.vendorResponse?.status !== "Participating" &&
-    rfp?.vendorResponse?.status !== "ProposalSubmitted";
+    rfp?.vendorResponse?.status !== "ProposalSubmitted" &&
+    rfp?.vendorResponse?.status !== "Declined";
+  
+  const isDeclined = rfp?.vendorResponse?.status === "Declined";
 
   // Get acceptance deadline
   const acceptanceDate = rfp?.scheduleItems.find((item) => item.type === "AcceptanceDate")?.date;
@@ -124,11 +143,13 @@ export default function RFPDetailPage() {
         />
       )}
 
-      {/* Participation Banner */}
-      {!isPreviewMode && !isParticipating && !dismissedBanner && !acceptanceDeadlinePassed && (
+      {/* Participation Banner - Only visible for main contacts */}
+      {!isPreviewMode && !isParticipating && !dismissedBanner && !acceptanceDeadlinePassed && contactPerson?.isMainContact && (
         <ParticipationBanner
           onDismiss={() => setDismissedBanner(true)}
           acceptanceDate={acceptanceDate}
+          isMainContact={contactPerson.isMainContact}
+          mainContactName={mainContact ? `${mainContact.firstName} ${mainContact.lastName}` : null}
         />
       )}
 
@@ -179,31 +200,38 @@ export default function RFPDetailPage() {
       <div className="mb-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h1 className="text-4xl font-bold text-text-primary mb-2">
-              {rfp.project.name}
-            </h1>
-            {rfp.vendorResponse && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-text-secondary">Status:</span>
-                <span
-                  className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    rfp.vendorResponse.status === "Participating"
-                      ? "bg-green-100 text-green-800"
-                      : rfp.vendorResponse.status === "ProposalSubmitted"
-                      ? "bg-purple-100 text-purple-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  {rfp.vendorResponse.status}
-                </span>
-              </div>
-            )}
+            <div className="flex items-baseline justify-between gap-4">
+              <h1 className="text-4xl font-bold text-text-primary">
+                {rfp.project.name}
+              </h1>
+              {rfp.vendorResponse && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm text-text-secondary">Status:</span>
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      rfp.vendorResponse.status === "Participating"
+                        ? "bg-green-100 text-green-800"
+                        : rfp.vendorResponse.status === "ProposalSubmitted"
+                        ? "bg-purple-100 text-purple-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {rfp.vendorResponse.status}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             {canParticipate && (
-              <Button onClick={() => setShowParticipateModal(true)}>
-                Participate
-              </Button>
+              <>
+                <Button variant="danger" onClick={() => setShowDeclineModal(true)}>
+                  Won't participate
+                </Button>
+                <Button onClick={() => setShowParticipateModal(true)}>
+                  Participate
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -214,7 +242,7 @@ export default function RFPDetailPage() {
         // Preview mode - show all tabs but read-only
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex items-center justify-between border-b border-border-primary">
-            <TabsList className="border-0">
+            <TabsList>
               <TabsTrigger value="information">Information</TabsTrigger>
               <TabsTrigger value="questions">Questions and Answers</TabsTrigger>
               <TabsTrigger value="proposal">Delivery of Proposal</TabsTrigger>
@@ -236,7 +264,7 @@ export default function RFPDetailPage() {
       ) : isParticipating ? (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex items-center justify-between border-b border-border-primary">
-            <TabsList className="border-0">
+            <TabsList>
               <TabsTrigger value="information">Information</TabsTrigger>
               <TabsTrigger value="questions">Questions and Answers</TabsTrigger>
               <TabsTrigger value="proposal">Delivery of Proposal</TabsTrigger>
@@ -247,7 +275,7 @@ export default function RFPDetailPage() {
           </div>
 
           <TabsContent value="information">
-            <RFPInformation rfp={rfp} />
+            <RFPInformation rfp={rfp} isDeclined={isDeclined} />
           </TabsContent>
 
           <TabsContent value="questions">
@@ -269,6 +297,46 @@ export default function RFPDetailPage() {
           onConfirm={handleParticipate}
           onCancel={() => setShowParticipateModal(false)}
         />
+      )}
+
+      {/* Decline Modal */}
+      {showDeclineModal && (
+        <Dialog open={true} onClose={() => setShowDeclineModal(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm You Won't Participate</DialogTitle>
+              <DialogDescription>
+                You will not be able to participate further in this RFP. You will lose access to review any further documents.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="declineNote" className="block text-sm font-medium text-text-primary mb-1">
+                  Reason (optional)
+                </label>
+                <Textarea
+                  id="declineNote"
+                  value={declineNote}
+                  onChange={(e) => setDeclineNote(e.target.value)}
+                  rows={4}
+                  placeholder="Please let us know why you won't participate..."
+                  className="w-full"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setShowDeclineModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={() => {
+                handleDecline(declineNote);
+                setShowDeclineModal(false);
+              }}>
+                Confirm - Won't Participate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

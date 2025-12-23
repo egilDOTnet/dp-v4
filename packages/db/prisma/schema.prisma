@@ -146,6 +146,7 @@ model User {
   rfpChangelogEntries         RFPChangelogEntry[]
   rfpQuestionsAnswered        RFPQuestion[]        @relation("RFPQuestionAnsweredBy")
   rfpAnnouncements            RFPAnnouncement[]
+  pendingEmailNotifications   PendingEmailNotification[]
 
   @@index([email])
   @@index([tenantId])
@@ -324,6 +325,7 @@ enum RFIVendorResponseStatus {
 enum NotificationType {
   TASK_MENTION
   TASK_COMMENT
+  RFP_QUESTION
 }
 
 enum RFIStatus {
@@ -490,6 +492,7 @@ model Notification {
   type              NotificationType
   taskId            String?
   commentId         String?
+  rfpQuestionId     String?
   mentionedByUserId String?
   read              Boolean          @default(false)
   createdAt         DateTime         @default(now())
@@ -497,11 +500,13 @@ model Notification {
   user        User         @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
   task        Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
   comment     TaskComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  rfpQuestion RFPQuestion? @relation(fields: [rfpQuestionId], references: [id], onDelete: Cascade)
   mentionedBy User?        @relation("NotificationMentionedBy", fields: [mentionedByUserId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([read])
   @@index([taskId])
+  @@index([rfpQuestionId])
 }
 
 model RFP {
@@ -605,6 +610,8 @@ model RFPQuestion {
   vendor        Vendor              @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   contactPerson VendorContactPerson @relation(fields: [contactPersonId], references: [id], onDelete: Restrict)
   answeredBy    User?               @relation("RFPQuestionAnsweredBy", fields: [answeredById], references: [id], onDelete: SetNull)
+  notifications Notification[]
+  pendingEmailNotifications PendingEmailNotification[]
 
   @@index([rfpId])
   @@index([vendorId])
@@ -638,6 +645,7 @@ model RFPVendorResponse {
   status              RFPVendorResponseStatus @default(Sent)
   participatedAt      DateTime?
   proposalSubmittedAt DateTime?
+  declineNote         String?
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
 
@@ -667,4 +675,22 @@ model RFPProposalFile {
 
   @@index([vendorResponseId])
   @@index([vendorResponseId, order])
+}
+
+model PendingEmailNotification {
+  id            String    @id @default(cuid())
+  userId        String
+  rfpQuestionId String
+  scheduledFor  DateTime
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rfpQuestion RFPQuestion @relation(fields: [rfpQuestionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([rfpQuestionId])
+  @@index([scheduledFor])
+  @@index([sentAt])
 }

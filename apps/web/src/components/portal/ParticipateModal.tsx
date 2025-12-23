@@ -19,9 +19,14 @@ export function ParticipateModal({ rfp, onConfirm, onCancel }: ParticipateModalP
         <DialogHeader>
           <DialogTitle>Confirm Participation</DialogTitle>
           <DialogDescription>
-            By clicking OK, you agree to return with an offer before {deliveryDate ? formatISODate(deliveryDate) : "the deadline for delivery"}.
+            By clicking OK, you agree to return with an offer at latest within {deliveryDate ? formatISODate(deliveryDate) : "the deadline for delivery"}.
           </DialogDescription>
         </DialogHeader>
+        <div className="mt-4 space-y-2">
+          <p className="text-sm text-text-secondary">
+            By participating, you will get access to all parts of the RFP, including Questions & Answers, Documents, and the ability to upload your proposal.
+          </p>
+        </div>
         <DialogFooter>
           <Button variant="secondary" onClick={onCancel}>
             Cancel
@@ -32,4 +37,5 @@ export function ParticipateModal({ rfp, onConfirm, onCancel }: ParticipateModalP
     </Dialog>
   );
 }
+
 

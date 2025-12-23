@@ -62,7 +62,7 @@ export function RFPQuestions({ rfpId, rfp, onReload, showQuestionModal: external
           <h2 className="text-2xl font-semibold text-text-primary">Questions and Answers</h2>
         </CardHeader>
         <CardBody>
-          {rfp.questions.filter(q => q.answer && q.answeredAt).length > 0 ? (
+          {rfp.questions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -72,21 +72,25 @@ export function RFPQuestions({ rfpId, rfp, onReload, showQuestionModal: external
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rfp.questions.filter(q => q.answer && q.answeredAt).map((q) => (
+                {rfp.questions.map((q) => (
                   <TableRow key={q.id}>
-                    <TableCell className="text-text-secondary">
-                      {formatISODateTime(q.answeredAt)}
+                    <TableCell className="text-text-secondary align-top">
+                      {q.answeredAt ? formatISODateTime(q.answeredAt) : formatISODateTime(q.createdAt)}
                     </TableCell>
-                    <TableCell className="text-text-primary">
+                    <TableCell className="text-text-primary align-top">
                       <div className="font-medium">
                         {q.cleanedQuestion || q.question}
                       </div>
                     </TableCell>
-                    <TableCell className="text-text-primary">
-                      <div
-                        className="prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: q.answer }}
-                      />
+                    <TableCell className="text-text-primary align-top">
+                      {q.answer ? (
+                        <div
+                          className="prose prose-sm max-w-none"
+                          dangerouslySetInnerHTML={{ __html: q.answer }}
+                        />
+                      ) : (
+                        <span className="text-text-tertiary italic">Not answered yet</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -94,7 +98,7 @@ export function RFPQuestions({ rfpId, rfp, onReload, showQuestionModal: external
             </Table>
           ) : (
             <div className="text-center py-12">
-              <p className="text-text-secondary">No answered questions yet.</p>
+              <p className="text-text-secondary">No questions yet.</p>
             </div>
           )}
         </CardBody>
@@ -140,4 +144,5 @@ export function RFPQuestions({ rfpId, rfp, onReload, showQuestionModal: external
     </div>
   );
 }
+
 

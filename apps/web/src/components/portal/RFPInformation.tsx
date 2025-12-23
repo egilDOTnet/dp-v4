@@ -10,9 +10,10 @@ import { CheckSquare } from "lucide-react";
 
 interface RFPInformationProps {
   rfp: RFPDetail;
+  isDeclined?: boolean;
 }
 
-export function RFPInformation({ rfp }: RFPInformationProps) {
+export function RFPInformation({ rfp, isDeclined = false }: RFPInformationProps) {
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingExcel, setDownloadingExcel] = useState(false);
@@ -127,6 +128,25 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
         }
       }
 
+      // Add Requirements PDF and Excel using vendor-specific endpoints
+      // These endpoints work with vendor contact authentication
+      try {
+        // Download Requirements PDF
+        const pdfBlob = await api.vendorRfp.rfps.downloadRequirementsPdf(rfp.id);
+        const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+        const pdfFileName = `${sanitizeFileName(rfp.project?.name || "Requirements")}_Requirements.pdf`;
+        zip.file(pdfFileName, pdfArrayBuffer);
+
+        // Download Requirements Excel
+        const excelBlob = await api.vendorRfp.rfps.downloadRequirementsExcel(rfp.id);
+        const excelArrayBuffer = await excelBlob.arrayBuffer();
+        const excelFileName = `${sanitizeFileName(rfp.project?.name || "Requirements")}_Requirements.xlsx`;
+        zip.file(excelFileName, excelArrayBuffer);
+      } catch (err: any) {
+        // Silently skip requirements if download fails
+        console.warn("Could not include requirements in zip:", err.message || err);
+      }
+
       // Generate zip file
       const zipBlob = await zip.generateAsync({ type: "blob" });
       
@@ -203,7 +223,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-text-primary">Documents</h2>
-              {rfp.documents.length > 0 && (
+              {!isDeclined && (rfp.documents.length > 0 || projectId) && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -218,7 +238,13 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
           </CardHeader>
           <CardBody>
             <div className="space-y-3">
-              {rfp.documents.length > 0 ? (
+              {isDeclined ? (
+                <div className="py-8 text-center">
+                  <p className="text-text-primary text-lg mb-2">
+                    We are sorry to see you leave, but hope we can return to you in the future.
+                  </p>
+                </div>
+              ) : rfp.documents.length > 0 ? (
                 rfp.documents.map((doc) => (
                   <div key={doc.id} className="border-b border-border-primary pb-3 last:border-0">
                     {doc.type === "Document" && doc.fileName && doc.fileData ? (
@@ -267,7 +293,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
                           href={doc.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-medium text-text-primary hover:text-primary-600 break-all"
+                          className="font-medium text-text-primary hover:text-primary-600 break-all cursor-pointer"
                         >
                           {doc.description}
                         </a>
@@ -301,7 +327,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
                               }
                             }}
                             disabled={downloadingPdf}
-                            className="text-primary-600 hover:text-primary-700 hover:underline disabled:opacity-50"
+                            className="text-primary-600 hover:text-primary-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
                             PDF
                           </button>
@@ -327,7 +353,7 @@ export function RFPInformation({ rfp }: RFPInformationProps) {
                               }
                             }}
                             disabled={downloadingExcel}
-                            className="text-primary-600 hover:text-primary-700 hover:underline disabled:opacity-50"
+                            className="text-primary-600 hover:text-primary-700 hover:underline disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
                             Excel
                           </button>

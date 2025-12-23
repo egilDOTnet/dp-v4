@@ -48,12 +48,14 @@ export async function authenticateVendorContact(
     }
 
     // Attach vendor contact info to request
+    // Preserve impersonated flag from token if present
     (request as VendorContactRequest).vendorContact = {
       contactPersonId: contactPerson.id,
       vendorId: contactPerson.vendorId,
       email: contactPerson.email,
       isMainContact: contactPerson.isMainContact,
       type: "vendor-contact",
+      impersonated: decoded.impersonated,
     };
   } catch {
     reply.status(401).send({ error: "Unauthorized" });

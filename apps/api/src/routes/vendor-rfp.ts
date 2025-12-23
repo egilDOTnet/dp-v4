@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import { db } from "@dp/db";
 import { RFPVendorResponseStatus } from "@prisma/client";
 import { authenticateVendorContact, requireMainContact, verifyRFPAccess, VendorContactRequest } from "../middleware/vendor-auth";
+import { generateRequirementsPDF } from "../utils/requirements-pdf";
+import { generateRequirementsExcel } from "../utils/requirements-excel";
 
 // Store magic links in memory (in production, use Redis or database)
 const vendorMagicLinks = new Map<string, { email: string; expiresAt: number }>();
@@ -533,35 +535,66 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
       },
     },
     async (request: VendorContactRequest, reply: FastifyReply) => {
-      const vendorContact = request.vendorContact;
-      if (!vendorContact) {
-        return reply.status(401).send({ error: "Unauthorized" });
-      }
+      try {
+        const vendorContact = request.vendorContact;
+        if (!vendorContact) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
 
-      const contactPerson = await db.vendorContactPerson.findUnique({
-        where: { id: vendorContact.contactPersonId },
-        include: {
-          vendor: true,
-        },
-      });
-
-      if (!contactPerson) {
-        return reply.status(404).send({ error: "Vendor contact not found" });
-      }
-
-      return reply.send({
-        contactPerson: {
-          id: contactPerson.id,
-          email: contactPerson.email,
-          firstName: contactPerson.firstName,
-          lastName: contactPerson.lastName,
-          isMainContact: contactPerson.isMainContact,
-          vendor: {
-            id: contactPerson.vendor.id,
-            name: contactPerson.vendor.name,
+        const contactPerson = await db.vendorContactPerson.findUnique({
+          where: { id: vendorContact.contactPersonId },
+          include: {
+            vendor: {
+              include: {
+                VendorContactPerson: {
+                  where: { isMainContact: true },
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                  },
+                },
+              },
+            },
           },
-        },
-      });
+        });
+
+        if (!contactPerson) {
+          return reply.status(404).send({ error: "Vendor contact not found" });
+        }
+
+        // Get main contact person (first one found, should be only one)
+        const mainContact = contactPerson.vendor.VendorContactPerson[0] || null;
+
+        return reply.send({
+          contactPerson: {
+            id: contactPerson.id,
+            email: contactPerson.email,
+            firstName: contactPerson.firstName,
+            lastName: contactPerson.lastName,
+            isMainContact: contactPerson.isMainContact,
+            vendor: {
+              id: contactPerson.vendor.id,
+              name: contactPerson.vendor.name,
+            },
+          },
+          mainContact: mainContact
+            ? {
+                id: mainContact.id,
+                firstName: mainContact.firstName,
+                lastName: mainContact.lastName,
+                email: mainContact.email,
+              }
+            : null,
+        });
+      } catch (error: any) {
+        request.log.error({ err: error, endpoint: "/vendor-rfp/auth/me" }, "Error in GET /vendor-rfp/auth/me");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
     }
   );
 
@@ -629,51 +662,52 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
       },
     },
     async (request: VendorContactRequest, reply: FastifyReply) => {
-      const vendorContact = request.vendorContact;
-      if (!vendorContact) {
-        return reply.status(401).send({ error: "Unauthorized" });
-      }
+      try {
+        const vendorContact = request.vendorContact;
+        if (!vendorContact) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
 
-      const now = new Date();
+        const now = new Date();
 
-      // Get RFPs where:
-      // 1. Vendor is linked to project via ProjectVendor
-      // 2. RFP status is Published
-      // 3. Current date is before delivery date (ongoing)
-      const projectVendors = await db.projectVendor.findMany({
-        where: {
-          vendorId: vendorContact.vendorId,
-        },
-        include: {
-          project: {
-            include: {
-              RFP: {
-                where: {
-                  status: "Published",
-                  deliveryDate: {
-                    gt: now,
-                  },
-                },
-                include: {
-                  scheduleItems: {
-                    where: {
-                      type: { in: ["StartDate", "AcceptanceDate", "QuestionsDate", "DeliveryDate"] },
+        // Get RFPs where:
+        // 1. Vendor is linked to project via ProjectVendor
+        // 2. RFP status is Published
+        // 3. Current date is before delivery date (ongoing)
+        const projectVendors = await db.projectVendor.findMany({
+          where: {
+            vendorId: vendorContact.vendorId,
+          },
+          include: {
+            project: {
+              include: {
+                RFP: {
+                  include: {
+                    scheduleItems: {
+                      where: {
+                        type: { in: ["StartDate", "AcceptanceDate", "QuestionsDate", "DeliveryDate"] },
+                      },
+                      orderBy: { order: "asc" },
                     },
-                    orderBy: { order: "asc" },
+                    vendorResponses: true,
                   },
-                  vendorResponses: true,
                 },
               },
             },
           },
-        },
-      });
+        });
 
-      // Flatten and format RFPs
-      const rfps = projectVendors
-        .flatMap((pv) => {
-          if (!pv.project.RFP) return [];
-          return pv.project.RFP.map((rfp) => {
+        // Flatten and format RFPs
+        // Note: RFP is a one-to-one relationship, so pv.project.RFP is a single object or null
+        const rfps = projectVendors
+          .flatMap((pv) => {
+            const rfp = pv.project.RFP;
+            
+            // Filter: RFP must exist, be Published, and delivery date must be in the future
+            if (!rfp || rfp.status !== "Published" || !rfp.deliveryDate || rfp.deliveryDate <= now) {
+              return [];
+            }
+
             const vendorResponse = rfp.vendorResponses.find(
               (vr) => vr.projectVendorId === pv.id
             );
@@ -708,11 +742,17 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
                   }
                 : null,
             };
-          });
-        })
-        .filter((rfp) => rfp !== null);
+          })
+          .filter((rfp) => rfp !== null);
 
-      return reply.send(rfps);
+        return reply.send(rfps);
+      } catch (error: any) {
+        request.log.error({ err: error, endpoint: "/vendor-rfp/rfps" }, "Error in GET /vendor-rfp/rfps");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
     }
   );
 
@@ -1081,6 +1121,25 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
             },
           },
           questions: {
+            where: {
+              OR: [
+                // All answered questions (from any vendor)
+                {
+                  AND: [
+                    { answer: { not: null } },
+                    { answeredAt: { not: null } },
+                  ],
+                },
+                // Unanswered questions from this vendor
+                { 
+                  vendorId: vendorContact.vendorId,
+                  OR: [
+                    { answer: null },
+                    { answeredAt: null },
+                  ],
+                },
+              ],
+            },
             orderBy: { createdAt: "desc" },
             include: {
               vendor: {
@@ -1160,6 +1219,7 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
           type: doc.type,
           description: doc.description,
           fileName: doc.fileName,
+          fileData: doc.fileData,
           fileType: doc.fileType,
           fileSize: doc.fileSize,
           url: doc.url,
@@ -1208,6 +1268,7 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
               status: vendorResponse.status,
               participatedAt: vendorResponse.participatedAt?.toISOString() || null,
               proposalSubmittedAt: vendorResponse.proposalSubmittedAt?.toISOString() || null,
+              declineNote: vendorResponse.declineNote || null,
               proposalFiles: vendorResponse.proposalFiles.map((file) => ({
                 id: file.id,
                 fileName: file.fileName,
@@ -1329,6 +1390,113 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
   );
 
   /**
+   * Vendor declines to participate in RFP
+   * Only allowed for main contact
+   * Updates RFPVendorResponse with status Declined and optional note
+   */
+  fastify.post<{ Params: { rfpId: string }; Body: { note?: string } }>(
+    "/vendor-rfp/rfps/:rfpId/decline",
+    {
+      preHandler: [authenticateVendorContact, verifyRFPAccess, requireMainContact()],
+      schema: {
+        description: "Vendor declines to participate in RFP. Only allowed for main contact.",
+        tags: ["vendor-rfp"],
+        params: {
+          type: "object",
+          required: ["rfpId"],
+          properties: {
+            rfpId: {
+              type: "string",
+              description: "RFP ID",
+            },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            note: {
+              type: "string",
+              description: "Optional note explaining why vendor won't participate",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              status: { type: "string" },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { rfpId: string }; Body: { note?: string } }>, reply: FastifyReply) => {
+      try {
+        const vendorContact = (request as VendorContactRequest).vendorContact;
+        if (!vendorContact) {
+          return reply.status(401).send({ error: "Unauthorized" });
+        }
+
+        const rfp = (request as any).rfp;
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        // Get project vendor
+        const projectVendor = await db.projectVendor.findFirst({
+          where: {
+            projectId: rfp.projectId,
+            vendorId: vendorContact.vendorId,
+          },
+        });
+
+        if (!projectVendor) {
+          return reply.status(403).send({ error: "Vendor does not have access to this RFP" });
+        }
+
+        // Create or update vendor response with Declined status
+        const vendorResponse = await db.rFPVendorResponse.upsert({
+          where: {
+            rfpId_projectVendorId: {
+              rfpId: rfp.id,
+              projectVendorId: projectVendor.id,
+            },
+          },
+          create: {
+            rfpId: rfp.id,
+            projectVendorId: projectVendor.id,
+            contactPersonId: vendorContact.contactPersonId,
+            status: RFPVendorResponseStatus.Declined,
+            declineNote: request.body.note || null,
+          },
+          update: {
+            status: RFPVendorResponseStatus.Declined,
+            declineNote: request.body.note || null,
+          },
+        });
+
+        return reply.send({
+          id: vendorResponse.id,
+          status: vendorResponse.status,
+        });
+      } catch (error: any) {
+        request.log.error({ err: error, endpoint: "/vendor-rfp/rfps/:rfpId/decline" }, "Error in POST /vendor-rfp/rfps/:rfpId/decline");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
    * Submit a question for RFP
    * Creates RFPQuestion with vendor and contact person info
    */
@@ -1388,6 +1556,16 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "Question is required" });
       }
 
+      // Get RFP with contact persons to determine who to notify
+      const rfpWithContacts = await db.rFP.findUnique({
+        where: { id: rfp.id },
+        select: {
+          id: true,
+          contactPersonId: true,
+          alternativeContactPersonId: true,
+        },
+      });
+
       // Create question
       const rfpQuestion = await db.rFPQuestion.create({
         data: {
@@ -1397,6 +1575,59 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
           question: question.trim(),
         },
       });
+
+      // Create notifications for main contact and alternative contact only
+      try {
+        const userIdsToNotify: string[] = [];
+        
+        if (rfpWithContacts?.contactPersonId) {
+          userIdsToNotify.push(rfpWithContacts.contactPersonId);
+        }
+        
+        if (rfpWithContacts?.alternativeContactPersonId) {
+          userIdsToNotify.push(rfpWithContacts.alternativeContactPersonId);
+        }
+
+        // Remove duplicates
+        const uniqueUserIds = Array.from(new Set(userIdsToNotify));
+
+        const notificationPromises = uniqueUserIds.map((userId) =>
+          db.notification.create({
+            data: {
+              userId,
+              type: "RFP_QUESTION",
+              rfpQuestionId: rfpQuestion.id,
+            },
+          }).catch((err: any) => {
+            request.log.error({ err, userId }, "Failed to create notification for RFP question");
+            return null;
+          })
+        );
+
+        await Promise.all(notificationPromises);
+        request.log.info({ questionId: rfpQuestion.id, userIds: uniqueUserIds }, "Created notifications for RFP question");
+
+        // Schedule email notifications for 15 minutes later
+        // We'll create a pending email notification record that the scheduler will process
+        const emailNotificationPromises = uniqueUserIds.map((userId) =>
+          db.pendingEmailNotification.create({
+            data: {
+              userId,
+              rfpQuestionId: rfpQuestion.id,
+              scheduledFor: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+            },
+          }).catch((err: any) => {
+            request.log.error({ err, userId }, "Failed to schedule email notification for RFP question");
+            return null;
+          })
+        );
+
+        await Promise.all(emailNotificationPromises);
+        request.log.info({ questionId: rfpQuestion.id, userIds: uniqueUserIds }, "Scheduled email notifications for RFP question");
+      } catch (notificationError: any) {
+        // Log error but don't fail the request if notification creation fails
+        request.log.error({ err: notificationError, questionId: rfpQuestion.id }, "Error creating notifications for RFP question");
+      }
 
       return reply.send({
         id: rfpQuestion.id,
@@ -1471,13 +1702,38 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
       },
     },
     async (request: FastifyRequest<{ Params: { rfpId: string } }>, reply: FastifyReply) => {
+      const vendorContact = (request as VendorContactRequest).vendorContact;
+      if (!vendorContact) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
       const rfp = (request as any).rfp;
       if (!rfp) {
         return reply.status(404).send({ error: "RFP not found" });
       }
 
+      // Return ALL answered questions (from any vendor) AND unanswered questions from this vendor
       const questions = await db.rFPQuestion.findMany({
-        where: { rfpId: rfp.id },
+        where: { 
+          rfpId: rfp.id,
+          OR: [
+            // All answered questions (from any vendor)
+            {
+              AND: [
+                { answer: { not: null } },
+                { answeredAt: { not: null } },
+              ],
+            },
+            // Unanswered questions from this vendor
+            { 
+              vendorId: vendorContact.vendorId,
+              OR: [
+                { answer: null },
+                { answeredAt: null },
+              ],
+            },
+          ],
+        },
         orderBy: { createdAt: "desc" },
         include: {
           vendor: {
@@ -2059,6 +2315,224 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         status: updated.status,
         proposalSubmittedAt: updated.proposalSubmittedAt?.toISOString() || null,
       });
+    }
+  );
+
+  /**
+   * Download Requirements PDF for vendor
+   * Only accessible to vendors who have access to the RFP
+   */
+  fastify.get<{ Params: { rfpId: string } }>(
+    "/vendor-rfp/rfps/:rfpId/requirements/pdf",
+    {
+      preHandler: [authenticateVendorContact, verifyRFPAccess],
+      schema: {
+        description: "Download Requirements PDF for vendor. Only accessible to vendors with RFP access.",
+        tags: ["vendor-rfp"],
+        params: {
+          type: "object",
+          required: ["rfpId"],
+          properties: {
+            rfpId: {
+              type: "string",
+              description: "RFP ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "PDF file",
+            type: "string",
+            format: "binary",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { rfpId: string } }>, reply: FastifyReply) => {
+      try {
+        const rfp = (request as any).rfp;
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        // Get project info
+        const project = await db.project.findUnique({
+          where: { id: rfp.projectId },
+          select: { name: true },
+        });
+
+        if (!project) {
+          return reply.status(404).send({ error: "Project not found" });
+        }
+
+        // Get approved requirements with hierarchy information
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId: rfp.projectId,
+            },
+            status: "Approved",
+          },
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+          },
+          orderBy: [
+            { hierarchyId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        // Generate PDF
+        const pdfDoc = generateRequirementsPDF(
+          { name: project.name },
+          requirements as any
+        );
+
+        // Use hijack() to take full control of the response stream
+        reply.hijack();
+        const responseStream = reply.raw;
+        
+        // Get origin from request for CORS
+        const origin = request.headers.origin;
+        const isDevelopment = process.env.NODE_ENV !== "production";
+        
+        // Determine allowed origin
+        let allowedOrigin: string | null = null;
+        if (origin) {
+          if (isDevelopment) {
+            if (
+              origin === "http://localhost:3000" ||
+              origin === "http://127.0.0.1:3000" ||
+              /^http:\/\/.*\.local:\d+$/.test(origin) ||
+              /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin) ||
+              /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
+              /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/.test(origin)
+            ) {
+              allowedOrigin = origin;
+            }
+          } else {
+            if (origin === "http://localhost:3000" || origin === "http://127.0.0.1:3000") {
+              allowedOrigin = origin;
+            }
+          }
+        }
+        
+        // Set headers directly on the raw response
+        responseStream.statusCode = 200;
+        responseStream.setHeader("Content-Type", "application/pdf");
+        responseStream.setHeader("Content-Disposition", `attachment; filename="${project.name.replace(/[^a-z0-9]/gi, "_")}_Requirements.pdf"`);
+        
+        // Add CORS headers
+        if (allowedOrigin) {
+          responseStream.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+          responseStream.setHeader("Access-Control-Allow-Credentials", "true");
+          responseStream.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+          responseStream.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        }
+        
+        // Pipe PDF to response
+        pdfDoc.pipe(responseStream);
+        pdfDoc.end();
+      } catch (error: any) {
+        request.log.error({ err: error, rfpId: request.params.rfpId }, "Error generating requirements PDF for vendor");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to generate PDF",
+        });
+      }
+    }
+  );
+
+  /**
+   * Download Requirements Excel for vendor
+   * Only accessible to vendors who have access to the RFP
+   */
+  fastify.get<{ Params: { rfpId: string } }>(
+    "/vendor-rfp/rfps/:rfpId/requirements/excel",
+    {
+      preHandler: [authenticateVendorContact, verifyRFPAccess],
+      schema: {
+        description: "Download Requirements Excel for vendor. Only accessible to vendors with RFP access.",
+        tags: ["vendor-rfp"],
+        params: {
+          type: "object",
+          required: ["rfpId"],
+          properties: {
+            rfpId: {
+              type: "string",
+              description: "RFP ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            description: "Excel file",
+            type: "string",
+            format: "binary",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { rfpId: string } }>, reply: FastifyReply) => {
+      try {
+        const rfp = (request as any).rfp;
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        // Get project info
+        const project = await db.project.findUnique({
+          where: { id: rfp.projectId },
+          select: { name: true },
+        });
+
+        if (!project) {
+          return reply.status(404).send({ error: "Project not found" });
+        }
+
+        // Get approved requirements with hierarchy information
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId: rfp.projectId,
+            },
+            status: "Approved",
+          },
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+          },
+          orderBy: [
+            { hierarchyId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        // Generate Excel
+        const excelBuffer = await generateRequirementsExcel(
+          { name: project.name },
+          requirements as any
+        );
+
+        // Set response headers
+        reply
+          .type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+          .header("Content-Disposition", `attachment; filename="${project.name.replace(/[^a-z0-9]/gi, "_")}_Requirements.xlsx"`)
+          .send(excelBuffer);
+      } catch (error: any) {
+        request.log.error({ err: error, rfpId: request.params.rfpId }, "Error generating requirements Excel for vendor");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to generate Excel",
+        });
+      }
     }
   );
 }

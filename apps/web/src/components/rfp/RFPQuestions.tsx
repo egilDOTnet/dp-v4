@@ -12,9 +12,10 @@ import CreateQuestionModal from "./CreateQuestionModal";
 interface RFPQuestionsProps {
   projectId: string;
   rfp: RFP;
+  scrollToQuestionId?: string | null;
 }
 
-export default function RFPQuestions({ projectId, rfp: _rfp }: RFPQuestionsProps) {
+export default function RFPQuestions({ projectId, rfp: _rfp, scrollToQuestionId }: RFPQuestionsProps) {
   const [questions, setQuestions] = useState<RFPQuestion[]>([]);
   const [vendors, setVendors] = useState<ProjectVendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +33,24 @@ export default function RFPQuestions({ projectId, rfp: _rfp }: RFPQuestionsProps
   useEffect(() => {
     loadData();
   }, [projectId, filter]);
+
+  // Scroll to specific question when it loads
+  useEffect(() => {
+    if (scrollToQuestionId && questions.length > 0) {
+      // Small delay to ensure DOM is rendered
+      setTimeout(() => {
+        const element = document.getElementById(`question-${scrollToQuestionId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Highlight the row briefly
+          element.classList.add("bg-primary-50", "dark:bg-primary-900/20");
+          setTimeout(() => {
+            element.classList.remove("bg-primary-50", "dark:bg-primary-900/20");
+          }, 2000);
+        }
+      }, 100);
+    }
+  }, [scrollToQuestionId, questions]);
 
   const loadData = async () => {
     try {
@@ -161,8 +180,13 @@ export default function RFPQuestions({ projectId, rfp: _rfp }: RFPQuestionsProps
                 {filteredItems.map((question) => {
                   const dateTime = formatISODateTime(question.createdAt);
                   const [date, time] = dateTime.includes(" ") ? dateTime.split(" ") : [dateTime, null];
+                  const isHighlighted = scrollToQuestionId === question.id;
                   return (
-                    <TableRow key={question.id}>
+                    <TableRow 
+                      key={question.id} 
+                      id={`question-${question.id}`}
+                      className={isHighlighted ? "bg-primary-50 dark:bg-primary-900/20" : ""}
+                    >
                       <TableCell className="align-top">
                         <div className="text-sm text-text-primary">
                           <div>{date}</div>

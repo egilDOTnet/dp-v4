@@ -255,6 +255,7 @@ export default function TasksPage() {
             hideNewTaskButton
             isCreatingNewTaskExternal={isCreatingNewTask}
             onIsCreatingNewTaskChange={setIsCreatingNewTask}
+            scrollToTaskId={searchParams.get("task")}
           />
         </div>
       )}

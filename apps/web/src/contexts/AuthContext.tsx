@@ -32,6 +32,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+    
+    // Skip token validation if we're in impersonation mode
+    // (impersonation uses vendor tokens, not admin tokens)
+    const isImpersonating = typeof window !== "undefined" 
+      ? sessionStorage.getItem('isImpersonating') === 'true'
+      : false;
+    
+    if (isImpersonating) {
+      // In impersonation mode, don't validate the token with admin API
+      // The portal layout will handle vendor token validation
+      setLoading(false);
+      return;
+    }
+    
     if (token) {
       refreshUser();
     } else {
