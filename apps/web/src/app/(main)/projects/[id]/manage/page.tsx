@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, User } from "@/lib/api";
 import { HeroBanner, Tabs, TabsList, TabsTrigger, TabsContent, SearchBar, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button, ContactPersonSelector, ContactPerson, Breadcrumbs } from "@/components/ui";
