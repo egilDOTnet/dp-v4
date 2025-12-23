@@ -901,18 +901,35 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
           select: { order: true },
         });
 
+        const itemDate = request.body.date ? new Date(request.body.date) : null;
         const item = await db.rFPScheduleItem.create({
           data: {
             rfpId: rfp.id,
             type: request.body.type,
             description: request.body.description,
-            date: request.body.date ? new Date(request.body.date) : null,
+            date: itemDate,
             fromDate: request.body.fromDate ? new Date(request.body.fromDate) : null,
             toDate: request.body.toDate ? new Date(request.body.toDate) : null,
             order: (maxOrder?.order ?? -1) + 1,
             isRequired: request.body.isRequired ?? false,
           },
         });
+
+        // Sync schedule item dates to RFP model for StartDate and DeliveryDate
+        const rfpUpdateData: any = {};
+        if (request.body.type === "StartDate" && itemDate) {
+          rfpUpdateData.publishDate = itemDate;
+        } else if (request.body.type === "DeliveryDate" && itemDate) {
+          rfpUpdateData.deliveryDate = itemDate;
+        }
+
+        // Update RFP if needed
+        if (Object.keys(rfpUpdateData).length > 0) {
+          await db.rFP.update({
+            where: { id: rfp.id },
+            data: rfpUpdateData,
+          });
+        }
 
         // Create changelog entry
         await createChangelogEntry(
@@ -963,6 +980,8 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
             date: { type: "string", format: "date-time", nullable: true },
             fromDate: { type: "string", format: "date-time", nullable: true },
             toDate: { type: "string", format: "date-time", nullable: true },
+            linkedToDeliveryDate: { type: "boolean" },
+            disregardTimestamp: { type: "boolean" },
           },
         },
         response: {
@@ -1011,11 +1030,33 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
         if (request.body.toDate !== undefined) {
           updateData.toDate = request.body.toDate ? new Date(request.body.toDate) : null;
         }
+        if (request.body.linkedToDeliveryDate !== undefined) {
+          updateData.linkedToDeliveryDate = request.body.linkedToDeliveryDate;
+        }
+        if (request.body.disregardTimestamp !== undefined) {
+          updateData.disregardTimestamp = request.body.disregardTimestamp;
+        }
 
         const updated = await db.rFPScheduleItem.update({
           where: { id: itemId },
           data: updateData,
         });
+
+        // Sync schedule item dates to RFP model for StartDate and DeliveryDate
+        const rfpUpdateData: any = {};
+        if (item.type === "StartDate" && updateData.date !== undefined) {
+          rfpUpdateData.publishDate = updateData.date;
+        } else if (item.type === "DeliveryDate" && updateData.date !== undefined) {
+          rfpUpdateData.deliveryDate = updateData.date;
+        }
+
+        // Update RFP if needed
+        if (Object.keys(rfpUpdateData).length > 0) {
+          await db.rFP.update({
+            where: { id: rfp.id },
+            data: rfpUpdateData,
+          });
+        }
 
         // Create changelog entry
         await createChangelogEntry(

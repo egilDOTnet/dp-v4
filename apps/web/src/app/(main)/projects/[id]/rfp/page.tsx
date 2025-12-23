@@ -10,6 +10,7 @@ import RFPDocuments from "@/components/rfp/RFPDocuments";
 import RFPChangelog from "@/components/rfp/RFPChangelog";
 import RFPQuestions from "@/components/rfp/RFPQuestions";
 import RFPAnnouncements from "@/components/rfp/RFPAnnouncements";
+import { PublishRFPDialog } from "@/components/rfp/PublishRFPDialog";
 import WysiwygEditor from "@/components/WysiwygEditor";
 
 type TabType = "overview" | "about" | "schedule" | "documents" | "changelog" | "qa" | "announcements";
@@ -25,6 +26,7 @@ export default function RFPPage() {
   const [about, setAbout] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const loadingProjectIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -122,13 +124,11 @@ export default function RFPPage() {
     }
   };
 
-  const handlePublish = async () => {
-    // Warn user that start date will be set to current time
-    const confirmMessage = "Publishing the RFP will set the start date to the current time. All required dates must be set, and a main contact person must be assigned. Continue?";
-    if (!confirm(confirmMessage)) {
-      return;
-    }
+  const handlePublish = () => {
+    setIsPublishDialogOpen(true);
+  };
 
+  const handlePublishConfirm = async () => {
     setIsPublishing(true);
     try {
       await api.rfp.publish(projectId);
@@ -284,7 +284,7 @@ export default function RFPPage() {
           </TabsContent>
 
           <TabsContent value="schedule">
-            <RFPSchedule projectId={projectId} rfp={rfp} />
+            <RFPSchedule projectId={projectId} rfp={rfp} onRfpUpdate={loadRFP} />
           </TabsContent>
 
           <TabsContent value="documents">
@@ -303,6 +303,16 @@ export default function RFPPage() {
             <RFPAnnouncements projectId={projectId} rfp={rfp} />
           </TabsContent>
         </Tabs>
+      )}
+
+      {rfp && (
+        <PublishRFPDialog
+          open={isPublishDialogOpen}
+          onOpenChange={setIsPublishDialogOpen}
+          projectId={projectId}
+          rfp={rfp}
+          onConfirm={handlePublishConfirm}
+        />
       )}
     </div>
   );

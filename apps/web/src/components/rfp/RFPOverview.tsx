@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, RFP, ProjectVendor, Project } from "@/lib/api";
 import { Card, CardBody, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, ContactPersonSelector, ContactPerson, Button } from "@/components/ui";
-import { formatISODateTime } from "@/lib/utils";
+import { formatISODateTime, formatISODate } from "@/lib/utils";
+import { RFPScheduleItem } from "@/lib/api";
 
 interface RFPOverviewProps {
   projectId: string;
@@ -24,6 +25,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
   const [_isSavingContact, setIsSavingContact] = useState(false);
   const [_isSavingAlternativeContact, setIsSavingAlternativeContact] = useState(false);
   const [impersonatingContactId, setImpersonatingContactId] = useState<string | null>(null);
+  const [scheduleItems, setScheduleItems] = useState<RFPScheduleItem[]>([]);
 
   const isAdmin = user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
 
@@ -61,15 +63,30 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
     loadData();
   }, [projectId]);
 
+  // Reload schedule items when RFP changes (e.g., after schedule updates)
+  useEffect(() => {
+    const loadScheduleItems = async () => {
+      try {
+        const scheduleData = await api.rfp.schedule.list(projectId);
+        setScheduleItems(scheduleData);
+      } catch (err: any) {
+        console.error("Error loading schedule items:", err);
+      }
+    };
+    loadScheduleItems();
+  }, [projectId, rfp.publishDate, rfp.deliveryDate]);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [vendorsData, questionsData] = await Promise.all([
+      const [vendorsData, questionsData, scheduleData] = await Promise.all([
         api.projects.vendors.list(projectId),
         api.rfp.questions.list(projectId, "unanswered"),
+        api.rfp.schedule.list(projectId),
       ]);
       setVendors(vendorsData);
       setUnansweredCount(questionsData.length);
+      setScheduleItems(scheduleData);
     } catch (err: any) {
       console.error("Error loading overview data:", err);
     } finally {
@@ -191,8 +208,8 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
   return (
     <div className="space-y-6">
       {/* Dashboard Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+        <Card className="h-full">
           <CardBody>
             <div className="text-sm font-medium text-text-primary mb-1">Status</div>
             <Badge className={getStatusColor(rfp.status)}>{rfp.status}</Badge>
@@ -202,16 +219,17 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
         <Card
           variant="interactive"
           onClick={handleUnansweredQuestionsClick}
+          className="h-full"
         >
-          <CardBody className="min-h-[80px]">
-            <div className="text-sm font-medium text-text-primary mb-1 text-left">Unanswered Questions</div>
-            <div className="text-2xl font-bold text-text-primary text-center">
+          <CardBody>
+            <div className="text-sm font-medium text-text-primary mb-1">Unanswered Questions</div>
+            <div className="text-2xl font-bold text-text-primary">
               {unansweredCount}
             </div>
           </CardBody>
         </Card>
 
-        <Card variant="interactive">
+        <Card variant="interactive" className="h-full">
           <CardBody>
             <ContactPersonSelector
               value={contactPersonValue}
@@ -223,7 +241,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
           </CardBody>
         </Card>
 
-        <Card variant="interactive">
+        <Card variant="interactive" className="h-full">
           <CardBody>
             <ContactPersonSelector
               value={alternativeContactPersonValue}
@@ -242,7 +260,11 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
           <CardBody>
             <div className="text-sm font-medium text-text-primary mb-1 text-left">Publish date</div>
             <div className="text-text-primary text-left">
-              {rfp.publishDate ? formatISODateTime(rfp.publishDate) : "Not set"}
+              {rfp.publishDate ? (() => {
+                const startDateItem = scheduleItems.find((item) => item.type === "StartDate");
+                const disregardTimestamp = startDateItem?.disregardTimestamp || false;
+                return disregardTimestamp ? formatISODate(rfp.publishDate) : formatISODateTime(rfp.publishDate);
+              })() : "Not set"}
             </div>
           </CardBody>
         </Card>
@@ -251,7 +273,11 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
           <CardBody>
             <div className="text-sm font-medium text-text-primary mb-1 text-left">Deadline for Delivery</div>
             <div className="text-text-primary text-left">
-              {rfp.deliveryDate ? formatISODateTime(rfp.deliveryDate) : "Not set"}
+              {rfp.deliveryDate ? (() => {
+                const deliveryDateItem = scheduleItems.find((item) => item.type === "DeliveryDate");
+                const disregardTimestamp = deliveryDateItem?.disregardTimestamp || false;
+                return disregardTimestamp ? formatISODate(rfp.deliveryDate) : formatISODateTime(rfp.deliveryDate);
+              })() : "Not set"}
             </div>
           </CardBody>
         </Card>

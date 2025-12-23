@@ -521,17 +521,19 @@ model RFP {
 }
 
 model RFPScheduleItem {
-  id          String              @id @default(cuid())
-  rfpId       String
-  type        RFPScheduleItemType
-  description String
-  date        DateTime?
-  fromDate    DateTime?
-  toDate      DateTime?
-  order       Int
-  isRequired  Boolean             @default(false)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id                  String              @id @default(cuid())
+  rfpId               String
+  type                RFPScheduleItemType
+  description         String
+  date                DateTime?
+  fromDate            DateTime?
+  toDate              DateTime?
+  order               Int
+  isRequired          Boolean             @default(false)
+  linkedToDeliveryDate Boolean            @default(false) // For QuestionsDate: whether it's linked to DeliveryDate
+  disregardTimestamp  Boolean            @default(false) // Whether to show only date (no time) for this item
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   rfp RFP @relation(fields: [rfpId], references: [id], onDelete: Cascade)
 

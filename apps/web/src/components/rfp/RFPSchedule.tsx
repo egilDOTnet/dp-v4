@@ -8,14 +8,14 @@ import { formatISODateTime } from "@/lib/utils";
 interface RFPScheduleProps {
   projectId: string;
   rfp: RFP;
+  onRfpUpdate?: () => void;
 }
 
-export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
+export default function RFPSchedule({ projectId, rfp, onRfpUpdate }: RFPScheduleProps) {
   const [items, setItems] = useState<RFPScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingFields, setEditingFields] = useState<Record<string, Set<string>>>({});
   const [formData, setFormData] = useState<Record<string, Partial<RFPScheduleItem>>>({});
-  const [questionsLinkedToDelivery, setQuestionsLinkedToDelivery] = useState(true);
   const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [disregardTimestamp, setDisregardTimestamp] = useState<Record<string, boolean>>({});
@@ -40,15 +40,6 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
       setLoading(true);
       const data = await api.rfp.schedule.list(projectId);
       setItems(data);
-
-      // Check if questions date is linked to delivery
-      const questionsItem = data.find((item) => item.type === "QuestionsDate");
-      const deliveryItem = data.find((item) => item.type === "DeliveryDate");
-      if (questionsItem && deliveryItem && questionsItem.date === deliveryItem.date) {
-        setQuestionsLinkedToDelivery(true);
-      } else {
-        setQuestionsLinkedToDelivery(false);
-      }
     } catch (err: any) {
       console.error("Error loading schedule:", err);
     } finally {
@@ -70,30 +61,12 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
           },
         }));
       }
-      // Initialize disregardTimestamp - check if date has time component
+      // Initialize disregardTimestamp from database
       if (item && item.id && disregardTimestamp[item.id] === undefined) {
-        const date = item.date || item.fromDate;
-        if (date) {
-          try {
-            const dateObj = new Date(date);
-            const hasTime = dateObj.getHours() !== 0 || dateObj.getMinutes() !== 0 || dateObj.getSeconds() !== 0 || dateObj.getMilliseconds() !== 0;
-            // Default to false (show time if it exists)
-            setDisregardTimestamp((prev) => ({
-              ...prev,
-              [item.id]: !hasTime, // If no time, disregard is true by default
-            }));
-          } catch {
-            setDisregardTimestamp((prev) => ({
-              ...prev,
-              [item.id]: true,
-            }));
-          }
-        } else {
-          setDisregardTimestamp((prev) => ({
-            ...prev,
-            [item.id]: true,
-          }));
-        }
+        setDisregardTimestamp((prev) => ({
+          ...prev,
+          [item.id]: item.disregardTimestamp || false,
+        }));
       }
     });
   }, [items]);
@@ -275,6 +248,11 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
 
       await api.rfp.schedule.update(projectId, itemId, updatePayload);
       await loadSchedule();
+      
+      // Refresh RFP data to update Overview page
+      if (onRfpUpdate) {
+        onRfpUpdate();
+      }
 
       // Clear editing state for this field
       setEditingFields((prev) => {
@@ -309,6 +287,11 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
     try {
       await api.rfp.schedule.delete(projectId, itemId);
       await loadSchedule();
+      
+      // Refresh RFP data to update Overview page
+      if (onRfpUpdate) {
+        onRfpUpdate();
+      }
     } catch (err: any) {
       console.error("Error deleting schedule item:", err);
     }
@@ -422,6 +405,11 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
       });
       setNewItemDisregardTimestamp(false);
       await loadSchedule();
+      
+      // Refresh RFP data to update Overview page
+      if (onRfpUpdate) {
+        onRfpUpdate();
+      }
     } catch (err: any) {
       console.error("Error adding schedule item:", err);
       // Re-throw to show error to user
@@ -459,44 +447,59 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
 
     if (!questionsItem || !deliveryItem) return;
 
-    const newLinked = !questionsLinkedToDelivery;
-    // Set the state immediately to reflect user's action
-    setQuestionsLinkedToDelivery(newLinked);
+    const newLinked = !questionsItem.linkedToDeliveryDate;
 
     if (newLinked && deliveryItem.date) {
       // Link to delivery date - update the Questions date to match delivery date
+      // Also sync the disregardTimestamp setting from delivery item
       await api.rfp.schedule.update(projectId, questionsItem.id, {
         date: deliveryItem.date,
+        linkedToDeliveryDate: true,
+        disregardTimestamp: deliveryItem.disregardTimestamp,
       });
-    }
-    // Note: When unlinking, we don't change the Questions date value in the database
-    // The user can then edit it separately if they want
-    
-    // Reload schedule to get latest data
-    const updatedData = await api.rfp.schedule.list(projectId);
-    setItems(updatedData);
-
-    // Only update the linked state if we're linking (to sync with server)
-    // If unlinking, keep it unchecked as the user intended
-    if (newLinked) {
-      const updatedQuestionsItem = updatedData.find((item) => item.type === "QuestionsDate");
-      const updatedDeliveryItem = updatedData.find((item) => item.type === "DeliveryDate");
-      if (updatedQuestionsItem && updatedDeliveryItem && updatedQuestionsItem.date === updatedDeliveryItem.date) {
-        setQuestionsLinkedToDelivery(true);
+    } else {
+      // Unlinking - preserve the current date (or use delivery date if currently linked)
+      const dateToUse = questionsItem.date || (deliveryItem.date ? deliveryItem.date : null);
+      if (dateToUse) {
+        await api.rfp.schedule.update(projectId, questionsItem.id, {
+          date: dateToUse,
+          linkedToDeliveryDate: false,
+        });
+      } else {
+        // Just update the link flag
+        await api.rfp.schedule.update(projectId, questionsItem.id, {
+          linkedToDeliveryDate: false,
+        });
       }
     }
-    // If unlinking, keep it unchecked and initialize formData
-    else {
-      const updatedQuestionsItem = updatedData.find((item) => item.type === "QuestionsDate");
-      if (updatedQuestionsItem) {
-        setFormData((prev) => ({
+    
+    // Reload schedule to get latest data
+    await loadSchedule();
+    
+    // Refresh RFP data to update Overview page
+    if (onRfpUpdate) {
+      onRfpUpdate();
+    }
+    
+    // Initialize formData for the updated item
+    const updatedData = await api.rfp.schedule.list(projectId);
+    const updatedQuestionsItem = updatedData.find((item) => item.type === "QuestionsDate");
+    const updatedDeliveryItem = updatedData.find((item) => item.type === "DeliveryDate");
+    if (updatedQuestionsItem) {
+      setFormData((prev) => ({
+        ...prev,
+        [updatedQuestionsItem.id]: {
+          description: updatedQuestionsItem.description,
+          date: updatedQuestionsItem.date,
+          fromDate: updatedQuestionsItem.fromDate,
+          toDate: updatedQuestionsItem.toDate,
+        },
+      }));
+      // Update disregardTimestamp state if linked
+      if (updatedQuestionsItem.linkedToDeliveryDate && updatedDeliveryItem) {
+        setDisregardTimestamp((prev) => ({
           ...prev,
-          [updatedQuestionsItem.id]: {
-            description: updatedQuestionsItem.description,
-            date: updatedQuestionsItem.date,
-            fromDate: updatedQuestionsItem.fromDate,
-            toDate: updatedQuestionsItem.toDate,
-          },
+          [updatedQuestionsItem.id]: updatedDeliveryItem.disregardTimestamp,
         }));
       }
     }
@@ -629,7 +632,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
 
     // Get display date for Questions date (show delivery date if linked, otherwise show item date)
     const getDisplayDateForQuestions = () => {
-      if (isQuestionsDate && questionsLinkedToDelivery && deliveryItem?.date) {
+      if (isQuestionsDate && item?.linkedToDeliveryDate && deliveryItem?.date) {
         return deliveryItem.date;
       }
       return itemFormData.date || item?.date || null;
@@ -653,6 +656,15 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
       // Date ranges never show time
       if (isDateRange) {
         return null;
+      }
+      // For Questions date when linked, check delivery item's disregardTimestamp setting
+      if (isQuestionsDate && item?.linkedToDeliveryDate && deliveryItem) {
+        // If delivery item has disregardTimestamp, don't show time
+        if (deliveryItem.disregardTimestamp) {
+          return null;
+        }
+        const displayDate = getDisplayDateForQuestions();
+        return getTimeString(displayDate);
       }
       // Don't show time if timestamp is disregarded
       if (item && disregardTimestamp[item.id]) {
@@ -755,7 +767,11 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                     </div>
                     {/* Show time below description in list mode if timestamp exists and not disregarded */}
                     {!isNew && !isEditing && item && (() => {
-                      const shouldShowTime = !disregardTimestamp[item.id] && displayTime;
+                      // For Questions date when linked, check delivery item's disregardTimestamp
+                      let shouldShowTime = !disregardTimestamp[item.id] && displayTime;
+                      if (isQuestionsDate && item.linkedToDeliveryDate && deliveryItem) {
+                        shouldShowTime = !deliveryItem.disregardTimestamp && displayTime;
+                      }
                       return shouldShowTime ? (
                         <div className="text-xs text-text-secondary px-2 -mx-2 mt-1">
                           {displayTime}
@@ -946,7 +962,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                             <div className="flex items-center gap-2 mb-2">
                               <input
                                 type="checkbox"
-                                checked={questionsLinkedToDelivery}
+                                checked={item?.linkedToDeliveryDate || false}
                                 onChange={handleQuestionsLinkToggle}
                                 className="rounded"
                               />
@@ -956,7 +972,7 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                             </div>
                           )}
                           {/* Hide date input and disregard timestamp checkbox when Questions date is linked to delivery */}
-                          {!(isQuestionsDate && !isNew && questionsLinkedToDelivery) && (
+                          {!(isQuestionsDate && !isNew && item?.linkedToDeliveryDate) && (
                             <div className="flex items-center gap-2">
                               <input
                                 type={(isNew ? newItemDisregardTimestamp : disregardTimestamp[item?.id || ""]) ? "date" : "datetime-local"}
@@ -966,8 +982,11 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                                     setNewItemData({ ...newItemData, date: e.target.value || null });
                                   } else if (item) {
                                     // If Questions date is linked and user changes it, unlink it
-                                    if (isQuestionsDate && questionsLinkedToDelivery) {
-                                      setQuestionsLinkedToDelivery(false);
+                                    if (isQuestionsDate && item?.linkedToDeliveryDate) {
+                                      // Update the link flag when user manually changes the date
+                                      api.rfp.schedule.update(projectId, item.id, {
+                                        linkedToDeliveryDate: false,
+                                      }).catch(console.error);
                                     }
                                     setFormData({
                                       ...formData,
@@ -1008,12 +1027,19 @@ export default function RFPSchedule({ projectId, rfp }: RFPScheduleProps) {
                                         }
                                       }
                                     } else if (item) {
+                                      const newDisregardTimestamp = e.target.checked;
                                       setDisregardTimestamp((prev) => ({
                                         ...prev,
-                                        [item.id]: e.target.checked,
+                                        [item.id]: newDisregardTimestamp,
                                       }));
+                                      
+                                      // Save the preference to database
+                                      api.rfp.schedule.update(projectId, item.id, {
+                                        disregardTimestamp: newDisregardTimestamp,
+                                      }).catch(console.error);
+                                      
                                       // If checking "disregard timestamp", strip time from the date
-                                      if (e.target.checked && itemFormData.date) {
+                                      if (newDisregardTimestamp && itemFormData.date) {
                                         try {
                                           const dateObj = new Date(itemFormData.date);
                                           const year = dateObj.getFullYear();

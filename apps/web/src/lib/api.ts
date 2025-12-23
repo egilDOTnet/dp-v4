@@ -1751,6 +1751,8 @@ export interface RFPScheduleItem {
   toDate: string | null;
   order: number;
   isRequired: boolean;
+  linkedToDeliveryDate: boolean;
+  disregardTimestamp: boolean;
   createdAt: string;
   updatedAt: string;
 }
