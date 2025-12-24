@@ -786,10 +786,10 @@ export default function RequirementList({
                 <div 
                   {...(dragAttributes || {})}
                   {...(dragListeners || {})}
-                  className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg ${dragAttributes ? 'cursor-grab active:cursor-grabbing hover:brightness-110 transition-all' : ''}`}
+                  className={`${colorClasses.bg} text-white flex items-start justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg ${dragAttributes ? 'cursor-grab active:cursor-grabbing hover:brightness-110 transition-all' : ''}`}
                   title={dragAttributes ? "Drag to reorder" : undefined}
                 >
-                  <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>
+                  <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-1`}>
                     {requirement.number.endsWith('.') ? requirement.number.slice(0, -1) : requirement.number}
                   </span>
                 </div>
@@ -1027,7 +1027,7 @@ export default function RequirementList({
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-start justify-between gap-4">
                       {/* Description area */}
                       <div className="flex-1 min-w-0">
                         <p 
@@ -1039,7 +1039,7 @@ export default function RequirementList({
                       </div>
 
                       {/* Right side: Type and Status */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-start gap-2 flex-shrink-0">
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
                             requirementFormData.type
@@ -1079,8 +1079,8 @@ export default function RequirementList({
                 }`}
               >
                 {/* Left side: Number indicator */}
-                <div className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
-                  <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>+</span>
+                <div className={`${colorClasses.bg} text-white flex items-start justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                  <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-1`}>+</span>
                 </div>
 
                 {/* Right side: Form content */}
@@ -1293,10 +1293,10 @@ export default function RequirementList({
                         <div 
                           {...attributes}
                           {...listeners}
-                          className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all`}
+                          className={`${colorClasses.bg} text-white flex items-start justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all`}
                           title="Drag to reorder"
                         >
-                          <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>
+                          <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-1`}>
                             {requirement.number.endsWith('.') ? requirement.number.slice(0, -1) : requirement.number}
                           </span>
                         </div>
@@ -1528,7 +1528,7 @@ export default function RequirementList({
                               )}
                             </div>
                           ) : (
-                            <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-start justify-between gap-4">
                               {/* Description area */}
                               <div className="flex-1 min-w-0">
                                 <p 
@@ -1540,7 +1540,7 @@ export default function RequirementList({
                               </div>
 
                             {/* Right side: Type and Status */}
-                            <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="flex items-start gap-2 flex-shrink-0">
                                 <span
                                   className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
                                     requirementFormData.type
@@ -1582,8 +1582,8 @@ export default function RequirementList({
                   }`}
                 >
                   {/* Left side: Number indicator */}
-                  <div className={`${colorClasses.bg} text-white flex items-center justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
-                    <span className={`font-semibold ${colorClasses.numberSize} leading-none`}>+</span>
+                  <div className={`${colorClasses.bg} text-white flex items-start justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg`}>
+                    <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-1`}>+</span>
                   </div>
 
                   {/* Right side: Form content */}
