@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface RFIQuestionOption {
   id: string;
@@ -34,11 +34,36 @@ export function RFIQuestionRenderer({
   onChange,
   error,
 }: RFIQuestionRendererProps) {
-  const [localValue, setLocalValue] = useState(value);
+  // Normalize value based on question type to prevent type mismatches
+  const normalizeValue = (val: any, questionType: string): any => {
+    if (val === undefined || val === null || val === "") {
+      return undefined;
+    }
+    
+    switch (questionType) {
+      case "Dropdown":
+      case "SingleText":
+      case "MultilineText":
+      case "Scale":
+        // These types expect scalar values (string or null)
+        return typeof val === "string" ? val : undefined;
+      case "YesNo":
+        // Boolean or null
+        return typeof val === "boolean" ? val : undefined;
+      case "MultipleChoice":
+        // Array or object (for grid) or null
+        return val;
+      default:
+        return val;
+    }
+  };
+
+  const [localValue, setLocalValue] = useState(() => normalizeValue(value, question.type));
 
   useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
+    // Reset to normalized value when value or question type changes
+    setLocalValue(normalizeValue(value, question.type));
+  }, [value, question.type]);
 
   const handleChange = (newValue: any) => {
     setLocalValue(newValue);
@@ -74,9 +99,11 @@ export function RFIQuestionRenderer({
         );
 
       case "Dropdown":
+        // Ensure value is always a string (scalar) for select element
+        const dropdownValue = typeof localValue === "string" ? localValue : "";
         return (
           <select
-            value={localValue || ""}
+            value={dropdownValue}
             onChange={(e) => handleChange(e.target.value || null)}
             className="w-full px-3 py-2 border border-border-primary rounded-md bg-background-tertiary text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
@@ -202,6 +229,9 @@ export function RFIQuestionRenderer({
         const scaleLabels = question.scaleLabels || {};
         const scalePoints = Object.keys(scaleLabels).sort((a, b) => parseInt(a) - parseInt(b));
         
+        // Ensure value is a string (scale point) or undefined - never default to first point
+        const scaleValue = typeof localValue === "string" ? localValue : undefined;
+        
         // Check if all labels are empty (no labels provided)
         const hasLabels = scalePoints.some((point) => {
           const label = scaleLabels[point];
@@ -218,7 +248,7 @@ export function RFIQuestionRenderer({
                     type="radio"
                     name={`question-${question.id}`}
                     value={point}
-                    checked={localValue === point}
+                    checked={scaleValue === point}
                     onChange={() => handleChange(point)}
                     className="w-4 h-4 text-primary-600 focus:ring-primary-500"
                   />
@@ -238,7 +268,7 @@ export function RFIQuestionRenderer({
                   type="radio"
                   name={`question-${question.id}`}
                   value={point}
-                  checked={localValue === point}
+                  checked={scaleValue === point}
                   onChange={() => handleChange(point)}
                   className="w-4 h-4 text-primary-600 focus:ring-primary-500"
                 />
