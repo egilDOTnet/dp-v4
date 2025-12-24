@@ -450,7 +450,7 @@ export async function generateRequirementsExcel(
     cellD2.alignment = { horizontal: "center", vertical: "top" };
   }
 
-  // Add data validation for column D (Yes/No/Partial) - only for requirement rows
+  // Add data validation for column D (Yes/No/Partial/Development) - only for requirement rows
   if (requirementRowNumbers.length > 0) {
     // Apply data validation to each requirement row's column D
     // ExcelJS list validation: formula should be a string with quoted comma-separated values
@@ -459,7 +459,7 @@ export async function generateRequirementsExcel(
       cell.dataValidation = {
         type: "list",
         allowBlank: true,
-        formulae: ['"Yes,No,Partial"'],
+        formulae: ['"Yes,No,Partial,Development"'],
         showInputMessage: true,
         showErrorMessage: true,
       };
