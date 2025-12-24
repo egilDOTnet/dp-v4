@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { api, RFPDetail, VendorContactPerson } from "@/lib/api";
+import { api, RFPDetail, RFPProposalFile, VendorContactPerson } from "@/lib/api";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button, Textarea } from "@/components/ui/FormField";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/Tabs";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { HeroBanner } from "@/components/HeroBanner";
 import { RFPInformation } from "@/components/portal/RFPInformation";
 import { RFPQuestions } from "@/components/portal/RFPQuestions";
-import { RFPProposal } from "@/components/portal/RFPProposal";
+import { RFPProposal, RFPProposalSubmitButton } from "@/components/portal/RFPProposal";
 import { ParticipateModal } from "@/components/portal/ParticipateModal";
 import { ParticipationBanner } from "@/components/portal/ParticipationBanner";
 import { ProjectLogo } from "@/components/ProjectLogo";
@@ -34,10 +34,58 @@ export default function RFPDetailPage() {
   const [dismissedBanner, setDismissedBanner] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [proposalFiles, setProposalFiles] = useState<RFPProposalFile[]>([]);
+  const [proposalRequirementsResponse, setProposalRequirementsResponse] = useState<{
+    responses?: Array<{
+      id: string;
+      requirementId: string;
+      requirementNumber: string;
+      answer: string | null;
+      description: string | null;
+      reference: string | null;
+    }>;
+    totalRequirements: number;
+    answeredCount: number;
+    percentage: number;
+    invalidAnswers?: Array<{ requirementNumber: string; invalidValue: string; row: number }>;
+  } | null>(null);
 
   useEffect(() => {
     loadData();
   }, [rfpId, previewToken]);
+
+  const loadProposalData = async () => {
+    if (isPreviewMode) {
+      // Don't load proposal data in preview mode
+      return;
+    }
+    try {
+      const [filesData, requirementsData] = await Promise.all([
+        api.vendorRfp.rfps.getProposal(rfpId),
+        api.vendorRfp.rfps.getRequirementsResponses(rfpId).catch(() => null),
+      ]);
+      setProposalFiles(filesData);
+      if (requirementsData) {
+        // If totalRequirements > 0, it means a vendorResponse exists (file was uploaded)
+        // The backend returns totalRequirements: 0 only when no vendorResponse exists
+        // So if totalRequirements > 0, we should show stats even if answeredCount is 0
+        if (requirementsData.totalRequirements > 0) {
+          setProposalRequirementsResponse({
+            responses: requirementsData.responses,
+            totalRequirements: requirementsData.totalRequirements,
+            answeredCount: requirementsData.answeredCount,
+            percentage: requirementsData.percentage,
+          });
+        } else {
+          setProposalRequirementsResponse(null);
+        }
+      } else {
+        setProposalRequirementsResponse(null);
+      }
+    } catch (err: any) {
+      console.error("Failed to load proposal data:", err);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -67,12 +115,27 @@ export default function RFPDetailPage() {
         if (rfpData.vendorResponse?.status === "Participating" || rfpData.vendorResponse?.status === "ProposalSubmitted") {
           setActiveTab("information");
         }
+
+        // Load proposal data if participating
+        if (rfpData.vendorResponse?.status === "Participating" || rfpData.vendorResponse?.status === "ProposalSubmitted") {
+          await loadProposalData();
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to load RFP");
       console.error("Failed to load RFP:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReload = async () => {
+    await loadData();
+    // Also reload proposal data if participating
+    if (rfp?.vendorResponse?.status === "Participating" || rfp?.vendorResponse?.status === "ProposalSubmitted") {
+      if (!isPreviewMode) {
+        await loadProposalData();
+      }
     }
   };
 
@@ -110,6 +173,11 @@ export default function RFPDetailPage() {
     rfp?.vendorResponse?.status !== "Declined";
   
   const isDeclined = rfp?.vendorResponse?.status === "Declined";
+
+  // Expand enum status values with spaces (e.g., "ProposalSubmitted" -> "Proposal Submitted")
+  const expandStatusValue = (status: string): string => {
+    return status.replace(/([A-Z])/g, " $1").trim();
+  };
 
   // Get acceptance deadline
   const acceptanceDate = rfp?.scheduleItems.find((item) => item.type === "AcceptanceDate")?.date;
@@ -200,27 +268,9 @@ export default function RFPDetailPage() {
       <div className="mb-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-baseline justify-between gap-4">
-              <h1 className="text-4xl font-bold text-text-primary">
-                {rfp.project.name}
-              </h1>
-              {rfp.vendorResponse && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-sm text-text-secondary">Status:</span>
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      rfp.vendorResponse.status === "Participating"
-                        ? "bg-green-100 text-green-800"
-                        : rfp.vendorResponse.status === "ProposalSubmitted"
-                        ? "bg-purple-100 text-purple-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {rfp.vendorResponse.status}
-                  </span>
-                </div>
-              )}
-            </div>
+            <h1 className="text-4xl font-bold text-text-primary">
+              {rfp.project.name}
+            </h1>
           </div>
           <div className="flex gap-2">
             {canParticipate && (
@@ -254,15 +304,21 @@ export default function RFPDetailPage() {
           </TabsContent>
 
           <TabsContent value="questions">
-            <RFPQuestions rfpId={rfpId} rfp={rfp} onReload={loadData} />
+            <RFPQuestions rfpId={rfpId} rfp={rfp} onReload={handleReload} />
           </TabsContent>
 
           <TabsContent value="proposal">
-            <RFPProposal rfpId={rfpId} rfp={rfp} contactPerson={null} onReload={loadData} isPreviewMode={true} />
+            <RFPProposal rfpId={rfpId} rfp={rfp} contactPerson={null} onReload={handleReload} isPreviewMode={true} />
           </TabsContent>
         </Tabs>
       ) : isParticipating ? (
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value);
+          // Load proposal data when proposal tab becomes active
+          if (value === "proposal" && !isPreviewMode) {
+            loadProposalData();
+          }
+        }}>
           <div className="flex items-center justify-between border-b border-border-primary">
             <TabsList>
               <TabsTrigger value="information">Information</TabsTrigger>
@@ -270,7 +326,33 @@ export default function RFPDetailPage() {
               <TabsTrigger value="proposal">Delivery of Proposal</TabsTrigger>
             </TabsList>
             <div className="pb-2">
-              <Button onClick={() => setShowQuestionModal(true)}>Ask a Question</Button>
+              {activeTab === "information" && rfp.vendorResponse && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-text-secondary">Status:</span>
+                  <span
+                    className={`px-2 py-2 text-sm font-medium rounded-full ${
+                      rfp.vendorResponse.status === "Participating" || rfp.vendorResponse.status === "ProposalSubmitted"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {expandStatusValue(rfp.vendorResponse.status)}
+                  </span>
+                </div>
+              )}
+              {activeTab === "questions" && (
+                <Button onClick={() => setShowQuestionModal(true)}>Ask a Question</Button>
+              )}
+              {activeTab === "proposal" && (
+                <RFPProposalSubmitButton 
+                  rfpId={rfpId} 
+                  rfp={rfp} 
+                  contactPerson={contactPerson} 
+                  onReload={handleReload}
+                  files={proposalFiles}
+                  requirementsResponse={proposalRequirementsResponse}
+                />
+              )}
             </div>
           </div>
 
@@ -279,11 +361,19 @@ export default function RFPDetailPage() {
           </TabsContent>
 
           <TabsContent value="questions">
-            <RFPQuestions rfpId={rfpId} rfp={rfp} onReload={loadData} showQuestionModal={showQuestionModal} onCloseQuestionModal={() => setShowQuestionModal(false)} />
+            <RFPQuestions rfpId={rfpId} rfp={rfp} onReload={handleReload} showQuestionModal={showQuestionModal} onCloseQuestionModal={() => setShowQuestionModal(false)} />
           </TabsContent>
 
           <TabsContent value="proposal">
-            <RFPProposal rfpId={rfpId} rfp={rfp} contactPerson={contactPerson} onReload={loadData} />
+            <RFPProposal 
+              rfpId={rfpId} 
+              rfp={rfp} 
+              contactPerson={contactPerson} 
+              onReload={handleReload}
+              files={proposalFiles}
+              requirementsResponse={proposalRequirementsResponse}
+              onProposalDataReload={loadProposalData}
+            />
           </TabsContent>
         </Tabs>
       ) : (

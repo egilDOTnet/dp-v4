@@ -190,6 +190,7 @@ model Requirement {
   createdBy      User                 @relation("RequirementCreator", fields: [createdById], references: [id], onDelete: Restrict)
   lastModifiedBy User                 @relation("RequirementModifier", fields: [lastModifiedById], references: [id], onDelete: Restrict)
   history        RequirementHistory[]
+  rfpRequirementResponses RFPRequirementResponse[]
 
   @@index([hierarchyId])
   @@index([hierarchyId, order])
@@ -224,6 +225,13 @@ enum RequirementStatus {
   Imported
 }
 
+enum RequirementAnswer {
+  Yes
+  No
+  Partial
+  Development
+}
+
 enum Role {
   GlobalAdministrator
   CompanyAdministrator
@@ -237,7 +245,7 @@ enum VendorStatus {
   RFI_Started
   RFI_Answered
   RFP_Received
-  RFP_Answered
+  RFP_Delivered
   RFP_Rejected
   Shortlisted
   Lost
@@ -646,6 +654,7 @@ model RFPVendorResponse {
   participatedAt      DateTime?
   proposalSubmittedAt DateTime?
   declineNote         String?
+  hasProposalChanges  Boolean                 @default(false)
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
 
@@ -653,6 +662,7 @@ model RFPVendorResponse {
   projectVendor ProjectVendor       @relation(fields: [projectVendorId], references: [id], onDelete: Cascade)
   contactPerson VendorContactPerson @relation(fields: [contactPersonId], references: [id], onDelete: Restrict)
   proposalFiles RFPProposalFile[]
+  requirementResponses RFPRequirementResponse[]
 
   @@unique([rfpId, projectVendorId])
   @@index([rfpId])
@@ -675,6 +685,24 @@ model RFPProposalFile {
 
   @@index([vendorResponseId])
   @@index([vendorResponseId, order])
+}
+
+model RFPRequirementResponse {
+  id              String              @id @default(cuid())
+  requirementId   String
+  vendorResponseId String
+  answer          RequirementAnswer?
+  description     String?
+  reference       String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  requirement     Requirement         @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  vendorResponse  RFPVendorResponse   @relation(fields: [vendorResponseId], references: [id], onDelete: Cascade)
+  
+  @@unique([requirementId, vendorResponseId])
+  @@index([vendorResponseId])
+  @@index([requirementId])
 }
 
 model PendingEmailNotification {

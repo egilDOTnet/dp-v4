@@ -498,7 +498,7 @@ export default function VendorForm({
               <option value="RFI_Started">RFI Started</option>
               <option value="RFI_Answered">RFI Answered</option>
               <option value="RFP_Received">RFP Received</option>
-              <option value="RFP_Answered">RFP Answered</option>
+              <option value="RFP_Delivered">RFP Delivered</option>
               <option value="RFP_Rejected">RFP Rejected</option>
               <option value="Shortlisted">Shortlisted</option>
               <option value="Lost">Lost</option>

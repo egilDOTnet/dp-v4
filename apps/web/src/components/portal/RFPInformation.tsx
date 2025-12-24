@@ -357,8 +357,6 @@ export function RFPInformation({ rfp, isDeclined = false }: RFPInformationProps)
                           >
                             Excel
                           </button>
-                          <span className="text-text-tertiary">Inline editing</span>
-                          <span className="text-xs text-text-tertiary italic">(Coming soon)</span>
                         </div>
                       </div>
                     ) : (

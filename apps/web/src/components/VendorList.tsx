@@ -62,7 +62,7 @@ const STATUS_OPTIONS: { value: VendorStatus; label: string }[] = [
   { value: "RFI_Started", label: "RFI Started" },
   { value: "RFI_Answered", label: "RFI Answered" },
   { value: "RFP_Received", label: "RFP Received" },
-  { value: "RFP_Answered", label: "RFP Answered" },
+  { value: "RFP_Delivered", label: "RFP Delivered" },
   { value: "RFP_Rejected", label: "RFP Rejected" },
   { value: "Shortlisted", label: "Shortlisted" },
   { value: "Lost", label: "Lost" },

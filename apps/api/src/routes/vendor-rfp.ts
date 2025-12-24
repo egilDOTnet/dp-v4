@@ -5,6 +5,7 @@ import { RFPVendorResponseStatus } from "@prisma/client";
 import { authenticateVendorContact, requireMainContact, verifyRFPAccess, VendorContactRequest } from "../middleware/vendor-auth";
 import { generateRequirementsPDF } from "../utils/requirements-pdf";
 import { generateRequirementsExcel } from "../utils/requirements-excel";
+import { parseRequirementsExcel, detectColumnStructure, parseRequirementsExcelWithMapping, ColumnMapping } from "../utils/rfp-requirements-excel";
 
 // Store magic links in memory (in production, use Redis or database)
 const vendorMagicLinks = new Map<string, { email: string; expiresAt: number }>();
@@ -1269,6 +1270,7 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
               participatedAt: vendorResponse.participatedAt?.toISOString() || null,
               proposalSubmittedAt: vendorResponse.proposalSubmittedAt?.toISOString() || null,
               declineNote: vendorResponse.declineNote || null,
+              hasProposalChanges: vendorResponse.hasProposalChanges,
               proposalFiles: vendorResponse.proposalFiles.map((file) => ({
                 id: file.id,
                 fileName: file.fileName,
@@ -2013,6 +2015,12 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         },
       });
 
+      // Mark proposal as having changes
+      await db.rFPVendorResponse.update({
+        where: { id: vendorResponse.id },
+        data: { hasProposalChanges: true },
+      });
+
       return reply.send({
         id: proposalFile.id,
         fileName: proposalFile.fileName,
@@ -2121,6 +2129,12 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         },
       });
 
+      // Mark proposal as having changes
+      await db.rFPVendorResponse.update({
+        where: { id: proposalFile.vendorResponse.id },
+        data: { hasProposalChanges: true },
+      });
+
       return reply.send({
         id: updated.id,
         fileName: updated.fileName,
@@ -2202,9 +2216,18 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: "Access denied" });
       }
 
+      // Store vendor response ID before deletion
+      const vendorResponseId = proposalFile.vendorResponse.id;
+
       // Delete file
       await db.rFPProposalFile.delete({
         where: { id: fileId },
+      });
+
+      // Mark proposal as having changes
+      await db.rFPVendorResponse.update({
+        where: { id: vendorResponseId },
+        data: { hasProposalChanges: true },
       });
 
       return reply.send({ message: "File deleted successfully" });
@@ -2285,6 +2308,7 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         },
         include: {
           proposalFiles: true,
+          requirementResponses: true,
         },
       });
 
@@ -2292,8 +2316,19 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "Vendor response not found. Please participate first." });
       }
 
-      if (vendorResponse.status !== RFPVendorResponseStatus.Participating) {
-        return reply.status(400).send({ error: "Vendor must be participating to submit proposal" });
+      // Check if this is a resubmission
+      const isResubmission = vendorResponse.status === RFPVendorResponseStatus.ProposalSubmitted;
+      
+      if (isResubmission) {
+        // Only allow resubmission if there are proposal changes
+        if (!vendorResponse.hasProposalChanges) {
+          return reply.status(400).send({ error: "No changes detected. You can only resubmit after making changes to your proposal." });
+        }
+      } else {
+        // First submission - must be participating
+        if (vendorResponse.status !== RFPVendorResponseStatus.Participating) {
+          return reply.status(400).send({ error: "Vendor must be participating to submit proposal" });
+        }
       }
 
       // Check if there are any files
@@ -2301,12 +2336,36 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "At least one proposal file is required" });
       }
 
-      // Update vendor response status
+      // Check if RFP has Requirements document
+      const requirementsDocument = await db.rFPDocument.findFirst({
+        where: {
+          rfpId: rfp.id,
+          type: "Requirements",
+        },
+      });
+
+      // If Requirements document exists, validate that at least one requirement response exists
+      if (requirementsDocument) {
+        if (vendorResponse.requirementResponses.length === 0) {
+          return reply.status(400).send({ error: "Requirements response is required. Please upload your requirements response Excel file." });
+        }
+      }
+
+      // Update vendor response status and reset hasProposalChanges
       const updated = await db.rFPVendorResponse.update({
         where: { id: vendorResponse.id },
         data: {
           status: RFPVendorResponseStatus.ProposalSubmitted,
           proposalSubmittedAt: new Date(),
+          hasProposalChanges: false,
+        },
+      });
+
+      // Update ProjectVendor status to RFP_Delivered
+      await db.projectVendor.update({
+        where: { id: projectVendor.id },
+        data: {
+          status: "RFP_Delivered",
         },
       });
 
@@ -2314,6 +2373,110 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         id: updated.id,
         status: updated.status,
         proposalSubmittedAt: updated.proposalSubmittedAt?.toISOString() || null,
+      });
+    }
+  );
+
+  /**
+   * Reopen proposal submission
+   * Only allowed for main contact
+   * Updates RFPVendorResponse status from ProposalSubmitted back to Participating
+   */
+  fastify.post<{ Params: { rfpId: string } }>(
+    "/vendor-rfp/rfps/:rfpId/proposal/reopen",
+    {
+      preHandler: [authenticateVendorContact, verifyRFPAccess, requireMainContact()],
+      schema: {
+        description: "Reopen proposal submission. Only allowed for main contact.",
+        tags: ["vendor-rfp"],
+        params: {
+          type: "object",
+          required: ["rfpId"],
+          properties: {
+            rfpId: {
+              type: "string",
+              description: "RFP ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              status: { type: "string" },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { rfpId: string } }>, reply: FastifyReply) => {
+      const vendorContact = (request as VendorContactRequest).vendorContact;
+      if (!vendorContact) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const rfp = (request as any).rfp;
+      if (!rfp) {
+        return reply.status(404).send({ error: "RFP not found" });
+      }
+
+      // Get project vendor
+      const projectVendor = await db.projectVendor.findFirst({
+        where: {
+          projectId: rfp.projectId,
+          vendorId: vendorContact.vendorId,
+        },
+      });
+
+      if (!projectVendor) {
+        return reply.status(403).send({ error: "Vendor does not have access to this RFP" });
+      }
+
+      // Get vendor response
+      const vendorResponse = await db.rFPVendorResponse.findUnique({
+        where: {
+          rfpId_projectVendorId: {
+            rfpId: rfp.id,
+            projectVendorId: projectVendor.id,
+          },
+        },
+      });
+
+      if (!vendorResponse) {
+        return reply.status(400).send({ error: "Vendor response not found." });
+      }
+
+      // Only allow reopening if status is ProposalSubmitted
+      if (vendorResponse.status !== RFPVendorResponseStatus.ProposalSubmitted) {
+        return reply.status(400).send({ error: "Proposal must be submitted to reopen it." });
+      }
+
+      // Update vendor response status back to Participating
+      const updated = await db.rFPVendorResponse.update({
+        where: { id: vendorResponse.id },
+        data: {
+          status: RFPVendorResponseStatus.Participating,
+        },
+      });
+
+      // Update ProjectVendor status back to RFP_Received
+      await db.projectVendor.update({
+        where: { id: projectVendor.id },
+        data: {
+          status: "RFP_Received",
+        },
+      });
+
+      return reply.send({
+        id: updated.id,
+        status: updated.status,
       });
     }
   );
@@ -2533,6 +2696,396 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
           message: error.message || "Failed to generate Excel",
         });
       }
+    }
+  );
+
+  /**
+   * Upload requirements response Excel file
+   * Accepts xlsx file upload, parses it, and creates/updates RFPRequirementResponse records
+   * First attempts auto-detection of column structure
+   * If auto-detection fails, returns column detection result with available columns
+   * Accepts optional columnMapping in form data for second call
+   */
+  fastify.post<{ Params: { rfpId: string } }>(
+    "/vendor-rfp/rfps/:rfpId/requirements/upload",
+    {
+      preHandler: [authenticateVendorContact, verifyRFPAccess],
+      schema: {
+        description: "Upload requirements response Excel file. Returns column mapping info if needed.",
+        tags: ["vendor-rfp"],
+        params: {
+          type: "object",
+          required: ["rfpId"],
+          properties: {
+            rfpId: {
+              type: "string",
+              description: "RFP ID",
+            },
+          },
+        },
+        consumes: ["multipart/form-data"],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              totalRequirements: { type: "number" },
+              answeredCount: { type: "number" },
+              percentage: { type: "number" },
+              invalidAnswers: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    requirementNumber: { type: "string" },
+                    invalidValue: { type: "string" },
+                    row: { type: "number" },
+                  },
+                },
+              },
+              needsColumnMapping: { type: "boolean" },
+              availableColumns: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    index: { type: "number" },
+                    header: { type: "string" },
+                    sampleValues: {
+                      type: "array",
+                      items: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { rfpId: string } }>, reply: FastifyReply) => {
+      const vendorContact = (request as VendorContactRequest).vendorContact;
+      if (!vendorContact) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const rfp = (request as any).rfp;
+      if (!rfp) {
+        return reply.status(404).send({ error: "RFP not found" });
+      }
+
+      // Get project vendor
+      const projectVendor = await db.projectVendor.findFirst({
+        where: {
+          projectId: rfp.projectId,
+          vendorId: vendorContact.vendorId,
+        },
+      });
+
+      if (!projectVendor) {
+        return reply.status(403).send({ error: "Vendor does not have access to this RFP" });
+      }
+
+      // Get or create vendor response
+      let vendorResponse = await db.rFPVendorResponse.findUnique({
+        where: {
+          rfpId_projectVendorId: {
+            rfpId: rfp.id,
+            projectVendorId: projectVendor.id,
+          },
+        },
+      });
+
+      if (!vendorResponse) {
+        vendorResponse = await db.rFPVendorResponse.create({
+          data: {
+            rfpId: rfp.id,
+            projectVendorId: projectVendor.id,
+            contactPersonId: vendorContact.contactPersonId,
+            status: RFPVendorResponseStatus.Participating,
+          },
+        });
+      }
+
+      // Parse multipart form data
+      // First, check for column mapping field
+      let columnMapping: ColumnMapping | undefined;
+      let fileData: any = null;
+
+      const parts = request.parts();
+      for await (const part of parts) {
+        if (part.type === "file") {
+          fileData = part;
+        } else if (part.type === "field" && part.fieldname === "columnMapping") {
+          try {
+            columnMapping = JSON.parse(part.value as string) as ColumnMapping;
+          } catch (err) {
+            return reply.status(400).send({ error: "Invalid column mapping format" });
+          }
+        }
+      }
+
+      if (!fileData) {
+        return reply.status(400).send({ error: "File is required" });
+      }
+
+      // Validate file type (must be xlsx)
+      if (!fileData.mimetype || !fileData.mimetype.includes("spreadsheetml")) {
+        return reply.status(400).send({ error: "File must be an Excel file (.xlsx)" });
+      }
+
+      // Read file data
+      const chunks: Buffer[] = [];
+      for await (const chunk of fileData.file) {
+        chunks.push(chunk);
+      }
+      const fileBuffer = Buffer.concat(chunks);
+
+      // If no column mapping provided, try auto-detection
+      if (!columnMapping) {
+        try {
+          const detectionResult = await detectColumnStructure(fileBuffer);
+          if (detectionResult.needsMapping) {
+            // Return column mapping request
+            return reply.send({
+              needsColumnMapping: true,
+              availableColumns: detectionResult.availableColumns,
+              totalRequirements: 0,
+              answeredCount: 0,
+              percentage: 0,
+              invalidAnswers: [],
+            });
+          }
+          // Use detected mapping
+          if (detectionResult.mapping) {
+            columnMapping = detectionResult.mapping;
+          }
+        } catch (err: any) {
+          return reply.status(400).send({ 
+            error: `Failed to detect column structure: ${err.message || "Invalid file format"}` 
+          });
+        }
+      }
+
+      // If still no mapping, use standard format
+      if (!columnMapping) {
+        columnMapping = {
+          requirementNumber: 0, // Column A
+          answer: 3, // Column D
+          description: 4, // Column E
+          reference: 5, // Column F
+        };
+      }
+
+      // Parse Excel file with mapping
+      let parseResult;
+      try {
+        parseResult = await parseRequirementsExcelWithMapping(fileBuffer, columnMapping);
+      } catch (err: any) {
+        return reply.status(400).send({ 
+          error: `Failed to parse Excel file: ${err.message || "Invalid file format"}` 
+        });
+      }
+
+      // Delete all existing requirement responses for this vendor before loading new data
+      // This ensures each upload completely replaces the previous responses
+      await db.rFPRequirementResponse.deleteMany({
+        where: {
+          vendorResponseId: vendorResponse.id,
+        },
+      });
+
+      // Get all requirements for this project
+      const requirements = await db.requirement.findMany({
+        where: {
+          hierarchy: {
+            projectId: rfp.projectId,
+          },
+          status: "Approved",
+        },
+      });
+
+      // Create a map of requirement numbers to requirement IDs
+      const requirementMap = new Map<string, string>();
+      requirements.forEach((req) => {
+        requirementMap.set(req.number, req.id);
+      });
+
+      // Process parsed responses
+      const upsertPromises = parseResult.responses.map(async (response) => {
+        const requirementId = requirementMap.get(response.requirementNumber);
+        if (!requirementId) {
+          // Skip if requirement not found (might be from different version)
+          return null;
+        }
+
+        // Upsert requirement response
+        return db.rFPRequirementResponse.upsert({
+          where: {
+            requirementId_vendorResponseId: {
+              requirementId,
+              vendorResponseId: vendorResponse.id,
+            },
+          },
+          create: {
+            requirementId,
+            vendorResponseId: vendorResponse.id,
+            answer: response.answer,
+            description: response.description || null,
+            reference: response.reference || null,
+          },
+          update: {
+            answer: response.answer,
+            description: response.description || null,
+            reference: response.reference || null,
+          },
+        });
+      });
+
+      await Promise.all(upsertPromises);
+
+      return reply.send({
+        totalRequirements: parseResult.totalRequirements,
+        answeredCount: parseResult.answeredCount,
+        percentage: parseResult.percentage,
+        invalidAnswers: parseResult.invalidAnswers,
+        needsColumnMapping: false,
+      });
+    }
+  );
+
+  /**
+   * Get requirements responses for RFP
+   * Returns existing responses for the vendor
+   */
+  fastify.get<{ Params: { rfpId: string } }>(
+    "/vendor-rfp/rfps/:rfpId/requirements/responses",
+    {
+      preHandler: [authenticateVendorContact, verifyRFPAccess],
+      schema: {
+        description: "Get requirements responses for RFP",
+        tags: ["vendor-rfp"],
+        params: {
+          type: "object",
+          required: ["rfpId"],
+          properties: {
+            rfpId: {
+              type: "string",
+              description: "RFP ID",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              responses: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    requirementId: { type: "string" },
+                    requirementNumber: { type: "string" },
+                    answer: { type: "string", nullable: true },
+                    description: { type: "string", nullable: true },
+                    reference: { type: "string", nullable: true },
+                  },
+                },
+              },
+              totalRequirements: { type: "number" },
+              answeredCount: { type: "number" },
+              percentage: { type: "number" },
+            },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { rfpId: string } }>, reply: FastifyReply) => {
+      const vendorContact = (request as VendorContactRequest).vendorContact;
+      if (!vendorContact) {
+        return reply.status(401).send({ error: "Unauthorized" });
+      }
+
+      const rfp = (request as any).rfp;
+      if (!rfp) {
+        return reply.status(404).send({ error: "RFP not found" });
+      }
+
+      // Get project vendor
+      const projectVendor = await db.projectVendor.findFirst({
+        where: {
+          projectId: rfp.projectId,
+          vendorId: vendorContact.vendorId,
+        },
+      });
+
+      if (!projectVendor) {
+        return reply.status(403).send({ error: "Vendor does not have access to this RFP" });
+      }
+
+      // Get vendor response
+      const vendorResponse = await db.rFPVendorResponse.findUnique({
+        where: {
+          rfpId_projectVendorId: {
+            rfpId: rfp.id,
+            projectVendorId: projectVendor.id,
+          },
+        },
+        include: {
+          requirementResponses: {
+            include: {
+              requirement: true,
+            },
+          },
+        },
+      });
+
+      if (!vendorResponse) {
+        return reply.send({
+          responses: [],
+          totalRequirements: 0,
+          answeredCount: 0,
+          percentage: 0,
+        });
+      }
+
+      // Get total approved requirements
+      const totalRequirements = await db.requirement.count({
+        where: {
+          hierarchy: {
+            projectId: rfp.projectId,
+          },
+          status: "Approved",
+        },
+      });
+
+      const answeredCount = vendorResponse.requirementResponses.filter(
+        (r) => r.answer !== null
+      ).length;
+
+      const percentage = totalRequirements > 0
+        ? Math.round((answeredCount / totalRequirements) * 100)
+        : 0;
+
+      return reply.send({
+        responses: vendorResponse.requirementResponses.map((r) => ({
+          id: r.id,
+          requirementId: r.requirementId,
+          requirementNumber: r.requirement.number,
+          answer: r.answer,
+          description: r.description,
+          reference: r.reference,
+        })),
+        totalRequirements,
+        answeredCount,
+        percentage,
+      });
     }
   );
 }

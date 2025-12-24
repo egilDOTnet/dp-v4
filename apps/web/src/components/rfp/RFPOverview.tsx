@@ -116,13 +116,24 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
       RFI_Started: "RFI Started",
       RFI_Answered: "RFI Answered",
       RFP_Received: "RFP Received",
-      RFP_Answered: "RFP Answered",
+      RFP_Delivered: "RFP Delivered",
       RFP_Rejected: "RFP Rejected",
       Shortlisted: "Shortlisted",
       Lost: "Lost",
       Won: "Won",
     };
     return statusLabels[status] || status;
+  };
+
+  const getVendorStatusColor = (status: string): "default" | "success" | "warning" | "error" | "info" => {
+    switch (status) {
+      case "RFP_Delivered":
+        return "success"; // Acknowledgement color (green)
+      case "RFP_Rejected":
+        return "error"; // Error color (red)
+      default:
+        return "default";
+    }
   };
 
 
@@ -340,7 +351,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
                           : "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge>{formatVendorStatus(pv.status)}</Badge>
+                        <Badge variant={getVendorStatusColor(pv.status)}>{formatVendorStatus(pv.status)}</Badge>
                       </TableCell>
                       {isAdmin && (
                         <TableCell>

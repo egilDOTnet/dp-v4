@@ -1379,6 +1379,68 @@ export const api = {
         }>(`/api/vendor-rfp/rfps/${rfpId}/proposal/submit`, {
           method: "POST",
         }),
+      reopenProposal: (rfpId: string) =>
+        apiRequest<{
+          id: string;
+          status: RFPVendorResponseStatus;
+        }>(`/api/vendor-rfp/rfps/${rfpId}/proposal/reopen`, {
+          method: "POST",
+        }),
+      uploadRequirementsResponse: async (
+        rfpId: string,
+        file: File,
+        columnMapping?: { requirementNumber: number; answer: number; description: number; reference: number }
+      ) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        if (columnMapping) {
+          formData.append("columnMapping", JSON.stringify(columnMapping));
+        }
+
+        const token = typeof window !== "undefined"
+          ? localStorage.getItem("token")
+          : (globalThis as any).localStorage?.getItem("token") ?? null;
+
+        const headers: HeadersInit = {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        };
+
+        const apiUrl = getApiUrlRuntime();
+        const response = await fetch(`${apiUrl}/api/vendor-rfp/rfps/${rfpId}/requirements/upload`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: "Request failed" }));
+          throw new Error(errorData.error || "Request failed");
+        }
+
+        return response.json() as Promise<{
+          totalRequirements: number;
+          answeredCount: number;
+          percentage: number;
+          invalidAnswers?: Array<{ requirementNumber: string; invalidValue: string; row: number }>;
+          needsColumnMapping?: boolean;
+          availableColumns?: Array<{ index: number; header: string; sampleValues: string[] }>;
+        }>;
+      },
+      getRequirementsResponses: (rfpId: string) =>
+        apiRequest<{
+          responses: Array<{
+            id: string;
+            requirementId: string;
+            requirementNumber: string;
+            answer: string | null;
+            description: string | null;
+            reference: string | null;
+          }>;
+          totalRequirements: number;
+          answeredCount: number;
+          percentage: number;
+        }>(`/api/vendor-rfp/rfps/${rfpId}/requirements/responses`),
     },
   },
 };
@@ -1589,7 +1651,7 @@ export type VendorStatus =
   | "RFI_Started"
   | "RFI_Answered"
   | "RFP_Received"
-  | "RFP_Answered"
+  | "RFP_Delivered"
   | "RFP_Rejected"
   | "Shortlisted"
   | "Lost"
@@ -2046,6 +2108,7 @@ export interface RFPDetail extends RFPListItem {
     participatedAt: string | null;
     proposalSubmittedAt: string | null;
     declineNote: string | null;
+    hasProposalChanges: boolean;
     proposalFiles: RFPProposalFile[];
   } | null;
 }

@@ -38,6 +38,8 @@ This setup runs everything in Docker containers, including the development serve
    # Optional: Seed database
    docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:seed"
    ```
+   
+   **Note:** Migrations are automatically applied when the API container starts (see `docker-compose.yml`). The manual command above ensures immediate application during development.
 
 4. **Environment variables:**
    
@@ -147,17 +149,52 @@ If you see errors about workspace packages not being found (`@dp/config`, etc.):
 
 If you see OpenSSL-related errors with Prisma, the Docker images include OpenSSL. If issues persist, ensure the Prisma schema includes the correct binary targets for Alpine Linux (already configured in `packages/db/prisma/schema.prisma`).
 
+### Database Migrations in Docker
+
+**Important:** This project uses Docker containers. All database migration commands must be run inside the Docker containers.
+
+#### Creating New Migrations
+
+When creating new migrations, always use Docker commands:
+
+```bash
+# Create a migration (without applying - recommended to review SQL first)
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma migrate dev --name <migration_name> --create-only"
+
+# Review the generated SQL in packages/db/prisma/migrations/<timestamp>_<migration_name>/migration.sql
+
+# Apply the migration manually (for immediate effect)
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma migrate deploy"
+```
+
+**Note:** Migrations are automatically applied on container startup via `docker-compose.yml` (see line 42), but manual application ensures immediate effect during development.
+
+#### Generating Prisma Client
+
+After schema changes, Prisma client is automatically regenerated in the Docker container startup script. To regenerate manually:
+
+```bash
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma generate"
+```
+
+#### Checking Migration Status
+
+To check which migrations have been applied:
+
+```bash
+docker-compose exec postgres psql -U postgres -d app -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY started_at;"
+```
+
 ### Migration Shadow Database Error (P3006 / P1014)
 
 If you encounter a shadow database error when creating migrations (e.g., "The underlying table for model `User` does not exist"), see the detailed troubleshooting guide:
 
 📖 **[Migration Troubleshooting Guide](./packages/db/MIGRATION_TROUBLESHOOTING.md)**
 
-**Quick fix:** Use the `--create-only` flag when creating migrations:
+**Quick fix:** Use the `--create-only` flag when creating migrations (with Docker):
 
 ```bash
-cd packages/db
-pnpm db:migrate:create-only --name your_migration_name
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma migrate dev --name your_migration_name --create-only"
 ```
 
 This creates the migration file without applying it, avoiding shadow database validation issues.

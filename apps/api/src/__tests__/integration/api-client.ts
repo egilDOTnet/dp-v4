@@ -236,7 +236,7 @@ export type VendorStatus =
   | 'RFI_Started'
   | 'RFI_Answered'
   | 'RFP_Received'
-  | 'RFP_Answered'
+  | 'RFP_Delivered'
   | 'RFP_Rejected'
   | 'Shortlisted'
   | 'Lost'
