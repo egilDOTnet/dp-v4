@@ -15,34 +15,39 @@ This README outlines the tech stack, goals, structure, and setup steps.
 ## Tech Stack
 
 ### Frontend
-- Next.js (App Router)
-- TypeScript
-- Tailwind CSS
+- **Next.js 16.1.0** (App Router)
+- **React 19.2.3** (with React DOM)
+- **TypeScript 5.9.3**
+- **Tailwind CSS 4.1.18**
 - shadcn/ui
 - React Query (server state)
-- React Hook Form + Zod (forms + validation)
+- **React Hook Form 7.68.0** + **Zod 4.2.1** (forms + validation)
 - Optional: NextAuth or AWS Cognito integration
 
 ### Backend
-- Fastify (Node.js + TypeScript)
-- Zod for runtime validation
+- **Fastify 5.6.2** (Node.js + TypeScript)
+- **Zod 4.2.1** for runtime validation
 - PostgreSQL
-- Prisma ORM
+- **Prisma ORM 7.2.0** (with @prisma/client)
 - Optional: tRPC
 
 ### DevOps & Infrastructure
 - Docker for local development
 - docker-compose (web + api + postgres)
+  - Monorepo-aware: entire workspace mounted for proper pnpm workspace resolution
+  - Automatic dependency installation and Prisma client generation
+- **Turborepo 2.7.0** (monorepo build system)
+- **pnpm 10.26.1** (package manager)
 - AWS (ECS Fargate or EKS)
 - AWS Secrets Manager for secrets
 - Terraform or AWS CDK (TypeScript)
 - GitHub Actions for CI/CD
 
 ### Testing
-- Vitest
+- **Vitest 4.0.16**
 - Supertest (backend)
 - Playwright (E2E)
-- ESLint + Prettier
+- ESLint 9.39.2 + Prettier
 
 ---
 
@@ -66,22 +71,35 @@ docker/           # Docker configs
 
 ## Initial Setup
 
-### 1. Install dependencies
-pnpm install
+**Prerequisites:** Node.js 20.9.0+, pnpm 10.26.1+, Docker
 
-### 2. Start local dev
-docker-compose up --build
+See [SETUP.md](./SETUP.md) for detailed setup instructions.
 
-This runs:
-	•	Next.js app
-	•	Fastify API
-	•	PostgreSQL
+### Quick Start
 
-### 3. Run database migrations
-pnpm prisma migrate dev
+1. **Install dependencies:**
+   ```bash
+   pnpm install
+   ```
 
-### 4. Lint
+2. **Start all services with Docker:**
+   ```bash
+   docker-compose up --build
+   ```
+
+3. **Run database migrations:**
+   ```bash
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:migrate"
+   ```
+
+For more details:
+- **Setup Instructions**: [SETUP.md](./SETUP.md)
+- **Stack Versions**: [STACK_VERSIONS.md](./STACK_VERSIONS.md)
+
+### Lint
+```bash
 pnpm lint
+```
 
 ## Core Principles
 	•	Keep the codebase lean
@@ -108,5 +126,11 @@ Recommended pipeline steps:
 	3.	Test
 	4.	Build
 	5.	Deploy to AWS (ECS/EKS)
+
+## Documentation
+
+- **[SETUP.md](./SETUP.md)** - Detailed setup and troubleshooting guide
+- **[STACK_VERSIONS.md](./STACK_VERSIONS.md)** - Current dependency versions and upgrade history
+- **[API_DOCUMENTATION.md](./apps/api/API_DOCUMENTATION.md)** - API endpoint documentation
 
   

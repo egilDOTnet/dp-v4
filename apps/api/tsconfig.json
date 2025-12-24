@@ -1,8 +1,15 @@
 {
-  "extends": "@dp/config/typescript/node.json",
+  "extends": "../../packages/config/typescript/node.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+    "preserveSymlinks": false,
+    "lib": ["ES2022"],
+    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

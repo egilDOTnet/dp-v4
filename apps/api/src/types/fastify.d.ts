@@ -1,4 +1,3 @@
-import { FastifyRequest } from "fastify";
 import { JWTPayload } from "@dp/lib";
 
 declare module "@fastify/jwt" {
@@ -10,7 +9,10 @@ declare module "@fastify/jwt" {
 
 declare module "fastify" {
   interface FastifyRequest {
-    user?: JWTPayload;
+    user?: JWTPayload | undefined;
   }
+
+  // FastifySchema description is now declared in packages/config/typescript/types/fastify.d.ts
+  // to be available to both API and web packages
 }
 

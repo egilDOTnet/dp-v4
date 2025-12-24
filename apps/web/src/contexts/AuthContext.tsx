@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, User } from "@/lib/api";
 
 interface AuthContextType {
@@ -17,31 +17,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      refreshUser().catch(() => {
-        localStorage.removeItem("token");
-        setUser(null);
-        setLoading(false);
-      });
-    } else {
+  const refreshUser = useCallback(async () => {
+    try {
+      const userData = await api.auth.me();
+      setUser(userData);
+      setLoading(false);
+    } catch {
+      // Silently fail if API is not available or token is invalid
+      localStorage.removeItem("token");
+      setUser(null);
       setLoading(false);
     }
   }, []);
 
-  const refreshUser = async () => {
-    try {
-      const userData = await api.auth.me();
-      setUser(userData);
-    } catch (error) {
-      localStorage.removeItem("token");
-      setUser(null);
-      throw error;
-    } finally {
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    
+    // Skip token validation if we're in impersonation mode
+    // (impersonation uses vendor tokens, not admin tokens)
+    const isImpersonating = typeof window !== "undefined" 
+      ? sessionStorage.getItem('isImpersonating') === 'true'
+      : false;
+    
+    if (isImpersonating) {
+      // In impersonation mode, don't validate the token with admin API
+      // The portal layout will handle vendor token validation
+      setLoading(false);
+      return;
+    }
+    
+    if (token) {
+      refreshUser();
+    } else {
       setLoading(false);
     }
-  };
+  }, [refreshUser]);
 
   const login = (token: string, userData: User) => {
     localStorage.setItem("token", token);
@@ -52,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Call API first while token is still available
     try {
       await api.auth.logout();
-    } catch (error) {
+    } catch {
       // Ignore errors on logout - we'll clear local state anyway
     } finally {
       // Always clear local state

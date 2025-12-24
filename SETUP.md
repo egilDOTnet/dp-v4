@@ -2,19 +2,74 @@
 
 ## Prerequisites
 
-- Node.js 18+
-- pnpm 8+
+- Node.js 20.9.0+ (LTS)
+- pnpm 10.26.1+
 - Docker and Docker Compose
 - PostgreSQL (via Docker)
 
-## Initial Setup
+## Setup Options
+
+### Option 1: Full Docker Setup (Recommended)
+
+This setup runs everything in Docker containers, including the development servers. The entire monorepo workspace is mounted, so all workspace dependencies are properly resolved.
+
+1. **Install dependencies locally (for tooling like Prisma CLI):**
+   ```bash
+   pnpm install
+   ```
+
+2. **Start all services:**
+   ```bash
+   docker-compose up --build
+   ```
+
+   This will:
+   - Start PostgreSQL database
+   - Start Fastify API on port 3001
+   - Start Next.js app on port 3000
+   - Automatically install all workspace dependencies
+   - Generate Prisma client
+
+3. **Set up database:**
+   ```bash
+   # Run migrations
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:migrate"
+   
+   # Optional: Seed database
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:seed"
+   ```
+   
+   **Note:** Migrations are automatically applied when the API container starts (see `docker-compose.yml`). The manual command above ensures immediate application during development.
+
+4. **Environment variables:**
+   
+   The Docker setup uses environment variables from `docker-compose.yml`. For local development, you may want to create `.env` files:
+   
+   `apps/api/.env`:
+   ```
+   DATABASE_URL="postgresql://postgres:postgres@postgres:5432/app"
+   JWT_SECRET="your-secret-key-change-in-production"
+   PORT=3001
+   NODE_ENV=development
+   ```
+   
+   `apps/web/.env`:
+   ```
+   NEXT_PUBLIC_API_URL="http://localhost:3001"
+   ```
+
+**Note:** The Docker setup mounts the entire workspace to `/workspace` in the containers, which allows pnpm to properly resolve all workspace dependencies (`@dp/config`, `@dp/db`, `@dp/lib`, `@dp/ui`).
+
+### Option 2: Local Development
+
+For local development without Docker (except for PostgreSQL):
 
 1. **Install dependencies:**
    ```bash
    pnpm install
    ```
 
-2. **Start Docker services:**
+2. **Start PostgreSQL with Docker:**
    ```bash
    docker-compose up -d postgres
    ```
@@ -29,7 +84,7 @@
 
 4. **Environment variables:**
    
-   Create `.env` files in `apps/api` and `apps/web` (see `.env.example` files for reference):
+   Create `.env` files in `apps/api` and `apps/web`:
    
    `apps/api/.env`:
    ```
@@ -69,6 +124,81 @@
 
 ## Troubleshooting
 
+### Docker Issues
+
+#### Containers won't start or dependencies not found
+
+If you see errors about workspace packages not being found (`@dp/config`, etc.):
+
+1. **Ensure the entire workspace is mounted:**
+   The `docker-compose.yml` should mount the root directory (`.`), not individual app directories.
+
+2. **Rebuild containers:**
+   ```bash
+   docker-compose down
+   docker-compose up --build
+   ```
+
+3. **Check Prisma client generation:**
+   If the API fails with Prisma errors, regenerate the client:
+   ```bash
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma generate"
+   ```
+
+#### Prisma OpenSSL errors
+
+If you see OpenSSL-related errors with Prisma, the Docker images include OpenSSL. If issues persist, ensure the Prisma schema includes the correct binary targets for Alpine Linux (already configured in `packages/db/prisma/schema.prisma`).
+
+### Database Migrations in Docker
+
+**Important:** This project uses Docker containers. All database migration commands must be run inside the Docker containers.
+
+#### Creating New Migrations
+
+When creating new migrations, always use Docker commands:
+
+```bash
+# Create a migration (without applying - recommended to review SQL first)
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma migrate dev --name <migration_name> --create-only"
+
+# Review the generated SQL in packages/db/prisma/migrations/<timestamp>_<migration_name>/migration.sql
+
+# Apply the migration manually (for immediate effect)
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma migrate deploy"
+```
+
+**Note:** Migrations are automatically applied on container startup via `docker-compose.yml` (see line 42), but manual application ensures immediate effect during development.
+
+#### Generating Prisma Client
+
+After schema changes, Prisma client is automatically regenerated in the Docker container startup script. To regenerate manually:
+
+```bash
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma generate"
+```
+
+#### Checking Migration Status
+
+To check which migrations have been applied:
+
+```bash
+docker-compose exec postgres psql -U postgres -d app -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY started_at;"
+```
+
+### Migration Shadow Database Error (P3006 / P1014)
+
+If you encounter a shadow database error when creating migrations (e.g., "The underlying table for model `User` does not exist"), see the detailed troubleshooting guide:
+
+📖 **[Migration Troubleshooting Guide](./packages/db/MIGRATION_TROUBLESHOOTING.md)**
+
+**Quick fix:** Use the `--create-only` flag when creating migrations (with Docker):
+
+```bash
+docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma migrate dev --name your_migration_name --create-only"
+```
+
+This creates the migration file without applying it, avoiding shadow database validation issues.
+
 ### Port Already in Use
 
 If you get an error that port 3001 (or 3000) is already in use:
@@ -84,6 +214,113 @@ If you get an error that port 3001 (or 3000) is already in use:
 lsof -ti:3001 | xargs kill -9
 ```
 
+### Docker Container Logs
+
+To view logs for debugging:
+
+```bash
+# All services
+docker-compose logs
+
+# Specific service
+docker-compose logs api
+docker-compose logs web
+
+# Follow logs
+docker-compose logs -f api
+```
+
+### Next.js Routing Errors (Turbopack)
+
+#### Web server stuck in restart loop with "Invalid segment" error
+
+If the web container keeps restarting with an error like:
+```
+Invalid segment Static("contact"), catch all segment must be the last segment modifying the path
+```
+
+**Cause:** This happens when you have a catch-all route (`[...token]`) with nested static segments (like `contact`, `questions`, etc.) after it. In Next.js, catch-all routes must be the last segment in the path.
+
+**Solution:**
+1. Check for duplicate route directories:
+   ```bash
+   # Look for both [token] and [...token] directories
+   find apps/web/src/app -type d -name "*token*"
+   ```
+
+2. Remove the catch-all route directory if you have both:
+   ```bash
+   # Remove the catch-all route (keep the dynamic route [token] instead)
+   rm -rf apps/web/src/app/(vendor)/rfi/\[...token\]
+   ```
+
+3. Use dynamic routes (`[token]`) instead of catch-all routes (`[...token]`) when you need nested routes:
+   - ✅ **Correct:** `app/rfi/[token]/contact/page.tsx`
+   - ❌ **Incorrect:** `app/rfi/[...token]/contact/page.tsx`
+
+**Best Practice:** Use dynamic routes `[param]` for single parameters, and only use catch-all routes `[...param]` when you need to capture multiple path segments and don't have any nested static routes after it.
+
+### Test Database Setup
+
+**IMPORTANT:** Tests require a separate test database to prevent accidental deletion of development/production data.
+
+#### Safety Checks
+
+The test suite includes safety checks that:
+- **Require** the database name to contain `test` or `_test`
+- **Prevent** running tests against development/production databases
+- **Fail fast** with clear error messages if safety checks fail
+
+#### Setting Up Test Database
+
+1. **Create a test database:**
+   ```bash
+   # Connect to PostgreSQL
+   psql -U postgres -h localhost
+   
+   # Create test database
+   CREATE DATABASE app_test;
+   ```
+
+2. **Run migrations on test database:**
+   ```bash
+   cd packages/db
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test" pnpm prisma migrate deploy
+   ```
+
+3. **Set TEST_DATABASE_URL environment variable:**
+   
+   Option A: In `apps/api/.env`:
+   ```
+   TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test"
+   ```
+   
+   Option B: Export in your shell:
+   ```bash
+   export TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test"
+   ```
+
+4. **Run tests:**
+   ```bash
+   cd apps/api
+   pnpm test
+   ```
+
+#### Default Behavior
+
+If `TEST_DATABASE_URL` is not set, tests will default to `app_test` database. The safety checks ensure that even with this default, tests will fail if the database name doesn't contain `test`.
+
+#### Troubleshooting
+
+**Error: "SAFETY CHECK FAILED: Test database name must contain 'test'"**
+- Ensure your `TEST_DATABASE_URL` points to a database with `test` in its name
+- The default is `app_test` - create this database if it doesn't exist
+
+**Error: "Cannot cleanup non-test database"**
+- This means `cleanupDatabase()` detected a non-test database
+- Check that `DATABASE_URL` (used by tests) points to a test database
+- Never set `DATABASE_URL` to your development database when running tests
+
 ## Test User (if seeded)
 
 - Email: `admin@example.com`
@@ -91,6 +328,24 @@ lsof -ti:3001 | xargs kill -9
 - Role: Global Administrator
 
 ## Development Notes
+
+### Next.js Routing Best Practices
+
+When creating routes in `apps/web/src/app`, follow these rules:
+
+1. **Dynamic routes vs Catch-all routes:**
+   - Use `[param]` for single dynamic segments: `app/rfi/[token]/page.tsx`
+   - Use `[...param]` only when you need to capture multiple segments AND it's the last segment
+   - ❌ **Never** use catch-all routes with nested static segments:
+     - ❌ `app/rfi/[...token]/contact/page.tsx` (invalid - static segment after catch-all)
+   - ✅ **Always** use dynamic routes when you have nested routes:
+     - ✅ `app/rfi/[token]/contact/page.tsx` (correct)
+
+2. **Route groups:** Use `(groupName)` for organization without affecting the URL path
+
+3. **Before creating new routes:** Check for existing similar routes to avoid conflicts
+
+### General Development Notes
 
 - Magic links are displayed in the UI during development (not sent via email)
 - First user of a company is automatically assigned CompanyAdministrator role

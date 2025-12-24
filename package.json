@@ -6,16 +6,35 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
-    "test": "turbo run test",
+    "test": "turbo run test --filter=@dp/api && turbo run test --filter='!@dp/api'",
+    "test:parallel": "turbo run test",
     "clean": "turbo run clean"
   },
   "devDependencies": {
-    "turbo": "^2.0.0"
+    "turbo": "^2.7.0"
   },
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@10.26.1",
   "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
+    "node": ">=20.9.0",
+    "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "bcrypt",
+      "esbuild",
+      "prisma",
+      "sharp"
+    ],
+    "ignoredBuiltDependencies": [
+      "msw",
+      "unrs-resolver"
+    ],
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "react": "19",
+        "react-dom": "19"
+      }
+    }
   }
 }
-
