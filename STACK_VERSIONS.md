@@ -59,6 +59,13 @@ This document tracks the current versions of all major dependencies in the dp-v4
 - ✅ Zod 3.25.76 → 4.2.1 (Breaking changes: unified error handling)
 - ✅ Vitest 3.2.0 → 4.0.16 (Breaking changes: poolOptions removed, use maxWorkers/isolate)
 
+### Phase 4: Stack Cleanup (January 2025)
+- ✅ Standardized `@eslint/js` to `^9.39.2` across all packages
+- ✅ Updated `tsx` to `^4.21.0` in `apps/web` to match other packages
+- ✅ Removed redundant `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` (using unified `typescript-eslint` package)
+- ✅ Removed unused `@eslint/eslintrc` dependency (ESLint 9 uses flat config)
+- ✅ Added `*.tsbuildinfo` to `.gitignore` and cleaned up build artifacts
+
 ## Breaking Changes & Migration Notes
 
 ### Zod 4.2.1
@@ -119,4 +126,5 @@ pnpm --version
 
 See the upgrade plan for detailed migration notes:
 - `.cursor/plans/stack_version_review_and_upgrade_plan_*.plan.md`
+
 

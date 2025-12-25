@@ -38,6 +38,9 @@ assets/
 # Turbo
 .turbo
 
+# TypeScript
+*.tsbuildinfo
+
 # pnpm
 .pnpm-store
 **/.pnpm-store

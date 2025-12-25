@@ -70,7 +70,7 @@ importers:
         version: 4.2.1
     devDependencies:
       '@eslint/js':
-        specifier: ^9.38.0
+        specifier: ^9.39.2
         version: 9.39.2
       '@types/bcrypt':
         specifier: ^5.0.2
@@ -81,12 +81,6 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.16.0
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.0.0
-        version: 8.49.0(@typescript-eslint/parser@8.49.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.0.0
-        version: 8.49.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint:
         specifier: ^9.38.0
         version: 9.39.2(jiti@2.6.1)
@@ -97,7 +91,7 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
       typescript:
-        specifier: ^5.9.2
+        specifier: ^5.9.3
         version: 5.9.3
       typescript-eslint:
         specifier: ^8.49.0
@@ -178,9 +172,6 @@ importers:
       '@dp/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@eslint/eslintrc':
-        specifier: ^3.3.3
-        version: 3.3.3
       '@eslint/js':
         specifier: ^9.39.2
         version: 9.39.2
@@ -233,10 +224,10 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       tsx:
-        specifier: ^4.7.0
+        specifier: ^4.21.0
         version: 4.21.0
       typescript:
-        specifier: ^5.9.2
+        specifier: ^5.9.3
         version: 5.9.3
       typescript-eslint:
         specifier: ^8.49.0
@@ -285,7 +276,7 @@ importers:
         specifier: ^20.19.25
         version: 20.19.27
       typescript:
-        specifier: ^5.9.2
+        specifier: ^5.9.3
         version: 5.9.3
 
   packages/ui:
@@ -301,7 +292,7 @@ importers:
         version: 19.2.3(react@19.2.3)
     devDependencies:
       '@eslint/js':
-        specifier: ^9.38.0
+        specifier: ^9.39.2
         version: 9.39.2
       '@types/react':
         specifier: ^19.0.0
@@ -309,12 +300,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.0
         version: 19.2.3(@types/react@19.2.7)
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.0.0
-        version: 8.49.0(@typescript-eslint/parser@8.49.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.0.0
-        version: 8.49.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       eslint:
         specifier: ^9.38.0
         version: 9.39.2(jiti@2.6.1)
@@ -322,7 +307,7 @@ importers:
         specifier: ^9.1.0
         version: 9.1.2(eslint@9.39.2(jiti@2.6.1))
       typescript:
-        specifier: ^5.9.2
+        specifier: ^5.9.3
         version: 5.9.3
       typescript-eslint:
         specifier: ^8.49.0
