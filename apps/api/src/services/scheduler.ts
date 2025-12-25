@@ -142,7 +142,7 @@ async function checkAndPublish(fastify: FastifyInstance): Promise<void> {
  * Check for pending email notifications that should be sent
  * Only sends if the question hasn't been answered yet
  */
-async function checkAndSendEmailNotifications(fastify: FastifyInstance): Promise<void> {
+async function checkAndSendEmailNotifications(_fastify: FastifyInstance): Promise<void> {
   const now = new Date();
   
   try {

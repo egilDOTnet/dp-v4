@@ -127,4 +127,24 @@ pnpm --version
 See the upgrade plan for detailed migration notes:
 - `.cursor/plans/stack_version_review_and_upgrade_plan_*.plan.md`
 
+## Deprecated Subdependencies
+
+The following deprecated subdependencies are pulled in by transitive dependencies (not directly used):
+- `fstream@1.0.12` - from older build tools
+- `glob@7.2.3` - from older packages (glob v9+ available)
+- `inflight@1.0.6` - from older packages (has memory leaks)
+- `lodash.isequal@4.5.0` - from older lodash packages
+- `node-domexception@1.0.0` - from jsdom/polyfills (use native DOMException)
+- `rimraf@2.7.1` - from older packages (rimraf v4+ available)
+
+**Status:** Non-critical warnings. These are deep in the dependency tree and don't affect functionality.
+
+**Likely sources:**
+- `exceljs@4.4.0` - may use older dependencies
+- `pdfkit@0.15.0` - may use older dependencies  
+- `jszip@3.10.1` - may use older dependencies
+- `jsdom@23.0.1` - uses `node-domexception` for polyfills
+
+**Action:** Monitor for updates to parent packages. No immediate action required unless security issues are discovered.
+
 

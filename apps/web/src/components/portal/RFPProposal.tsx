@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { RFPDetail, RFPProposalFile, VendorContactPerson, api } from "@/lib/api";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/FormField";
@@ -37,7 +37,7 @@ export function RFPProposal({
   rfpId, 
   rfp, 
   contactPerson, 
-  onReload, 
+  onReload: _onReload, 
   isPreviewMode = false,
   files: filesProp,
   requirementsResponse: requirementsResponseProp,
@@ -92,22 +92,7 @@ export function RFPProposal({
     }
   }, [requirementsResponseProp]);
 
-  useEffect(() => {
-    if (isPreviewMode) {
-      // In preview mode, don't load files (read-only)
-      setFiles([]);
-      setLoading(false);
-    } else if (filesProp === undefined) {
-      // Only load data if props are not provided (backward compatibility)
-      loadData();
-    } else {
-      // Props provided, no need to load
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rfpId, isPreviewMode, filesProp]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [filesData, requirementsData] = await Promise.all([
         api.vendorRfp.rfps.getProposal(rfpId),
@@ -134,7 +119,21 @@ export function RFPProposal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [rfpId]);
+
+  useEffect(() => {
+    if (isPreviewMode) {
+      // In preview mode, don't load files (read-only)
+      setFiles([]);
+      setLoading(false);
+    } else if (filesProp === undefined) {
+      // Only load data if props are not provided (backward compatibility)
+      loadData();
+    } else {
+      // Props provided, no need to load
+      setLoading(false);
+    }
+  }, [rfpId, isPreviewMode, filesProp, loadData]);
 
   const loadFiles = async () => {
     if (onProposalDataReload) {
@@ -220,22 +219,6 @@ export function RFPProposal({
     } catch (err: any) {
       setError(err.message || "Failed to update file name");
       console.error("Failed to update file name:", err);
-    }
-  };
-
-  const handleSubmitProposal = async () => {
-    setSubmitting(true);
-    setError("");
-
-    try {
-      await api.vendorRfp.rfps.submitProposal(rfpId);
-      setShowSubmitModal(false);
-      await onReload(); // Reload RFP to get updated status
-    } catch (err: any) {
-      setError(err.message || "Failed to submit proposal");
-      console.error("Failed to submit proposal:", err);
-    } finally {
-      setSubmitting(false);
     }
   };
 

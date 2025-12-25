@@ -599,7 +599,7 @@ export default function VendorList({
     try {
       await onUpdateVendor(vendorId, { [field]: value });
       // Don't clear optimistic update here - let useEffect handle it when vendor data updates
-    } catch (error) {
+    } catch (_error) {
       // Revert optimistic update on error
       setCheckboxUpdates((prev) => {
         const newState = { ...prev };
@@ -1417,7 +1417,7 @@ export default function VendorList({
                                       setShowSearchResults((prev) => ({ ...prev, [vendor.id]: true }));
                                     }
                                   }}
-                                  onBlur={(e) => {
+                                  onBlur={(_e) => {
                                     // Delay to allow clicking on search results
                                     setTimeout(() => {
                                       const activeElement = document.activeElement;
@@ -1601,7 +1601,7 @@ export default function VendorList({
                                     const cleaned = e.target.value.replace(/\D/g, "").slice(0, 9);
                                     updateVendorFormField(vendor.id, "organizationNumber", cleaned);
                                   }}
-                                  onBlur={(e) => handleVendorFieldBlur(vendor.id, "organizationNumber")}
+                                  onBlur={(_e) => handleVendorFieldBlur(vendor.id, "organizationNumber")}
                                   onKeyDown={(e) => {
                                     if ((e.metaKey || e.ctrlKey) && e.key === "a") {
                                       e.preventDefault();
@@ -1652,7 +1652,7 @@ export default function VendorList({
                               placeholder="Domain name"
                               value={currentFormData.emailDomain}
                               onChange={(e) => updateVendorFormField(vendor.id, "emailDomain", e.target.value)}
-                              onBlur={(e) => handleVendorFieldBlur(vendor.id, "emailDomain")}
+                              onBlur={(_e) => handleVendorFieldBlur(vendor.id, "emailDomain")}
                               onKeyDown={(e) => {
                                 if ((e.metaKey || e.ctrlKey) && e.key === "a") {
                                   e.preventDefault();

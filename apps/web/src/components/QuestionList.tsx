@@ -71,6 +71,7 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
   const scrollPositionRef = React.useRef<number>(0);
+  const lastFocusedFieldRef = React.useRef<Record<string, string | null>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1248,14 +1249,14 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                         required: question.required ?? true,
                       };
 
-                      const [lastFocusedField, setLastFocusedField] = React.useState<string | null>(null);
+                      const lastFocusedField = lastFocusedFieldRef.current[question.id] || null;
 
                       const handleTitleClick = () => {
                         // Put all fields in edit mode
                         handleFieldFocus(question.id, "title");
                         handleFieldFocus(question.id, "description");
                         handleFieldFocus(question.id, "type");
-                        setLastFocusedField("title");
+                        lastFocusedFieldRef.current[question.id] = "title";
                       };
 
                       const handleTypeClick = () => {
@@ -1263,7 +1264,7 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
                         handleFieldFocus(question.id, "title");
                         handleFieldFocus(question.id, "description");
                         handleFieldFocus(question.id, "type");
-                        setLastFocusedField("type");
+                        lastFocusedFieldRef.current[question.id] = "type";
                       };
 
                       // Calculate display number accounting for active insert form

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, RFI, ProjectVendor } from "@/lib/api";
+import { api, RFI } from "@/lib/api";
 import {
   Dialog,
   DialogContent,

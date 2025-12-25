@@ -664,7 +664,7 @@ export async function createTestRFI(overrides?: {
   rfiInformation?: string;
   deadline?: Date | null;
   autoPublishDate?: Date | null;
-  isPublished?: boolean;
+  status?: "Draft" | "Published" | "Unpublished";
   publishedAt?: Date | null;
   unpublishedAt?: Date | null;
 }) {
@@ -692,7 +692,7 @@ export async function createTestRFI(overrides?: {
         rfiInformation: overrides.rfiInformation || "Test RFI Information",
         deadline: overrides.deadline ?? null,
         autoPublishDate: overrides.autoPublishDate ?? null,
-        isPublished: overrides.isPublished ?? false,
+        status: overrides.status || "Draft",
         publishedAt: overrides.publishedAt ?? null,
         unpublishedAt: overrides.unpublishedAt ?? null,
       },

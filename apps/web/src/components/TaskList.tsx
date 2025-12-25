@@ -338,7 +338,7 @@ export default function TaskList({
   hideNewTaskButton = false,
   isCreatingNewTaskExternal,
   onIsCreatingNewTaskChange,
-  scrollToTaskId,
+  scrollToTaskId: _scrollToTaskId,
 }: TaskListProps) {
   const [filter, setFilter] = useState<FilterType>("remaining");
   const [isCreatingNewTaskInternal, setIsCreatingNewTaskInternal] = useState(false);

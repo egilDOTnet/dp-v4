@@ -13,6 +13,8 @@ export default function PortalLoginPage() {
   const [magicLinkToken, setMagicLinkToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const router = useRouter();
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
@@ -140,9 +142,6 @@ export default function PortalLoginPage() {
   }
 
   if (step === "set-password") {
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-
     return (
       <div className="min-h-screen bg-background-primary flex items-center justify-center px-4">
         <div className="w-full max-w-md p-8 bg-background-tertiary rounded-lg shadow-md">
@@ -273,4 +272,5 @@ export default function PortalLoginPage() {
     </div>
   );
 }
+
 

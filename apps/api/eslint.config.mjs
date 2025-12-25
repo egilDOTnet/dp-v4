@@ -26,14 +26,22 @@ export default [
       "@typescript-eslint/no-explicit-any": "off", // Disable any check - too many false positives
       "@typescript-eslint/no-unused-vars": [
         "error",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }
       ],
     },
   },
   {
-    ignores: ["dist/**", "*.config.js"],
+    ignores: [
+      "dist/**",
+      "*.config.js",
+      "node_modules/**",
+      "**/node_modules/**",
+      ".pnpm/**",
+      "**/.pnpm/**",
+    ],
   },
 ];
+
 
 
 

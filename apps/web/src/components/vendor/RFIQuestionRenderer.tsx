@@ -98,7 +98,7 @@ export function RFIQuestionRenderer({
           </div>
         );
 
-      case "Dropdown":
+      case "Dropdown": {
         // Ensure value is always a string (scalar) for select element
         const dropdownValue = typeof localValue === "string" ? localValue : "";
         return (
@@ -118,6 +118,7 @@ export function RFIQuestionRenderer({
               ))}
           </select>
         );
+      }
 
       case "MultipleChoice": {
         // Check if this is a grid-style multiple choice (has both xAxis and yAxis options)

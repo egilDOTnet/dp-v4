@@ -170,7 +170,7 @@ export async function publishRFI(
 export async function publishRFP(
   rfpId: string,
   projectId: string,
-  fastify: FastifyInstance
+  _fastify: FastifyInstance
 ): Promise<void> {
   // Get RFP
   const rfp = await db.rFP.findUnique({

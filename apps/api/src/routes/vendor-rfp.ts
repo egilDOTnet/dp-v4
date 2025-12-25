@@ -5,7 +5,7 @@ import { RFPVendorResponseStatus } from "@prisma/client";
 import { authenticateVendorContact, requireMainContact, verifyRFPAccess, VendorContactRequest } from "../middleware/vendor-auth";
 import { generateRequirementsPDF } from "../utils/requirements-pdf";
 import { generateRequirementsExcel } from "../utils/requirements-excel";
-import { parseRequirementsExcel, detectColumnStructure, parseRequirementsExcelWithMapping, ColumnMapping } from "../utils/rfp-requirements-excel";
+import { detectColumnStructure, parseRequirementsExcelWithMapping, ColumnMapping } from "../utils/rfp-requirements-excel";
 
 // Store magic links in memory (in production, use Redis or database)
 const vendorMagicLinks = new Map<string, { email: string; expiresAt: number }>();
@@ -2824,7 +2824,7 @@ export default async function vendorRFPRoutes(fastify: FastifyInstance) {
         } else if (part.type === "field" && part.fieldname === "columnMapping") {
           try {
             columnMapping = JSON.parse(part.value as string) as ColumnMapping;
-          } catch (err) {
+          } catch (_err) {
             return reply.status(400).send({ error: "Invalid column mapping format" });
           }
         }
