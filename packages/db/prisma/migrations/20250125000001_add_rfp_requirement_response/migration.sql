@@ -30,3 +30,4 @@ ALTER TABLE "RFPRequirementResponse" ADD CONSTRAINT "RFPRequirementResponse_requ
 -- AddForeignKey
 ALTER TABLE "RFPRequirementResponse" ADD CONSTRAINT "RFPRequirementResponse_vendorResponseId_fkey" FOREIGN KEY ("vendorResponseId") REFERENCES "RFPVendorResponse"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+

@@ -15,6 +15,8 @@ import vendorRFIRoutes from "./routes/vendor-rfi";
 import vendorRFPRoutes from "./routes/vendor-rfp";
 import rfpRoutes from "./routes/rfp";
 import notificationRoutes from "./routes/notifications";
+import evaluationRoutes from "./routes/evaluation";
+import adminRoutes from "./routes/admin";
 import { errorHandler } from "./middleware/error-handler";
 import { swaggerOptions, swaggerUiOptions } from "./config/swagger";
 
@@ -85,6 +87,8 @@ const start = async () => {
     await fastify.register(vendorRFPRoutes, { prefix: "/api" });
     await fastify.register(rfpRoutes, { prefix: "/api/projects" });
     await fastify.register(notificationRoutes, { prefix: "/api/notifications" });
+    await fastify.register(evaluationRoutes, { prefix: "/api/projects" });
+    await fastify.register(adminRoutes, { prefix: "/api" });
 
     const port = Number(process.env.PORT) || 3001;
     await fastify.listen({ port, host: "0.0.0.0" });

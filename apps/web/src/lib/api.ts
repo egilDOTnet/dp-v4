@@ -1443,6 +1443,142 @@ export const api = {
         }>(`/api/vendor-rfp/rfps/${rfpId}/requirements/responses`),
     },
   },
+  evaluation: {
+    scores: {
+      list: (projectId: string) =>
+        apiRequest<EvaluationScore[]>(`/api/projects/${projectId}/rfp/evaluation/scores`),
+      create: (
+        projectId: string,
+        data: {
+          vendorResponseId: string;
+          requirementId: string;
+          score: number | null;
+          note?: string | null;
+          question?: string | null;
+        }
+      ) =>
+        apiRequest<EvaluationScore>(
+          `/api/projects/${projectId}/rfp/evaluation/scores`,
+          {
+            method: "POST",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, scoreId: string) =>
+        apiRequest<void>(`/api/projects/${projectId}/rfp/evaluation/scores/${scoreId}`, {
+          method: "DELETE",
+        }),
+    },
+    requirements: (projectId: string) =>
+      apiRequest<EvaluationRequirement[]>(
+        `/api/projects/${projectId}/rfp/evaluation/requirements`
+      ),
+    progress: (projectId: string) =>
+      apiRequest<EvaluationProgress>(
+        `/api/projects/${projectId}/rfp/evaluation/progress`
+      ),
+    hierarchyWeights: {
+      list: (projectId: string) =>
+        apiRequest<EvaluationHierarchyWeight[]>(
+          `/api/projects/${projectId}/rfp/evaluation/hierarchy-weights`
+        ),
+      update: (
+        projectId: string,
+        data: {
+          weights: Array<{
+            hierarchyId: string;
+            level1HierarchyId?: string | null;
+            weight: number;
+          }>;
+        }
+      ) =>
+        apiRequest<EvaluationHierarchyWeight[]>(
+          `/api/projects/${projectId}/rfp/evaluation/hierarchy-weights`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+    },
+    summary: (projectId: string) =>
+      apiRequest<EvaluationSummary>(
+        `/api/projects/${projectId}/rfp/evaluation/summary`
+      ),
+    comparison: (
+      projectId: string,
+      filters?: {
+        hierarchyId?: string;
+        evaluatorId?: string;
+        vendorId?: string;
+      }
+    ) => {
+      const queryParams = new URLSearchParams();
+      if (filters?.hierarchyId) queryParams.append("hierarchyId", filters.hierarchyId);
+      if (filters?.evaluatorId) queryParams.append("evaluatorId", filters.evaluatorId);
+      if (filters?.vendorId) queryParams.append("vendorId", filters.vendorId);
+      const query = queryParams.toString();
+      return apiRequest<EvaluationComparison[]>(
+        `/api/projects/${projectId}/rfp/evaluation/comparison${query ? `?${query}` : ""}`
+      );
+    },
+    references: {
+      list: (projectId: string) =>
+        apiRequest<ReferenceCheck[]>(`/api/projects/${projectId}/rfp/evaluation/references`),
+      get: (projectId: string, vendorId: string) =>
+        apiRequest<ReferenceCheck[]>(
+          `/api/projects/${projectId}/rfp/evaluation/references/${vendorId}`
+        ),
+      create: (
+        projectId: string,
+        data: {
+          vendorId: string;
+          companyName: string;
+          contactName: string;
+          contactPosition?: string | null;
+          contactEmail?: string | null;
+          contactPhone?: string | null;
+          content: string;
+        }
+      ) =>
+        apiRequest<ReferenceCheck>(`/api/projects/${projectId}/rfp/evaluation/references`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (
+        projectId: string,
+        referenceId: string,
+        data: {
+          companyName?: string;
+          contactName?: string;
+          contactPosition?: string | null;
+          contactEmail?: string | null;
+          contactPhone?: string | null;
+          content?: string;
+        }
+      ) =>
+        apiRequest<ReferenceCheck>(
+          `/api/projects/${projectId}/rfp/evaluation/references/${referenceId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          }
+        ),
+      delete: (projectId: string, referenceId: string) =>
+        apiRequest<void>(`/api/projects/${projectId}/rfp/evaluation/references/${referenceId}`, {
+          method: "DELETE",
+        }),
+    },
+  },
+  admin: {
+    referenceCheckTemplate: {
+      get: () => apiRequest<ReferenceCheckTemplate>("/api/admin/reference-check-template"),
+      update: (data: { content: string }) =>
+        apiRequest<ReferenceCheckTemplate>("/api/admin/reference-check-template", {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+    },
+  },
 };
 
 export interface User {
@@ -2111,5 +2247,199 @@ export interface RFPDetail extends RFPListItem {
     hasProposalChanges: boolean;
     proposalFiles: RFPProposalFile[];
   } | null;
+}
+
+// Evaluation Types
+export interface EvaluationScore {
+  id: string;
+  vendorResponseId: string;
+  requirementId: string;
+  score: number | null;
+  note: string | null;
+  question: string | null;
+  evaluatedById: string;
+  evaluatedAt: string;
+  updatedAt: string;
+  requirement?: {
+    id: string;
+    number: string;
+    description: string;
+    type: "Information" | "Mandatory" | "Important" | "Wish";
+    hierarchy: {
+      id: string;
+      number: string;
+      title: string;
+      parentId: string | null;
+    };
+  };
+  vendorResponse?: {
+    id: string;
+    vendorId: string;
+    vendorName: string;
+    anonymizedId?: string;
+  };
+  evaluatedBy?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  };
+}
+
+export interface EvaluationRequirement {
+  id: string;
+  number: string;
+  description: string;
+  type: "Information" | "Mandatory" | "Important" | "Wish";
+  hierarchy: {
+    id: string;
+    number: string;
+    title: string;
+    parentId: string | null;
+    parent: {
+      id: string;
+      number: string;
+      title: string;
+    } | null;
+  };
+  vendorResponses: Array<{
+    id: string;
+    vendorResponseId: string;
+    answer: "Yes" | "No" | "Partial" | "Development" | null;
+    description: string | null;
+    reference: string | null;
+    vendor: {
+      id: string;
+      name: string;
+      anonymizedId: string;
+    };
+  }>;
+}
+
+export interface EvaluationProgress {
+  totalNeeded: number;
+  completed: number;
+  percentage: number;
+  notesCount: number;
+  questionsCount: number;
+}
+
+export interface EvaluationHierarchyWeight {
+  id: string;
+  rfpId: string;
+  hierarchyId: string;
+  level1HierarchyId: string | null;
+  weight: string; // Decimal as string
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  hierarchy: {
+    id: string;
+    number: string;
+    title: string;
+    parentId: string | null;
+  };
+  createdBy: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  };
+}
+
+export interface EvaluationSummary {
+  summary: Array<{
+    requirementId: string;
+    requirementNumber: string;
+    requirementDescription: string;
+    hierarchy: {
+      id: string;
+      number: string;
+      title: string;
+      parentId: string | null;
+    };
+    vendorStats: Array<{
+      vendorId: string;
+      anonymizedId: string;
+      average: number;
+      scores: number[];
+    }>;
+  }>;
+  stats: {
+    totalRequirements: number;
+    totalVendors: number;
+    evaluationsCompleted: number;
+    totalNeeded: number;
+    percentage: number;
+    averageScore: number;
+    requirementsWithCompleteEvaluations: number;
+    evaluatorsActive: number;
+  };
+}
+
+export interface EvaluationComparison {
+  requirementId: string;
+  requirementNumber: string;
+  requirementDescription: string;
+  requirementType: "Information" | "Mandatory" | "Important" | "Wish";
+  hierarchy: {
+    id: string;
+    number: string;
+    title: string;
+    parentId: string | null;
+    parent: {
+      id: string;
+      number: string;
+      title: string;
+    } | null;
+  };
+  vendorData: Array<{
+    vendorId: string;
+    anonymizedId: string;
+    vendorName: string;
+    scores: number[];
+    average: number | null;
+    stdDev: number | null;
+  }>;
+}
+
+export interface ReferenceCheck {
+  id: string;
+  projectId: string;
+  vendorId: string;
+  vendorName: string;
+  companyName: string;
+  contactName: string;
+  contactPosition: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  content: string;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  };
+}
+
+export interface ReferenceCheckTemplate {
+  id: string;
+  content: string;
+  updatedById: string;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    name: string | null;
+  };
 }
 

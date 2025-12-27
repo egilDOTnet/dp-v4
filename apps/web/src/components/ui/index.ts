@@ -81,3 +81,7 @@ export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } fro
 // Contact Person Selector
 export { ContactPersonSelector } from "./ContactPersonSelector";
 export type { ContactPerson } from "./ContactPersonSelector";
+
+// Vendor Selector
+export { VendorSelector } from "./VendorSelector";
+export type { Vendor } from "./VendorSelector";

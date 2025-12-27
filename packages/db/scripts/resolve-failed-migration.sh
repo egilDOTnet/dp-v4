@@ -29,3 +29,4 @@ echo "After resolving, restart your containers to apply new migrations:"
 echo "  docker-compose restart api"
 echo ""
 
+

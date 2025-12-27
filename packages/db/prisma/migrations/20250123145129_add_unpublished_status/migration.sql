@@ -14,3 +14,4 @@ UPDATE "RFI" SET "status" = 'Draft' WHERE "isPublished" = false OR "isPublished"
 -- DropColumn: Remove isPublished column
 ALTER TABLE "RFI" DROP COLUMN "isPublished";
 
+

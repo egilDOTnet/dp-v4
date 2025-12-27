@@ -9,3 +9,4 @@ echo ""
 echo "=== All Migration Directories ==="
 ls -la packages/db/prisma/migrations/ | grep '^d' | awk '{print $NF}' | grep -E '^[0-9]'
 
+

@@ -46,6 +46,7 @@ model Project {
   ProjectVendor          ProjectVendor[]
   RFI                    RFI?
   RFP                    RFP?
+  referenceChecks        ReferenceCheck[]
 
   @@index([tenantId])
 }
@@ -147,6 +148,10 @@ model User {
   rfpQuestionsAnswered        RFPQuestion[]        @relation("RFPQuestionAnsweredBy")
   rfpAnnouncements            RFPAnnouncement[]
   pendingEmailNotifications   PendingEmailNotification[]
+  evaluationScores            EvaluationScore[]    @relation("EvaluationScoreEvaluatedBy")
+  evaluationHierarchyWeights  EvaluationHierarchyWeight[]
+  referenceChecks             ReferenceCheck[]
+  referenceCheckTemplates     ReferenceCheckTemplate[]
 
   @@index([email])
   @@index([tenantId])
@@ -167,6 +172,7 @@ model RequirementHierarchy {
   parent       RequirementHierarchy?  @relation("HierarchyParent", fields: [parentId], references: [id], onDelete: Cascade)
   children     RequirementHierarchy[] @relation("HierarchyParent")
   requirements Requirement[]
+  evaluationHierarchyWeights EvaluationHierarchyWeight[]
 
   @@index([projectId])
   @@index([parentId])
@@ -191,6 +197,7 @@ model Requirement {
   lastModifiedBy User                 @relation("RequirementModifier", fields: [lastModifiedById], references: [id], onDelete: Restrict)
   history        RequirementHistory[]
   rfpRequirementResponses RFPRequirementResponse[]
+  evaluationScores        EvaluationScore[]
 
   @@index([hierarchyId])
   @@index([hierarchyId, order])
@@ -269,6 +276,7 @@ model Vendor {
   ProjectVendor       ProjectVendor[]
   VendorContactPerson VendorContactPerson[]
   rfpQuestions        RFPQuestion[]
+  referenceChecks      ReferenceCheck[]
 
   @@index([tenantId])
   @@index([organizationNumber])
@@ -538,6 +546,7 @@ model RFP {
   questions                RFPQuestion[]
   announcements            RFPAnnouncement[]
   vendorResponses          RFPVendorResponse[]
+  evaluationHierarchyWeights EvaluationHierarchyWeight[]
 
   @@index([projectId])
   @@index([contactPersonId])
@@ -663,6 +672,7 @@ model RFPVendorResponse {
   contactPerson VendorContactPerson @relation(fields: [contactPersonId], references: [id], onDelete: Restrict)
   proposalFiles RFPProposalFile[]
   requirementResponses RFPRequirementResponse[]
+  evaluationScores      EvaluationScore[]
 
   @@unique([rfpId, projectVendorId])
   @@index([rfpId])
@@ -721,4 +731,80 @@ model PendingEmailNotification {
   @@index([rfpQuestionId])
   @@index([scheduledFor])
   @@index([sentAt])
+}
+
+model EvaluationScore {
+  id              String   @id @default(cuid())
+  vendorResponseId String
+  requirementId   String
+  score           Int?      // 1-5, nullable to allow deletion
+  note            String?
+  question        String?
+  evaluatedById   String
+  evaluatedAt     DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  requirement   Requirement      @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  vendorResponse RFPVendorResponse @relation(fields: [vendorResponseId], references: [id], onDelete: Cascade)
+  evaluatedBy   User              @relation("EvaluationScoreEvaluatedBy", fields: [evaluatedById], references: [id], onDelete: Restrict)
+
+  @@unique([vendorResponseId, requirementId, evaluatedById])
+  @@index([vendorResponseId])
+  @@index([requirementId])
+  @@index([evaluatedById])
+}
+
+model EvaluationHierarchyWeight {
+  id                String   @id @default(cuid())
+  rfpId             String
+  hierarchyId       String
+  level1HierarchyId String?  // For level 2 hierarchies
+  weight            Decimal   @db.Decimal(5, 2) // e.g., 25.50 for 25.5%
+  createdById      String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  rfp       RFP                 @relation(fields: [rfpId], references: [id], onDelete: Cascade)
+  hierarchy RequirementHierarchy @relation(fields: [hierarchyId], references: [id], onDelete: Cascade)
+  createdBy User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([rfpId, hierarchyId, level1HierarchyId])
+  @@index([rfpId])
+  @@index([hierarchyId])
+  @@index([createdById])
+}
+
+model ReferenceCheck {
+  id            String   @id @default(cuid())
+  projectId     String
+  vendorId      String
+  createdById   String
+  companyName   String
+  contactName   String
+  contactPosition String?
+  contactEmail  String?
+  contactPhone  String?
+  content       String   // HTML from WYSIWYG
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vendor    Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([projectId])
+  @@index([vendorId])
+  @@index([createdById])
+}
+
+model ReferenceCheckTemplate {
+  id        String   @id @default(cuid())
+  content   String   // HTML template
+  updatedById String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  updatedBy User @relation(fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([updatedById])
 }

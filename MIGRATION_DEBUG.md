@@ -38,3 +38,4 @@ docker-compose exec api sh -c "cd /workspace/packages/db && find prisma/migratio
 
 This will show what Prisma actually sees inside the container.
 
+

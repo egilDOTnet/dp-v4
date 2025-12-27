@@ -6,3 +6,4 @@ ADD COLUMN "profileColor" TEXT;
 
 
 
+

@@ -10,3 +10,4 @@ CREATE INDEX "Notification_rfpQuestionId_idx" ON "Notification"("rfpQuestionId")
 -- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_rfpQuestionId_fkey" FOREIGN KEY ("rfpQuestionId") REFERENCES "RFPQuestion"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
