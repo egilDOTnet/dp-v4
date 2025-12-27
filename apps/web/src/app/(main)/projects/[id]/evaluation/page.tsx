@@ -105,17 +105,19 @@ export default function EvaluationPage() {
 
       <div className="mt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="relative">
-            {isAdmin && (
-              <>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="compare">Compare</TabsTrigger>
-              </>
-            )}
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="references">References</TabsTrigger>
-            <TabsTrigger value="score">Score</TabsTrigger>
-          </TabsList>
+          <div className="border-b border-gray-200">
+            <TabsList>
+              {isAdmin && (
+                <>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="compare">Compare</TabsTrigger>
+                </>
+              )}
+              <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="references">References</TabsTrigger>
+              <TabsTrigger value="score">Score</TabsTrigger>
+            </TabsList>
+          </div>
 
           {isAdmin && (
             <>

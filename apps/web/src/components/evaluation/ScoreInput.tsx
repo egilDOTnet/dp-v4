@@ -45,7 +45,10 @@ export function ScoreInput({
       setInputValue(value?.toString() || "");
       return;
     }
-    onChange(numValue);
+    // Only call onChange if the value has actually changed
+    if (numValue !== value) {
+      onChange(numValue);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

@@ -331,7 +331,7 @@ export default function RequirementsPage() {
 
       {/* Search Bar and Filters */}
       <div className="flex items-center gap-4 mb-6">
-        <div className="flex-1 max-w-sm">
+        <div className="w-1/2">
           <SearchBar
             value={searchTerm}
             onChange={setSearchTerm}

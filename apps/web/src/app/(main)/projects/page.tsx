@@ -91,7 +91,7 @@ export default function ProjectsPage() {
       {/* Search Bar */}
       {projects.length > 0 && (
         <div className="flex items-center gap-4">
-          <div className="flex-1 max-w-md">
+          <div className="w-1/2">
             <SearchBar
               value={searchTerm}
               onChange={setSearchTerm}

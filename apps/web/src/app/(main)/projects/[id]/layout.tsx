@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMobileMenu } from "@/contexts/MobileMenuContext";
 import { api, Project } from "@/lib/api";
 
 const navigationItems = [
@@ -24,10 +25,13 @@ export default function ProjectLayout({
   const params = useParams();
   const pathname = usePathname();
   const { user } = useAuth();
+  const { isMobileMenuOpen, closeMobileMenu } = useMobileMenu();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const prevPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user || !projectId) return;
@@ -44,6 +48,16 @@ export default function ProjectLayout({
         setLoading(false);
       });
   }, [user, projectId]);
+
+  // Close mobile menu when navigating to a new section
+  // Must be before early returns to follow Rules of Hooks
+  useEffect(() => {
+    // Only close menu if pathname actually changed (not on initial render)
+    if (prevPathnameRef.current !== null && prevPathnameRef.current !== pathname) {
+      closeMobileMenu();
+    }
+    prevPathnameRef.current = pathname || null;
+  }, [pathname, closeMobileMenu]);
 
   const isAdmin =
     user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
@@ -71,13 +85,50 @@ export default function ProjectLayout({
 
   return (
     <div className="flex gap-6">
+      {/* Mobile backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 xl:hidden"
+          onClick={closeMobileMenu}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="w-64 flex-shrink-0">
-        <div className="bg-background-tertiary rounded-lg shadow-md sticky top-4 overflow-hidden border border-border-primary">
+      <aside
+        className={`fixed left-0 top-0 h-full w-64 z-50 transform transition-transform duration-300 ease-in-out xl:relative xl:transform-none xl:h-auto xl:w-64 flex-shrink-0 ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"
+        }`}
+      >
+        <div className="bg-background-tertiary xl:rounded-lg shadow-md xl:sticky xl:top-4 overflow-hidden border-r xl:border border-border-primary h-full xl:h-auto overflow-y-auto xl:overflow-y-visible">
+          {/* Mobile close button */}
+          <div className="xl:hidden flex justify-end p-2 border-b border-border-primary">
+            <button
+              onClick={closeMobileMenu}
+              className="p-2 rounded-md hover:bg-background-primary transition-colors"
+              aria-label="Close menu"
+            >
+              <svg
+                className="w-5 h-5 text-text-primary"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
           {/* Project Header - Primary color background */}
           <Link
             href={`/projects/${projectId}`}
             className="block px-4 py-4 bg-primary-600 hover:bg-primary-700 transition-colors"
+            onClick={closeMobileMenu}
           >
             <h2 className="text-lg font-semibold text-white mb-1">{project.name}</h2>
             {project.type && (
@@ -99,6 +150,7 @@ export default function ProjectLayout({
                       : "text-text-primary hover:bg-background-primary"
                   }`}
                   title={item.description}
+                  onClick={closeMobileMenu}
                 >
                   {item.name}
                 </Link>
@@ -119,6 +171,7 @@ export default function ProjectLayout({
                     ? "bg-primary-50 text-primary-700 border-l-4 border-primary-600"
                     : "text-text-primary hover:bg-background-primary"
                 }`}
+                onClick={closeMobileMenu}
               >
                 Manage Project
               </Link>

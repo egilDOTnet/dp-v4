@@ -289,7 +289,7 @@ export default function VendorsPage() {
 
       {/* Search Bar and Add Button */}
       <div className="flex items-center gap-4">
-        <div className="flex-1 max-w-md">
+        <div className="w-1/2">
           <SearchBar
             value={searchTerm}
             onChange={setSearchTerm}

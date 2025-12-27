@@ -615,6 +615,13 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
   ) => {
     const key = `${vendorResponseId}-${requirementId}`;
     const existingScore = scores.get(key);
+    const existingScoreValue = existingScore?.score ?? null;
+    
+    // Skip save if the score hasn't changed
+    if (existingScoreValue === score) {
+      return;
+    }
+    
     setSaving((prev) => new Set(prev).add(key));
     
     // Ensure the cell stays focused when changing score
@@ -825,14 +832,14 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
 
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center relative z-20">
-        <div className="flex-1 w-full sm:w-auto">
+        <div className="w-full sm:w-1/2">
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search requirements, responses, notes, questions..."
           />
         </div>
-        <div className="flex justify-end w-full sm:w-auto">
+        <div className="flex justify-end w-full sm:w-auto sm:ml-auto">
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button
@@ -1056,7 +1063,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                               {req.number}
                             </td>
                             <td className="px-4 py-4 text-sm text-text-primary max-w-[300px] align-top border-b border-border-primary">
-                              <div className="line-clamp-3">{req.description}</div>
+                              <div className="line-clamp-2">{req.description}</div>
                             </td>
                             <td className="px-4 py-4 text-sm text-text-primary align-top border-b border-border-primary">
                               <span className="text-xs px-2 py-1 rounded bg-background-tertiary">
@@ -1107,15 +1114,17 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                                   }}
                                 >
                                   <div className="flex items-center justify-center gap-1.5 min-h-[2.5rem]">
-                                    {/* Note indicator - inline next to score */}
-                                    {hasNote && (
-                                      <div 
-                                        className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold flex-shrink-0"
-                                        title="Has note"
-                                      >
-                                        n
-                                      </div>
-                                    )}
+                                    {/* Left side - note indicator or invisible placeholder */}
+                                    <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
+                                      {hasNote && (
+                                        <div 
+                                          className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold"
+                                          title="Has note"
+                                        >
+                                          n
+                                        </div>
+                                      )}
+                                    </div>
                                     
                                     <ScoreInput
                                       value={score?.score ?? null}
@@ -1126,15 +1135,17 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                                       className={hasAnswer ? "bg-primary-50 dark:bg-primary-800 text-text-primary dark:text-gray-900" : ""}
                                     />
                                     
-                                    {/* Question indicator - inline next to score */}
-                                    {hasQuestion && (
-                                      <div 
-                                        className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold flex-shrink-0"
-                                        title="Has question"
-                                      >
-                                        q
-                                      </div>
-                                    )}
+                                    {/* Right side - question indicator or invisible placeholder */}
+                                    <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
+                                      {hasQuestion && (
+                                        <div 
+                                          className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold"
+                                          title="Has question"
+                                        >
+                                          q
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </td>
                               );
@@ -1161,6 +1172,20 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                             
                             return (
                               <React.Fragment key={`expanded-${expandedRowKey}`}>
+                                {/* Requirement row - shows full requirement description */}
+                                <tr 
+                                  className="bg-background-tertiary border-t border-border-primary"
+                                  data-expanded-row="true"
+                                >
+                                  <td colSpan={3 + vendors.length} className="px-4 py-4 align-top">
+                                    <div className="text-xs font-semibold text-text-secondary mb-1">
+                                      Requirement
+                                    </div>
+                                    <div className="text-sm text-text-primary whitespace-pre-wrap">
+                                      {req.description}
+                                    </div>
+                                  </td>
+                                </tr>
                                 {/* Vendor Response row - aligns with table columns */}
                                 <tr 
                                   ref={(el) => {
@@ -1170,7 +1195,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                                       expandedRowRefs.current.delete(expandedRowKey);
                                     }
                                   }}
-                                  className="bg-background-tertiary border-t border-border-primary border-b border-border-primary"
+                                  className="bg-background-tertiary border-b border-border-primary"
                                   data-expanded-row="true"
                                 >
                                   {/* Answer - Req.# column */}

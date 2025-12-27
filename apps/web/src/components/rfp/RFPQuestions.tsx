@@ -117,7 +117,7 @@ export default function RFPQuestions({ projectId, rfp: _rfp, scrollToQuestionId 
   return (
     <div className="space-y-4">
       <div className="flex gap-4 items-center">
-        <div className="flex-1 max-w-md">
+        <div className="w-1/2">
           <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search questions..." />
         </div>
         <Button onClick={() => setCreateModalOpen(true)} variant="primary" className="ml-auto">

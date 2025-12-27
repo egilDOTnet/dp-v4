@@ -1565,7 +1565,7 @@ export default function TaskList({
                         <div 
                           {...attributes}
                           {...listeners}
-                          className="bg-primary-500 text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all"
+                          className={`${isDelayed && !isNewlyCreated && !isDragging && !isCompleting && !deletingTaskIds.has(task.id) ? "bg-red-400" : "bg-primary-500"} text-white flex items-center justify-center min-w-[2.5rem] px-2 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all`}
                           title="Drag to reorder"
                         >
                           {/* White grip dots (2x4 pattern) - smaller size */}

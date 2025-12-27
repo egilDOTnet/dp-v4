@@ -206,14 +206,14 @@ export default function TasksPage() {
       {/* Search Bar and New Task Button */}
       {selectedPhaseId && selectedPhase && (
         <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 max-w-md">
-            <SearchBar
-              value={searchTerm}
-              onChange={setSearchTerm}
-              onClear={clearSearch}
-              placeholder="Search tasks..."
-            />
-          </div>
+        <div className="w-1/2">
+          <SearchBar
+            value={searchTerm}
+            onChange={setSearchTerm}
+            onClear={clearSearch}
+            placeholder="Search tasks..."
+          />
+        </div>
           {isSearching && (
             <span className="text-sm text-text-secondary">
               {filteredTasks.length} of {tasks.length} tasks
