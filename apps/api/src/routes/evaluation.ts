@@ -1086,8 +1086,20 @@ export default async function evaluationRoutes(fastify: FastifyInstance) {
         // Calculate overall stats
         const totalRequirements = requirements.length;
         const totalVendors = vendorResponses.length;
-        const evaluationsCompleted = allScores.filter((s) => s.score !== null).length;
-        const totalNeeded = totalRequirements * totalVendors * evaluatorIds.length;
+        const submittedVendors = vendorResponses.filter(
+          (vr) => vr.status === "ProposalSubmitted" || vr.proposalSubmittedAt !== null
+        ).length;
+        // Calculate evaluations completed based on vendor-evaluator pairs (not requirements)
+        const completedVendorEvaluatorPairs = new Set<string>();
+        allScores.forEach((s) => {
+          if (s.score !== null) {
+            // Create a unique key for vendor-evaluator pair
+            const pairKey = `${s.vendorResponseId}-${s.evaluatedById}`;
+            completedVendorEvaluatorPairs.add(pairKey);
+          }
+        });
+        const evaluationsCompleted = completedVendorEvaluatorPairs.size;
+        const totalNeeded = totalVendors * evaluatorIds.length;
         const averageScore =
           allScores.length > 0
             ? allScores
@@ -1096,18 +1108,26 @@ export default async function evaluationRoutes(fastify: FastifyInstance) {
             : 0;
         const requirementsWithCompleteEvaluations = completeRequirements.length;
         const evaluatorsActive = new Set(allScores.map((s) => s.evaluatedById)).size;
+        const totalEvaluators = evaluatorIds.length;
+        
+        // Count notes and questions
+        const notesCount = allScores.filter((s) => s.note && s.note.trim() !== "").length;
+        const questionsCount = allScores.filter((s) => s.question && s.question.trim() !== "").length;
 
         return reply.send({
           summary,
           stats: {
             totalRequirements,
             totalVendors,
+            submittedVendors,
             evaluationsCompleted,
             totalNeeded,
-            percentage: totalNeeded > 0 ? Math.round((evaluationsCompleted / totalNeeded) * 100) : 0,
             averageScore: Math.round(averageScore * 10) / 10,
             requirementsWithCompleteEvaluations,
             evaluatorsActive,
+            totalEvaluators,
+            notesCount,
+            questionsCount,
           },
         });
       } catch (error: any) {

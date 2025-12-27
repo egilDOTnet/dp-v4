@@ -2390,12 +2390,15 @@ export interface EvaluationSummary {
   stats: {
     totalRequirements: number;
     totalVendors: number;
+    submittedVendors: number;
     evaluationsCompleted: number;
     totalNeeded: number;
-    percentage: number;
     averageScore: number;
     requirementsWithCompleteEvaluations: number;
     evaluatorsActive: number;
+    totalEvaluators: number;
+    notesCount: number;
+    questionsCount: number;
   };
 }
 

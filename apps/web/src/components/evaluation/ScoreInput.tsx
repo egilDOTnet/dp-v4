@@ -76,7 +76,7 @@ export function ScoreInput({
         onChange={handleChange}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className={`w-12 text-center border border-primary-600 rounded px-2 py-1 ${className}`}
+        className={`w-12 h-8 text-center border border-primary-600 rounded-full px-2 py-1 ${className}`}
         maxLength={1}
       />
     );
@@ -115,9 +115,9 @@ export function ScoreInput({
       tabIndex={0}
       role="button"
       aria-label={`Score: ${value !== null ? value : "not set"}`}
-      className={`cursor-pointer px-3 py-1 rounded border border-border-primary hover:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-600 min-w-[3rem] text-center ${className}`}
+      className={`cursor-pointer w-12 h-8 rounded-full border border-border-primary hover:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-600 text-center flex items-center justify-center ${className}`}
     >
-      {value !== null ? value : <span className="text-text-tertiary">{placeholder}</span>}
+      {value !== null ? <span>{value}</span> : <span className="text-text-tertiary">{placeholder}</span>}
     </div>
   );
 }

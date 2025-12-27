@@ -30,6 +30,28 @@ export default function EvaluationPage() {
     }
   }, [projectId]);
 
+  // Check if scoring is completed and set default tab to overview if so
+  useEffect(() => {
+    if (!projectId || !isAdmin) {
+      return;
+    }
+
+    const checkCompletion = async () => {
+      try {
+        const summary = await api.evaluation.summary(projectId);
+        // If all evaluations are completed, default to overview
+        if (summary.stats.evaluationsCompleted === summary.stats.totalNeeded && summary.stats.totalNeeded > 0) {
+          setActiveTab("overview");
+        }
+      } catch (err) {
+        // If summary fails (e.g., no RFP yet), just use default "score" tab
+        console.error("Failed to check evaluation completion:", err);
+      }
+    };
+
+    checkCompletion();
+  }, [projectId, isAdmin]);
+
   const breadcrumbItems = [
     { label: "Home", href: "/dashboard?noAutoRedirect=true" },
     { label: "Projects", href: "/projects" },

@@ -63,8 +63,10 @@ export function EvaluationOverview({ projectId }: EvaluationOverviewProps) {
 
         <Card>
           <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Total Vendors</div>
-            <div className="text-3xl font-bold text-text-primary">{stats.totalVendors}</div>
+            <div className="text-sm text-text-secondary mb-1">Vendors Submitted</div>
+            <div className="text-3xl font-bold text-text-primary">
+              {stats.submittedVendors} / {stats.totalVendors}
+            </div>
           </CardBody>
         </Card>
 
@@ -74,7 +76,6 @@ export function EvaluationOverview({ projectId }: EvaluationOverviewProps) {
             <div className="text-3xl font-bold text-text-primary">
               {stats.evaluationsCompleted} / {stats.totalNeeded}
             </div>
-            <div className="text-sm text-text-tertiary mt-1">{stats.percentage}%</div>
           </CardBody>
         </Card>
 
@@ -87,17 +88,25 @@ export function EvaluationOverview({ projectId }: EvaluationOverviewProps) {
 
         <Card>
           <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Requirements with Complete Evaluations</div>
-            <div className="text-3xl font-bold text-text-primary">
-              {stats.requirementsWithCompleteEvaluations}
+            <div className="text-sm text-text-secondary mb-1">Notes & Questions</div>
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-bold text-text-primary">
+                {stats.notesCount}
+              </div>
+              <div className="text-lg text-text-secondary">/</div>
+              <div className="text-3xl font-bold text-text-primary">
+                {stats.questionsCount}
+              </div>
             </div>
           </CardBody>
         </Card>
 
         <Card>
           <CardBody>
-            <div className="text-sm text-text-secondary mb-1">Evaluators Active</div>
-            <div className="text-3xl font-bold text-text-primary">{stats.evaluatorsActive}</div>
+            <div className="text-sm text-text-secondary mb-1">Evaluators Completed</div>
+            <div className="text-3xl font-bold text-text-primary">
+              {stats.evaluatorsActive} / {stats.totalEvaluators}
+            </div>
           </CardBody>
         </Card>
       </div>

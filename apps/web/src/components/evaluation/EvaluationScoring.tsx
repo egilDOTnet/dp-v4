@@ -13,6 +13,7 @@ import {
 import { ScoreInput } from "./ScoreInput";
 import { EvaluationNoteInput } from "./EvaluationNoteInput";
 import { EvaluationQuestionInput } from "./EvaluationQuestionInput";
+import { CompletionCelebrationModal } from "./CompletionCelebrationModal";
 
 interface EvaluationScoringProps {
   projectId: string;
@@ -43,6 +44,8 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
   const [focusedCell, setFocusedCell] = useState<FocusedCell | null>(null);
   const [scores, setScores] = useState<Map<string, EvaluationScore>>(new Map());
   const [saving, setSaving] = useState<Set<string>>(new Set());
+  const [showCelebration, setShowCelebration] = useState(false);
+  const hasShownCelebration = useRef(false);
   const tableRef = useRef<HTMLDivElement>(null);
   // Map to store refs for expanded rows, keyed by "requirementId-vendorResponseId"
   const expandedRowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
@@ -145,6 +148,53 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
       a.vendor.anonymizedId.localeCompare(b.vendor.anonymizedId)
     );
   }, [requirements]);
+
+  // Calculate total needed: number of requirements * number of vendors who have delivered results
+  const totalNeeded = useMemo(() => {
+    const vendorsWithResults = new Set<string>();
+    requirements.forEach((req) => {
+      req.vendorResponses.forEach((vr) => {
+        vendorsWithResults.add(vr.vendorResponseId);
+      });
+    });
+    return requirements.length * vendorsWithResults.size;
+  }, [requirements]);
+
+  // Helper function to check if all scores are completed given a scores map
+  const checkAllScoresCompleted = useCallback((scoresMap: Map<string, EvaluationScore>) => {
+    if (requirements.length === 0) return false;
+    
+    // Get all vendors who have delivered results
+    const vendorsWithResults = new Set<string>();
+    requirements.forEach((req) => {
+      req.vendorResponses.forEach((vr) => {
+        vendorsWithResults.add(vr.vendorResponseId);
+      });
+    });
+
+    // Check if every requirement has a score for every vendor with results
+    for (const req of requirements) {
+      for (const vendorResponseId of vendorsWithResults) {
+        const vendorResponse = req.vendorResponses.find(
+          (vr) => vr.vendorResponseId === vendorResponseId
+        );
+        if (!vendorResponse) continue; // Skip if vendor doesn't have a response for this requirement
+        
+        const key = `${vendorResponseId}-${req.id}`;
+        const score = scoresMap.get(key);
+        if (!score || score.score === null) {
+          return false; // Found a missing score
+        }
+      }
+    }
+    
+    return true; // All scores are completed
+  }, [requirements]);
+
+  // Check if all scores are completed
+  const isAllScoresCompleted = useMemo(() => {
+    return checkAllScoresCompleted(scores);
+  }, [scores, checkAllScoresCompleted]);
 
   // Helper function to remove spaces and count characters
   const countCharsWithoutSpaces = (str: string): number => {
@@ -582,20 +632,31 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
         question: existingScore?.question ?? null, // Preserve existing question
       });
 
-      setScores((prev) => {
-        const newScores = new Map(prev);
-        if (score === null) {
-          // Delete score
-          newScores.delete(key);
-        } else {
-          newScores.set(key, updatedScore);
-        }
-        return newScores;
-      });
+      // Create updated scores map
+      const newScores = new Map(scores);
+      if (score === null) {
+        // Delete score
+        newScores.delete(key);
+      } else {
+        newScores.set(key, updatedScore);
+      }
+
+      // Update scores state
+      setScores(newScores);
 
       // Refresh progress
       const newProgress = await api.evaluation.progress(projectId);
       setProgress(newProgress);
+
+      // Check if all scores are now completed after this save
+      // Only show celebration if this save completed all scores
+      if (checkAllScoresCompleted(newScores) && !hasShownCelebration.current) {
+        hasShownCelebration.current = true;
+        // Small delay to ensure the UI has updated
+        setTimeout(() => {
+          setShowCelebration(true);
+        }, 300);
+      }
     } catch (err) {
       console.error("Failed to save score:", err);
       // TODO: Show error toast
@@ -606,7 +667,15 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
         return newSet;
       });
     }
-  }, [projectId, scores]);
+  }, [projectId, scores, checkAllScoresCompleted]);
+
+  // Reset celebration flag when scores become incomplete, so celebration can trigger again
+  useEffect(() => {
+    if (!isAllScoresCompleted) {
+      hasShownCelebration.current = false;
+      setShowCelebration(false);
+    }
+  }, [isAllScoresCompleted]);
 
   // Handle note change
   const handleNoteChange = useCallback(async (
@@ -734,7 +803,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
           <div className="grid grid-cols-4 gap-4 text-sm">
             <div>
               <div className="text-text-secondary">Total Needed</div>
-              <div className="text-lg font-bold text-text-primary">{progress.totalNeeded}</div>
+              <div className="text-lg font-bold text-text-primary">{totalNeeded}</div>
             </div>
             <div>
               <div className="text-text-secondary">Progress</div>
@@ -755,7 +824,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
       )}
 
       {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center relative z-20">
         <div className="flex-1 w-full sm:w-auto">
           <SearchBar
             value={searchQuery}
@@ -768,12 +837,16 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="px-4 py-2 bg-background-secondary hover:bg-background-tertiary text-text-primary border border-border-primary rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 flex items-center gap-2"
+                className={`px-4 py-2 border border-border-primary rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 flex items-center gap-2 ${
+                  (filters.onlyUnanswered || filters.withNotes || filters.withQuestions || filters.priority.length > 0)
+                    ? "bg-accent-600 text-white hover:bg-accent-700"
+                    : "bg-background-secondary text-text-primary hover:bg-background-tertiary"
+                }`}
               >
                 <Filter className="h-4 w-4" />
                 Filter
                 {(filters.onlyUnanswered || filters.withNotes || filters.withQuestions || filters.priority.length > 0) && (
-                  <span className="px-1.5 py-0.5 bg-primary-600 text-white text-xs rounded-full">
+                  <span className="px-1.5 py-0.5 bg-white text-black text-xs rounded-full font-semibold">
                     {(filters.onlyUnanswered ? 1 : 0) +
                      (filters.withNotes ? 1 : 0) +
                      (filters.withQuestions ? 1 : 0) +
@@ -1033,11 +1106,11 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                                     });
                                   }}
                                 >
-                                  <div className="relative flex items-center justify-center min-h-[2.5rem] px-6">
-                                    {/* Note indicator - left side, absolutely positioned */}
+                                  <div className="flex items-center justify-center gap-1.5 min-h-[2.5rem]">
+                                    {/* Note indicator - inline next to score */}
                                     {hasNote && (
                                       <div 
-                                        className="absolute left-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold"
+                                        className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold flex-shrink-0"
                                         title="Has note"
                                       >
                                         n
@@ -1050,13 +1123,13 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                                         handleScoreChange(req.id, vendorResponse.vendorResponseId, newScore)
                                       }
                                       placeholder="—"
-                                      className={hasAnswer ? "bg-primary-50" : ""}
+                                      className={hasAnswer ? "bg-primary-50 dark:bg-primary-800 text-text-primary dark:text-gray-900" : ""}
                                     />
                                     
-                                    {/* Question indicator - right side, absolutely positioned */}
+                                    {/* Question indicator - inline next to score */}
                                     {hasQuestion && (
                                       <div 
-                                        className="absolute right-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold"
+                                        className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold flex-shrink-0"
                                         title="Has question"
                                       >
                                         q
@@ -1180,6 +1253,12 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
           </table>
         </div>
       </Card>
+
+      {/* Celebration Modal */}
+      <CompletionCelebrationModal
+        open={showCelebration}
+        onClose={() => setShowCelebration(false)}
+      />
     </div>
   );
 }
