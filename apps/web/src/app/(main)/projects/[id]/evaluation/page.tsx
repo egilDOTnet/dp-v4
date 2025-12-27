@@ -9,6 +9,7 @@ import { EvaluationOverview } from "@/components/evaluation/EvaluationOverview";
 import { EvaluationCompare } from "@/components/evaluation/EvaluationCompare";
 import { ReferenceChecks } from "@/components/evaluation/ReferenceChecks";
 import { EvaluationScoring } from "@/components/evaluation/EvaluationScoring";
+import { EvaluationDocuments } from "@/components/evaluation/EvaluationDocuments";
 
 export default function EvaluationPage() {
   const params = useParams();
@@ -89,6 +90,7 @@ export default function EvaluationPage() {
                 <TabsTrigger value="compare">Compare</TabsTrigger>
               </>
             )}
+            <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="references">References</TabsTrigger>
             <TabsTrigger value="score">Score</TabsTrigger>
           </TabsList>
@@ -103,6 +105,10 @@ export default function EvaluationPage() {
               </TabsContent>
             </>
           )}
+
+          <TabsContent value="documents">
+            <EvaluationDocuments projectId={projectId} project={project} />
+          </TabsContent>
 
           <TabsContent value="references">
             <ReferenceChecks projectId={projectId} />

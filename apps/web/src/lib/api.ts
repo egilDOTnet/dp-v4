@@ -1049,6 +1049,10 @@ export const api = {
           }
         ),
     },
+    vendorResponses: {
+      list: (projectId: string) =>
+        apiRequest<VendorResponseWithFiles[]>(`/api/projects/${projectId}/rfp/vendor-responses`),
+    },
   },
   notifications: {
     list: () => apiRequest<Notification[]>("/api/notifications"),
@@ -2140,6 +2144,22 @@ export interface RFPProposalFile {
   order: number;
   createdAt: string;
   updatedAt: string;
+  fileData?: string; // Base64 encoded, included when fetching vendor responses
+}
+
+export interface VendorResponseWithFiles {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  proposalSubmittedAt: string | null;
+  files: Array<{
+    id: string;
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+    fileData: string; // Base64 encoded
+    order: number;
+  }>;
 }
 
 export interface VendorContactPerson {

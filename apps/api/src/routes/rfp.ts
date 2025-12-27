@@ -2871,5 +2871,103 @@ export default async function rfpRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  /**
+   * Get vendor responses with proposal files for a project
+   * Returns all vendor responses that have submitted proposals (status = ProposalSubmitted)
+   * with their proposal files
+   */
+  fastify.get<{
+    Params: { id: string };
+  }>(
+    "/:id/rfp/vendor-responses",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get vendor responses with proposal files for a project",
+        tags: ["rfp"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string", description: "Project ID" },
+          },
+        },
+        response: {
+          200: { description: "List of vendor responses with proposal files" },
+          401: { type: "object", properties: { error: { type: "string" } } },
+          403: { type: "object", properties: { error: { type: "string" } } },
+          404: { type: "object", properties: { error: { type: "string" } } },
+          500: { type: "object", properties: { error: { type: "string" }, message: { type: "string" } } },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projectId = request.params.id;
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        const rfp = await db.rFP.findUnique({
+          where: { projectId },
+        });
+
+        if (!rfp) {
+          return reply.status(404).send({ error: "RFP not found" });
+        }
+
+        // Get all vendor responses that have submitted proposals
+        const vendorResponses = await db.rFPVendorResponse.findMany({
+          where: {
+            rfpId: rfp.id,
+            status: "ProposalSubmitted",
+          },
+          include: {
+            projectVendor: {
+              include: {
+                vendor: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            proposalFiles: {
+              orderBy: { order: "asc" },
+            },
+          },
+          orderBy: {
+            proposalSubmittedAt: "desc",
+          },
+        });
+
+        // Format response
+        const formattedResponses = vendorResponses.map((response) => ({
+          id: response.id,
+          vendorId: response.projectVendor.vendor.id,
+          vendorName: response.projectVendor.vendor.name,
+          proposalSubmittedAt: response.proposalSubmittedAt?.toISOString() || null,
+          files: response.proposalFiles.map((file) => ({
+            id: file.id,
+            fileName: file.fileName,
+            fileType: file.fileType,
+            fileSize: file.fileSize,
+            fileData: file.fileData, // Base64 encoded
+            order: file.order,
+          })),
+        }));
+
+        return reply.send(formattedResponses);
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in GET /:id/rfp/vendor-responses");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
 }
 
