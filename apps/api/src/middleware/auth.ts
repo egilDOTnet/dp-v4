@@ -61,3 +61,10 @@ export async function requireTenant(
   }
 }
 
+/**
+ * Convenience middleware to require GlobalAdministrator role
+ */
+export function requireGlobalAdmin() {
+  return requireRole(["GlobalAdministrator"]);
+}
+
