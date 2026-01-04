@@ -1583,10 +1583,10 @@ export const api = {
         }),
     },
     companies: {
-      list: () => apiRequest<Array<{ id: string; name: string; createdAt: string; updatedAt: string; _count: { User: number; Project: number } }>>("/api/admin/companies"),
-      get: (id: string) => apiRequest<{ id: string; name: string; createdAt: string; updatedAt: string; _count: { User: number; Project: number } }>(`/api/admin/companies/${id}`),
-      create: (data: { name: string }) => apiRequest<{ id: string; name: string; createdAt: string; updatedAt: string }>("/api/admin/companies", { method: "POST", body: JSON.stringify(data) }),
-      update: (id: string, data: { name: string }) => apiRequest<{ id: string; name: string; createdAt: string; updatedAt: string }>(`/api/admin/companies/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+      list: () => apiRequest<Array<{ id: string; name: string; organizationNumber?: string | null; emailDomain?: string | null; subscriptionStatus: "Trial" | "Active" | "Expired"; subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null; subscriptionExpiresAt?: string | null; trialStartedAt?: string | null; createdAt: string; updatedAt: string; _count: { User: number; Project: number } }>>("/api/admin/companies"),
+      get: (id: string) => apiRequest<{ id: string; name: string; organizationNumber?: string | null; emailDomain?: string | null; subscriptionStatus: "Trial" | "Active" | "Expired"; subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null; subscriptionExpiresAt?: string | null; trialStartedAt?: string | null; createdAt: string; updatedAt: string; _count: { User: number; Project: number } }>(`/api/admin/companies/${id}`),
+      create: (data: { name: string; organizationNumber?: string | null; emailDomain?: string | null; subscriptionStatus?: "Trial" | "Active" | "Expired"; subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null; subscriptionExpiresAt?: string | null }) => apiRequest<{ id: string; name: string; organizationNumber?: string | null; emailDomain?: string | null; subscriptionStatus: "Trial" | "Active" | "Expired"; subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null; subscriptionExpiresAt?: string | null; trialStartedAt?: string | null; createdAt: string; updatedAt: string }>("/api/admin/companies", { method: "POST", body: JSON.stringify(data) }),
+      update: (id: string, data: { name: string; organizationNumber?: string | null; emailDomain?: string | null; subscriptionStatus?: "Trial" | "Active" | "Expired"; subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null; subscriptionExpiresAt?: string | null; trialStartedAt?: string | null }) => apiRequest<{ id: string; name: string; organizationNumber?: string | null; emailDomain?: string | null; subscriptionStatus: "Trial" | "Active" | "Expired"; subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null; subscriptionExpiresAt?: string | null; trialStartedAt?: string | null; createdAt: string; updatedAt: string }>(`/api/admin/companies/${id}`, { method: "PUT", body: JSON.stringify(data) }),
       delete: (id: string) => apiRequest<void>(`/api/admin/companies/${id}`, { method: "DELETE" }),
     },
     users: {
@@ -1597,11 +1597,142 @@ export const api = {
       delete: (id: string) => apiRequest<void>(`/api/admin/users/${id}`, { method: "DELETE" }),
     },
     requirementTemplates: {
-      list: () => apiRequest<Array<{ id: string; shortName: string; description?: string | null; languageCode?: string | null; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>>("/api/admin/requirement-templates"),
-      get: (id: string) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode?: string | null; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null }; hierarchies: any[] }>(`/api/admin/requirement-templates/${id}`),
-      create: (data: { shortName: string; description?: string; languageCode?: string }) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode?: string | null; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>("/api/admin/requirement-templates", { method: "POST", body: JSON.stringify(data) }),
-      update: (id: string, data: { shortName?: string; description?: string; languageCode?: string }) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode?: string | null; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>(`/api/admin/requirement-templates/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+      list: () => apiRequest<Array<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>>("/api/admin/requirement-templates"),
+      get: (id: string) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null }; hierarchies: any[] }>(`/api/admin/requirement-templates/${id}`),
+      create: (data: { shortName: string; description?: string; languageCode: string }) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>("/api/admin/requirement-templates", { method: "POST", body: JSON.stringify(data) }),
+      update: (id: string, data: { shortName?: string; description?: string; languageCode?: string }) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>(`/api/admin/requirement-templates/${id}`, { method: "PUT", body: JSON.stringify(data) }),
       delete: (id: string) => apiRequest<void>(`/api/admin/requirement-templates/${id}`, { method: "DELETE" }),
+      hierarchies: {
+        list: (templateId: string) =>
+          apiRequest<RequirementHierarchy[]>(
+            `/api/admin/requirement-templates/${templateId}/hierarchies`
+          ),
+        create: (
+          templateId: string,
+          data: {
+            title: string;
+            description?: string | null;
+            parentId?: string | null;
+          }
+        ) =>
+          apiRequest<RequirementHierarchy>(
+            `/api/admin/requirement-templates/${templateId}/hierarchies`,
+            {
+              method: "POST",
+              body: JSON.stringify(data),
+            }
+          ),
+        update: (
+          templateId: string,
+          hierarchyId: string,
+          data: {
+            title?: string;
+            description?: string | null;
+          }
+        ) =>
+          apiRequest<RequirementHierarchy>(
+            `/api/admin/requirement-templates/${templateId}/hierarchies/${hierarchyId}`,
+            {
+              method: "PUT",
+              body: JSON.stringify(data),
+            }
+          ),
+        delete: (templateId: string, hierarchyId: string) =>
+          apiRequest<void>(
+            `/api/admin/requirement-templates/${templateId}/hierarchies/${hierarchyId}`,
+            {
+              method: "DELETE",
+            }
+          ),
+        reorder: (
+          templateId: string,
+          data: {
+            hierarchyIds: string[];
+            parentId?: string | null;
+          }
+        ) =>
+          apiRequest<void>(
+            `/api/admin/requirement-templates/${templateId}/hierarchies/reorder`,
+            {
+              method: "PUT",
+              body: JSON.stringify(data),
+            }
+          ),
+      },
+      requirements: {
+        list: (templateId: string) =>
+          apiRequest<Requirement[]>(
+            `/api/admin/requirement-templates/${templateId}/requirements`
+          ),
+        create: (
+          templateId: string,
+          data: {
+            hierarchyId: string;
+            description: string;
+            type?: string;
+          }
+        ) =>
+          apiRequest<Requirement>(
+            `/api/admin/requirement-templates/${templateId}/requirements`,
+            {
+              method: "POST",
+              body: JSON.stringify(data),
+            }
+          ),
+        update: (
+          templateId: string,
+          requirementId: string,
+          data: {
+            description?: string;
+            type?: string;
+          }
+        ) =>
+          apiRequest<Requirement>(
+            `/api/admin/requirement-templates/${templateId}/requirements/${requirementId}`,
+            {
+              method: "PUT",
+              body: JSON.stringify(data),
+            }
+          ),
+        delete: (templateId: string, requirementId: string) =>
+          apiRequest<void>(
+            `/api/admin/requirement-templates/${templateId}/requirements/${requirementId}`,
+            {
+              method: "DELETE",
+            }
+          ),
+        reorder: (
+          templateId: string,
+          requirementId: string,
+          data: {
+            requirementIds: string[];
+            hierarchyId: string;
+          }
+        ) =>
+          apiRequest<void>(
+            `/api/admin/requirement-templates/${templateId}/requirements/${requirementId}/reorder`,
+            {
+              method: "PUT",
+              body: JSON.stringify(data),
+            }
+          ),
+      },
+      importRequirements: (
+        templateId: string,
+        requirements: Array<{
+          level1: string;
+          level2?: string;
+          requirement: string;
+          type?: string;
+        }>
+      ) =>
+        apiRequest<{ count: number }>(
+          `/api/admin/requirement-templates/${templateId}/import/requirements`,
+          {
+            method: "POST",
+            body: JSON.stringify({ requirements }),
+          }
+        ),
     },
     emailTemplates: {
       list: () => apiRequest<Array<{ id: string; name: string; content?: string | null; isGlobal: boolean; createdAt: string; updatedAt: string; languages: Array<{ id: string; languageCode: string; subject?: string | null; content: string }> }>>("/api/admin/email-templates"),
@@ -1755,7 +1886,8 @@ export interface Notification {
 
 export interface RequirementHierarchy {
   id: string;
-  projectId: string;
+  projectId?: string | null;
+  templateId?: string | null;
   parentId: string | null;
   number: string;
   title: string;

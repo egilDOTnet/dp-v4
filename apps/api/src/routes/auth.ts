@@ -51,6 +51,24 @@ function deriveNameFromEmail(email: string): { firstName: string; lastName: stri
   };
 }
 
+// Helper function to derive company name from email domain
+// Example: "acme.com" -> "Acme"
+// Example: "mail.google.com" -> "Google"
+function deriveCompanyNameFromDomain(email: string): string {
+  const domain = email.split("@")[1];
+  if (!domain) {
+    // Fallback if domain extraction fails
+    return "Company";
+  }
+  
+  const domainParts = domain.split(".");
+  // Get the first part before the first dot
+  const firstPart = domainParts[0];
+  
+  // Capitalize first letter
+  return firstPart.charAt(0).toUpperCase() + firstPart.slice(1).toLowerCase();
+}
+
 // Store magic links in memory (in production, use Redis or database)
 const magicLinks = new Map<string, { email: string; expiresAt: number }>();
 
@@ -523,14 +541,86 @@ export default async function authRoutes(fastify: FastifyInstance) {
         });
 
         if (!user) {
-          // Create new user with a new tenant
-          const tenant = await db.tenant.create({
-            data: {
-              id: `tenant-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-              name: `${decoded.email.split("@")[0]} Company`,
-              updatedAt: new Date(),
-            },
+          // Extract domain from email
+          const domain = decoded.email.split("@")[1];
+          if (!domain) {
+            return reply.status(400).send({ error: "Invalid email format" });
+          }
+
+          // Derive company name from domain
+          const companyName = deriveCompanyNameFromDomain(decoded.email);
+
+          // Check if a tenant with this domain already exists
+          const existingTenantWithDomain = await db.tenant.findFirst({
+            where: { emailDomain: domain },
           });
+
+          // Check if a tenant with this name already exists
+          const existingTenantWithName = await db.tenant.findUnique({
+            where: { name: companyName },
+          });
+
+          // If name conflict exists, append a suffix to make it unique
+          let finalCompanyName = companyName;
+          if (existingTenantWithName) {
+            let suffix = 1;
+            while (await db.tenant.findUnique({ where: { name: `${companyName} ${suffix}` } })) {
+              suffix++;
+            }
+            finalCompanyName = `${companyName} ${suffix}`;
+          }
+
+          // Create new user with a new tenant
+          let tenant;
+          try {
+            tenant = await db.tenant.create({
+              data: {
+                id: `tenant-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                name: finalCompanyName,
+                emailDomain: existingTenantWithDomain ? null : domain,
+                updatedAt: new Date(),
+              },
+            });
+          } catch (error: any) {
+            // Handle unique constraint violations
+            if (error.code === "P2002") {
+              // Unique constraint violation - likely a race condition
+              // Check which field caused the conflict
+              const meta = error.meta as { target?: string[] };
+              
+              if (meta?.target?.includes("name")) {
+                // Name conflict - generate new name and retry
+                let suffix = 1;
+                while (await db.tenant.findUnique({ where: { name: `${companyName} ${suffix}` } })) {
+                  suffix++;
+                }
+                finalCompanyName = `${companyName} ${suffix}`;
+                tenant = await db.tenant.create({
+                  data: {
+                    id: `tenant-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    name: finalCompanyName,
+                    emailDomain: existingTenantWithDomain ? null : domain,
+                    updatedAt: new Date(),
+                  },
+                });
+              } else if (meta?.target?.includes("emailDomain")) {
+                // Domain conflict - create tenant without domain
+                tenant = await db.tenant.create({
+                  data: {
+                    id: `tenant-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                    name: finalCompanyName,
+                    emailDomain: null,
+                    updatedAt: new Date(),
+                  },
+                });
+              } else {
+                // Unknown conflict - throw original error
+                throw error;
+              }
+            } else {
+              throw error;
+            }
+          }
 
           // Derive name from email
           const nameData = deriveNameFromEmail(decoded.email);

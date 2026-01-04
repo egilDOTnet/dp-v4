@@ -1,11 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSearch } from "@/hooks/useSearch";
-import { Breadcrumbs, SearchBar, Card, CardBody, Button, LoadingSpinner, EmptyState, PageHeader, Badge } from "@/components/ui";
+import {
+  Breadcrumbs,
+  SearchBar,
+  Button,
+  LoadingSpinner,
+  EmptyState,
+  PageHeader,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui";
+import { UserFormDialog } from "@/components/admin/UserFormDialog";
 
 interface User {
   id: string;
@@ -28,9 +42,12 @@ const roleColors: Record<string, string> = {
 };
 
 export default function UsersPage() {
-  const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | undefined>(undefined);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const { searchTerm, setSearchTerm, filteredItems, clearSearch, isSearching } = useSearch(users, {
     searchKeys: ["email", "firstName", "lastName", "name", "tenant.name" as any],
@@ -39,27 +56,70 @@ export default function UsersPage() {
   const displayItems = isSearching ? filteredItems : users;
 
   useEffect(() => {
-    api.admin.users
-      .list()
-      .then((data) => {
-        setUsers(data);
-      })
-      .catch((err) => {
-        console.error("Failed to load users:", err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    loadUsers();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+  const loadUsers = async () => {
+    try {
+      const data = await api.admin.users.list();
+      setUsers(data);
+    } catch (err) {
+      console.error("Failed to load users:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingUser(undefined);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (user: User) => {
+    setEditingUser(user);
+    setDialogOpen(true);
+  };
+
+  const handleSave = async (data: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    role: string;
+    tenantId?: string | null;
+  }) => {
+    if (editingUser) {
+      await api.admin.users.update(editingUser.id, data);
+    } else {
+      await api.admin.users.create(data);
+    }
+    await loadUsers();
+  };
+
+  const handleDelete = async () => {
+    if (!editingUser) return;
     
     try {
-      await api.admin.users.delete(id);
-      setUsers(users.filter((u) => u.id !== id));
+      await api.admin.users.delete(editingUser.id);
+      await loadUsers();
+    } catch (err: any) {
+      throw new Error(err.message || "Failed to delete user");
+    }
+  };
+
+  const handleDeleteClick = async (user: User) => {
+    if (!confirm(`Are you sure you want to delete "${user.email}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    setDeletingUserId(user.id);
+    try {
+      await api.admin.users.delete(user.id);
+      await loadUsers();
     } catch (err: any) {
       alert(err.message || "Failed to delete user");
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -100,10 +160,7 @@ export default function UsersPage() {
       <PageHeader
         title="Users"
         actions={
-          <Button
-            variant="primary"
-            onClick={() => router.push("/admin/users/new")}
-          >
+          <Button variant="primary" onClick={handleCreate}>
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -136,44 +193,63 @@ export default function UsersPage() {
           description={isSearching ? "Try adjusting your search query" : "Get started by creating a new user"}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayItems.map((user) => (
-            <Card key={user.id} variant="default">
-              <CardBody className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <Link href={`/admin/users/${user.id}`} className="flex-1">
-                    <h3 className="text-lg font-semibold text-text-primary hover:text-primary-600">
-                      {getDisplayName(user)}
-                    </h3>
-                    <p className="text-sm text-text-secondary mt-1">{user.email}</p>
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(user.id)}
-                    className="text-red-600 hover:text-red-700 ml-2"
-                    title="Delete user"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <Badge className={roleColors[user.role] || roleColors.User}>
-                      {user.role.replace(/([A-Z])/g, " $1").trim()}
-                    </Badge>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayItems.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">{user.email}</TableCell>
+                <TableCell>{getDisplayName(user)}</TableCell>
+                <TableCell>
+                  <Badge className={roleColors[user.role] || roleColors.User}>
+                    {user.role.replace(/([A-Z])/g, " $1").trim()}
+                  </Badge>
+                </TableCell>
+                <TableCell>{user.tenant?.name || "—"}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleEdit(user)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteClick(user)}
+                      disabled={deletingUserId === user.id || user.id === currentUser?.id}
+                      loading={deletingUserId === user.id}
+                      title={user.id === currentUser?.id ? "You cannot delete your own account" : undefined}
+                    >
+                      Delete
+                    </Button>
                   </div>
-                  {user.tenant && (
-                    <p className="text-sm text-text-secondary">
-                      Company: {user.tenant.name}
-                    </p>
-                  )}
-                </div>
-              </CardBody>
-            </Card>
-          ))}
-        </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
+
+      <UserFormDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingUser(undefined);
+        }}
+        existingUser={editingUser}
+        onSave={handleSave}
+      />
     </div>
   );
 }

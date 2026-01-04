@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { api, Phase } from "@/lib/api";
 
 interface ImportWizardProps {
-  projectId: string;
+  target: { type: "project" | "template"; id: string };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (count: number, dataType: ImportDataType) => void;
@@ -45,7 +45,7 @@ const REQUIRED_FIELDS: Record<ImportDataType, string[]> = {
 };
 
 export const ImportWizard: React.FC<ImportWizardProps> = ({
-  projectId,
+  target,
   open,
   onOpenChange,
   onSuccess,
@@ -66,18 +66,18 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
   const [helpDataType, setHelpDataType] = useState<ImportDataType | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load phases when dataType is "tasks"
+  // Load phases when dataType is "tasks" (only for projects)
   useEffect(() => {
-    if (dataType === "tasks" && open) {
-      api.projects.phases.list(projectId)
+    if (dataType === "tasks" && open && target.type === "project") {
+      api.projects.phases.list(target.id)
         .then(setPhases)
         .catch((err) => {
           setError(`Failed to load phases: ${err.message}`);
         });
     }
-  }, [dataType, projectId, open]);
+  }, [dataType, target, open]);
 
-  // Reset state when dialog closes
+  // Reset state when dialog closes, or auto-set for templates
   useEffect(() => {
     if (!open) {
       setStep("select-type");
@@ -90,8 +90,12 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
       setError("");
       setImportCount(0);
       setSkippedRowsCount(0);
+    } else if (open && target.type === "template") {
+      // For templates, automatically select "requirements" and skip to file selection
+      setDataType("requirements");
+      setStep("select-file");
     }
-  }, [open]);
+  }, [open, target.type]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -208,6 +212,10 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
 
   const handleBack = () => {
     if (step === "select-file") {
+      // Don't go back from file selection if this is a template (we skipped the type selection)
+      if (target.type === "template") {
+        return;
+      }
       setStep("select-type");
     } else if (step === "select-phase") {
       setStep("select-file");
@@ -305,14 +313,25 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
       // Call appropriate import API
       let count = 0;
       if (dataType === "tasks") {
-        const result = await api.projects.importTasks(projectId, selectedPhaseId, dataToImport);
+        if (target.type !== "project") {
+          throw new Error("Tasks can only be imported into projects");
+        }
+        const result = await api.projects.importTasks(target.id, selectedPhaseId, dataToImport);
         count = result.count;
       } else if (dataType === "rfi-questions") {
-        const result = await api.projects.importRFIQuestions(projectId, dataToImport);
+        if (target.type !== "project") {
+          throw new Error("RFI questions can only be imported into projects");
+        }
+        const result = await api.projects.importRFIQuestions(target.id, dataToImport);
         count = result.count;
       } else if (dataType === "requirements") {
-        const result = await api.projects.importRequirements(projectId, dataToImport);
-        count = result.count;
+        if (target.type === "project") {
+          const result = await api.projects.importRequirements(target.id, dataToImport);
+          count = result.count;
+        } else {
+          const result = await api.admin.requirementTemplates.importRequirements(target.id, dataToImport);
+          count = result.count;
+        }
       }
 
       setImportCount(count);
@@ -333,11 +352,25 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
   };
 
   const getNavigationUrl = () => {
-    if (!dataType) return `/projects/${projectId}`;
-    if (dataType === "tasks") return `/projects/${projectId}/tasks`;
-    if (dataType === "rfi-questions") return `/projects/${projectId}/rfi`;
-    if (dataType === "requirements") return `/projects/${projectId}/requirements`;
-    return `/projects/${projectId}`;
+    if (!dataType) {
+      return target.type === "project" ? `/projects/${target.id}` : `/admin/requirement-templates/${target.id}`;
+    }
+    if (dataType === "tasks") {
+      if (target.type !== "project") return `/admin/requirement-templates/${target.id}`;
+      return `/projects/${target.id}/tasks`;
+    }
+    if (dataType === "rfi-questions") {
+      if (target.type !== "project") return `/admin/requirement-templates/${target.id}`;
+      return `/projects/${target.id}/rfi`;
+    }
+    if (dataType === "requirements") {
+      if (target.type === "project") {
+        return `/projects/${target.id}/requirements`;
+      } else {
+        return `/admin/requirement-templates/${target.id}`;
+      }
+    }
+    return target.type === "project" ? `/projects/${target.id}` : `/admin/requirement-templates/${target.id}`;
   };
 
   return (
@@ -677,7 +710,7 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
           <DialogFooter>
             {step !== "importing" && step !== "success" && (
               <>
-                {step !== "select-type" && (
+                {step !== "select-type" && !(step === "select-file" && target.type === "template") && (
                   <Button
                     variant="ghost"
                     onClick={handleBack}

@@ -21,7 +21,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 interface RequirementListProps {
-  projectId: string;
+  projectId?: string;
+  templateId?: string;
   hierarchyId: string;
   requirements: Requirement[];
   onRequirementUpdate: () => void;
@@ -77,6 +78,7 @@ interface RequirementFormData {
 
 export default function RequirementList({
   projectId,
+  templateId,
   hierarchyId,
   requirements,
   onRequirementUpdate,
@@ -90,6 +92,10 @@ export default function RequirementList({
   selectedRequirementIds = new Set(),
   onRequirementToggle,
 }: RequirementListProps) {
+  // Ensure either projectId or templateId is provided
+  if (!projectId && !templateId) {
+    throw new Error("Either projectId or templateId must be provided");
+  }
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newRequirement, setNewRequirement] = useState<RequirementFormData>({
     description: "",
@@ -352,12 +358,18 @@ export default function RequirementList({
     setError("");
 
     try {
-      const newRequirementData = await api.requirements.create(projectId, {
-        hierarchyId,
-        description: newRequirement.description.trim(),
-        type: newRequirement.type || "Information",
-        status: newRequirement.status || "New",
-      });
+      const newRequirementData = projectId
+        ? await api.requirements.create(projectId, {
+            hierarchyId,
+            description: newRequirement.description.trim(),
+            type: newRequirement.type || "Information",
+            status: newRequirement.status || "New",
+          })
+        : await api.admin.requirementTemplates.requirements.create(templateId!, {
+            hierarchyId,
+            description: newRequirement.description.trim(),
+            type: newRequirement.type || "Information",
+          });
       setNewRequirement({
         description: "",
         type: "Information",
@@ -411,7 +423,14 @@ export default function RequirementList({
         updatePayload.status = value as Requirement["status"];
       }
 
-      await api.requirements.update(projectId, requirementId, updatePayload);
+      if (projectId) {
+        await api.requirements.update(projectId, requirementId, updatePayload);
+      } else {
+        await api.admin.requirementTemplates.requirements.update(templateId!, requirementId, {
+          description: updatePayload.description,
+          type: updatePayload.type,
+        });
+      }
 
       setEditingFields((prev) => {
         const newFields = { ...prev };
@@ -588,7 +607,11 @@ export default function RequirementList({
     // Wait for animation to complete before deleting
     setTimeout(async () => {
       try {
-        await api.requirements.delete(projectId, id);
+        if (projectId) {
+          await api.requirements.delete(projectId, id);
+        } else {
+          await api.admin.requirementTemplates.requirements.delete(templateId!, id);
+        }
         setCancelingRequirementId(null);
         onRequirementUpdate();
         setLoading(false);
@@ -621,10 +644,18 @@ export default function RequirementList({
     setError("");
 
     try {
-      await api.requirements.reorder(projectId, {
-        requirementIds,
-        hierarchyId,
-      });
+      if (projectId) {
+        await api.requirements.reorder(projectId, {
+          requirementIds,
+          hierarchyId,
+        });
+      } else {
+        // For templates, use the first requirementId as the route param (API expects it)
+        await api.admin.requirementTemplates.requirements.reorder(templateId!, requirementIds[0] || "", {
+          requirementIds,
+          hierarchyId,
+        });
+      }
       onRequirementUpdate();
     } catch (err: any) {
       setError(err.message || "Failed to reorder requirements");
@@ -640,6 +671,11 @@ export default function RequirementList({
     }
 
     try {
+      // History is only available for project requirements, not templates
+      if (!projectId) {
+        setHistory((prev) => ({ ...prev, [requirementId]: [] }));
+        return;
+      }
       const historyData = await api.requirements.getHistory(projectId, requirementId);
       setHistory((prev) => ({ ...prev, [requirementId]: historyData }));
       setShowHistoryId(requirementId);

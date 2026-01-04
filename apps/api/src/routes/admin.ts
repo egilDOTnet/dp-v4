@@ -201,6 +201,12 @@ export default async function adminRoutes(fastify: FastifyInstance) {
               properties: {
                 id: { type: "string" },
                 name: { type: "string" },
+                organizationNumber: { type: "string", nullable: true },
+                emailDomain: { type: "string", nullable: true },
+                subscriptionStatus: { type: "string", enum: ["Trial", "Active", "Expired"] },
+                subscriptionTier: { type: "string", enum: ["Projects1", "Projects2", "Projects5", "Unlimited"], nullable: true },
+                subscriptionExpiresAt: { type: "string", format: "date-time", nullable: true },
+                trialStartedAt: { type: "string", format: "date-time", nullable: true },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
                 _count: {
@@ -234,6 +240,12 @@ export default async function adminRoutes(fastify: FastifyInstance) {
           companies.map((company) => ({
             id: company.id,
             name: company.name,
+            organizationNumber: company.organizationNumber,
+            emailDomain: company.emailDomain,
+            subscriptionStatus: company.subscriptionStatus,
+            subscriptionTier: company.subscriptionTier,
+            subscriptionExpiresAt: company.subscriptionExpiresAt?.toISOString() ?? null,
+            trialStartedAt: company.trialStartedAt?.toISOString() ?? null,
             createdAt: company.createdAt.toISOString(),
             updatedAt: company.updatedAt.toISOString(),
             _count: company._count,
@@ -267,6 +279,31 @@ export default async function adminRoutes(fastify: FastifyInstance) {
             id: { type: "string" },
           },
         },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              organizationNumber: { type: "string", nullable: true },
+              emailDomain: { type: "string", nullable: true },
+              subscriptionStatus: { type: "string", enum: ["Trial", "Active", "Expired"] },
+              subscriptionTier: { type: "string", enum: ["Projects1", "Projects2", "Projects5", "Unlimited"], nullable: true },
+              subscriptionExpiresAt: { type: "string", format: "date-time", nullable: true },
+              trialStartedAt: { type: "string", format: "date-time", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+              _count: {
+                type: "object",
+                properties: {
+                  User: { type: "number" },
+                  Project: { type: "number" },
+                },
+              },
+            },
+          },
+          404: { type: "object", properties: { error: { type: "string" } } },
+        },
       },
     },
     async (request, reply) => {
@@ -291,6 +328,12 @@ export default async function adminRoutes(fastify: FastifyInstance) {
         return reply.send({
           id: company.id,
           name: company.name,
+          organizationNumber: company.organizationNumber,
+          emailDomain: company.emailDomain,
+          subscriptionStatus: company.subscriptionStatus,
+          subscriptionTier: company.subscriptionTier,
+          subscriptionExpiresAt: company.subscriptionExpiresAt?.toISOString() ?? null,
+          trialStartedAt: company.trialStartedAt?.toISOString() ?? null,
           createdAt: company.createdAt.toISOString(),
           updatedAt: company.updatedAt.toISOString(),
           _count: company._count,
@@ -308,7 +351,16 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   /**
    * Create a new company
    */
-  fastify.post<{ Body: { name: string } }>(
+  fastify.post<{
+    Body: {
+      name: string;
+      organizationNumber?: string | null;
+      emailDomain?: string | null;
+      subscriptionStatus?: "Trial" | "Active" | "Expired";
+      subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null;
+      subscriptionExpiresAt?: string | null;
+    };
+  }>(
     "/admin/companies",
     {
       preHandler: [authenticate, requireGlobalAdmin()],
@@ -321,23 +373,72 @@ export default async function adminRoutes(fastify: FastifyInstance) {
           required: ["name"],
           properties: {
             name: { type: "string" },
+            organizationNumber: { type: "string", nullable: true },
+            emailDomain: { type: "string", nullable: true },
+            subscriptionStatus: { type: "string", enum: ["Trial", "Active", "Expired"] },
+            subscriptionTier: { type: "string", enum: ["Projects1", "Projects2", "Projects5", "Unlimited"], nullable: true },
+            subscriptionExpiresAt: { type: "string", format: "date-time", nullable: true },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              organizationNumber: { type: "string", nullable: true },
+              emailDomain: { type: "string", nullable: true },
+              subscriptionStatus: { type: "string", enum: ["Trial", "Active", "Expired"] },
+              subscriptionTier: { type: "string", enum: ["Projects1", "Projects2", "Projects5", "Unlimited"], nullable: true },
+              subscriptionExpiresAt: { type: "string", format: "date-time", nullable: true },
+              trialStartedAt: { type: "string", format: "date-time", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
           },
         },
       },
     },
     async (request, reply) => {
       try {
-        const { name } = request.body;
+        const {
+          name,
+          organizationNumber,
+          emailDomain,
+          subscriptionStatus = "Trial",
+          subscriptionTier,
+          subscriptionExpiresAt,
+        } = request.body;
+
+        const now = new Date();
+        const createData: any = {
+          id: `tenant-${Date.now()}`,
+          name,
+          organizationNumber: organizationNumber || null,
+          emailDomain: emailDomain || null,
+          subscriptionStatus,
+          subscriptionTier: subscriptionTier || null,
+          subscriptionExpiresAt: subscriptionExpiresAt ? new Date(subscriptionExpiresAt) : null,
+        };
+
+        // Set trialStartedAt if status is Trial
+        if (subscriptionStatus === "Trial") {
+          createData.trialStartedAt = now;
+        }
+
         const company = await db.tenant.create({
-          data: {
-            id: `tenant-${Date.now()}`,
-            name,
-          },
+          data: createData,
         });
 
         return reply.status(201).send({
           id: company.id,
           name: company.name,
+          organizationNumber: company.organizationNumber,
+          emailDomain: company.emailDomain,
+          subscriptionStatus: company.subscriptionStatus,
+          subscriptionTier: company.subscriptionTier,
+          subscriptionExpiresAt: company.subscriptionExpiresAt?.toISOString() ?? null,
+          trialStartedAt: company.trialStartedAt?.toISOString() ?? null,
           createdAt: company.createdAt.toISOString(),
           updatedAt: company.updatedAt.toISOString(),
         });
@@ -354,7 +455,18 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   /**
    * Update a company
    */
-  fastify.put<{ Params: { id: string }; Body: { name: string } }>(
+  fastify.put<{
+    Params: { id: string };
+    Body: {
+      name: string;
+      organizationNumber?: string | null;
+      emailDomain?: string | null;
+      subscriptionStatus?: "Trial" | "Active" | "Expired";
+      subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null;
+      subscriptionExpiresAt?: string | null;
+      trialStartedAt?: string | null;
+    };
+  }>(
     "/admin/companies/:id",
     {
       preHandler: [authenticate, requireGlobalAdmin()],
@@ -374,6 +486,29 @@ export default async function adminRoutes(fastify: FastifyInstance) {
           required: ["name"],
           properties: {
             name: { type: "string" },
+            organizationNumber: { type: "string", nullable: true },
+            emailDomain: { type: "string", nullable: true },
+            subscriptionStatus: { type: "string", enum: ["Trial", "Active", "Expired"] },
+            subscriptionTier: { type: "string", enum: ["Projects1", "Projects2", "Projects5", "Unlimited"], nullable: true },
+            subscriptionExpiresAt: { type: "string", format: "date-time", nullable: true },
+            trialStartedAt: { type: "string", format: "date-time", nullable: true },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              organizationNumber: { type: "string", nullable: true },
+              emailDomain: { type: "string", nullable: true },
+              subscriptionStatus: { type: "string", enum: ["Trial", "Active", "Expired"] },
+              subscriptionTier: { type: "string", enum: ["Projects1", "Projects2", "Projects5", "Unlimited"], nullable: true },
+              subscriptionExpiresAt: { type: "string", format: "date-time", nullable: true },
+              trialStartedAt: { type: "string", format: "date-time", nullable: true },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
           },
         },
       },
@@ -381,16 +516,46 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id } = request.params;
-        const { name } = request.body;
+        const {
+          name,
+          organizationNumber,
+          emailDomain,
+          subscriptionStatus,
+          subscriptionTier,
+          subscriptionExpiresAt,
+          trialStartedAt,
+        } = request.body;
+
+        const updateData: any = {
+          name,
+          updatedAt: new Date(),
+        };
+
+        if (organizationNumber !== undefined) updateData.organizationNumber = organizationNumber || null;
+        if (emailDomain !== undefined) updateData.emailDomain = emailDomain || null;
+        if (subscriptionStatus !== undefined) updateData.subscriptionStatus = subscriptionStatus;
+        if (subscriptionTier !== undefined) updateData.subscriptionTier = subscriptionTier || null;
+        if (subscriptionExpiresAt !== undefined) {
+          updateData.subscriptionExpiresAt = subscriptionExpiresAt ? new Date(subscriptionExpiresAt) : null;
+        }
+        if (trialStartedAt !== undefined) {
+          updateData.trialStartedAt = trialStartedAt ? new Date(trialStartedAt) : null;
+        }
 
         const company = await db.tenant.update({
           where: { id },
-          data: { name, updatedAt: new Date() },
+          data: updateData,
         });
 
         return reply.send({
           id: company.id,
           name: company.name,
+          organizationNumber: company.organizationNumber,
+          emailDomain: company.emailDomain,
+          subscriptionStatus: company.subscriptionStatus,
+          subscriptionTier: company.subscriptionTier,
+          subscriptionExpiresAt: company.subscriptionExpiresAt?.toISOString() ?? null,
+          trialStartedAt: company.trialStartedAt?.toISOString() ?? null,
           createdAt: company.createdAt.toISOString(),
           updatedAt: company.updatedAt.toISOString(),
         });
@@ -430,6 +595,16 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id } = request.params;
+        const user = getUser(request);
+
+        // Prevent users from deleting their own company/tenant
+        if (user.tenantId === id) {
+          return reply.status(400).send({
+            error: "Cannot delete your own company",
+            message: "You cannot delete the company that your account belongs to. Please use a different admin account or transfer your account to another company first.",
+          });
+        }
+
         await db.tenant.delete({
           where: { id },
         });
@@ -809,6 +984,16 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id } = request.params;
+        const user = getUser(request);
+
+        // Prevent users from deleting their own account
+        if (user.userId === id) {
+          return reply.status(400).send({
+            error: "Cannot delete your own account",
+            message: "You cannot delete your own account. Please use a different admin account to delete this user.",
+          });
+        }
+
         await db.user.delete({
           where: { id },
         });
@@ -983,7 +1168,7 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     Body: {
       shortName: string;
       description?: string;
-      languageCode?: string;
+      languageCode: string;
     };
   }>(
     "/admin/requirement-templates",
@@ -995,7 +1180,7 @@ export default async function adminRoutes(fastify: FastifyInstance) {
         security: [{ bearerAuth: [] }],
         body: {
           type: "object",
-          required: ["shortName"],
+          required: ["shortName", "languageCode"],
           properties: {
             shortName: { type: "string" },
             description: { type: "string" },
@@ -1008,6 +1193,20 @@ export default async function adminRoutes(fastify: FastifyInstance) {
       try {
         const user = getUser(request);
         const { shortName, description, languageCode } = request.body;
+
+        // Check for existing template with same shortName and languageCode
+        const existing = await db.requirementTemplate.findFirst({
+          where: {
+            shortName,
+            languageCode,
+          },
+        });
+
+        if (existing) {
+          return reply.status(400).send({
+            error: "A template with this short name and language code already exists",
+          });
+        }
 
         const template = await db.requirementTemplate.create({
           data: {
@@ -1038,7 +1237,9 @@ export default async function adminRoutes(fastify: FastifyInstance) {
         });
       } catch (error: any) {
         if (error.code === "P2002") {
-          return reply.status(400).send({ error: "Template shortName already exists" });
+          return reply.status(400).send({
+            error: "A template with this short name and language code already exists",
+          });
         }
         request.log.error({ err: error }, "Error in POST /admin/requirement-templates");
         return reply.status(500).send({
@@ -1089,6 +1290,35 @@ export default async function adminRoutes(fastify: FastifyInstance) {
         const { id } = request.params;
         const { shortName, description, languageCode } = request.body;
 
+        // Get current template to check what we're updating
+        const currentTemplate = await db.requirementTemplate.findUnique({
+          where: { id },
+        });
+
+        if (!currentTemplate) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Determine the final values for shortName and languageCode
+        const finalShortName = shortName !== undefined ? shortName : currentTemplate.shortName;
+        const finalLanguageCode = languageCode !== undefined ? languageCode : currentTemplate.languageCode;
+
+        // Check for existing template with same shortName and languageCode (excluding current)
+        if (shortName !== undefined || languageCode !== undefined) {
+          const existing = await db.requirementTemplate.findFirst({
+            where: {
+              shortName: finalShortName,
+              languageCode: finalLanguageCode,
+            },
+          });
+
+          if (existing && existing.id !== id) {
+            return reply.status(400).send({
+              error: "A template with this short name and language code already exists",
+            });
+          }
+        }
+
         const updateData: any = { updatedAt: new Date() };
         if (shortName !== undefined) updateData.shortName = shortName;
         if (description !== undefined) updateData.description = description;
@@ -1122,7 +1352,9 @@ export default async function adminRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: "Template not found" });
         }
         if (error.code === "P2002") {
-          return reply.status(400).send({ error: "Template shortName already exists" });
+          return reply.status(400).send({
+            error: "A template with this short name and language code already exists",
+          });
         }
         request.log.error({ err: error }, "Error in PUT /admin/requirement-templates/:id");
         return reply.status(500).send({
@@ -1641,6 +1873,1182 @@ export default async function adminRoutes(fastify: FastifyInstance) {
         request.log.error({ err: error }, "Error in DELETE /admin/email-templates/:id/languages/:languageCode");
         return reply.status(500).send({
           error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  // ============================================
+  // Template Hierarchy and Requirements Management
+  // ============================================
+
+  // Helper function to generate template hierarchy number
+  async function generateTemplateHierarchyNumber(
+    templateId: string,
+    parentId: string | null
+  ): Promise<string> {
+    if (parentId === null) {
+      // Level 1 hierarchy - count existing level 1 hierarchies for this template
+      const count = await db.requirementHierarchy.count({
+        where: {
+          templateId,
+          isTemplate: true,
+          parentId: null,
+        },
+      });
+      return `${count + 1}.`;
+    } else {
+      // Level 2 hierarchy - get parent number and count both siblings and requirements
+      const parent = await db.requirementHierarchy.findUnique({
+        where: { id: parentId },
+      });
+      if (!parent) {
+        throw new Error("Parent hierarchy not found");
+      }
+      
+      // Count both sub-hierarchies and requirements under the parent
+      const siblingHierarchyCount = await db.requirementHierarchy.count({
+        where: {
+          templateId,
+          isTemplate: true,
+          parentId,
+        },
+      });
+      
+      const requirementCount = await db.requirement.count({
+        where: {
+          hierarchyId: parentId,
+        },
+      });
+      
+      // Remove trailing period from parent number for concatenation
+      const parentNumberBase = parent.number.endsWith('.') ? parent.number.slice(0, -1) : parent.number;
+      const totalCount = siblingHierarchyCount + requirementCount;
+      return `${parentNumberBase}.${totalCount + 1}.`;
+    }
+  }
+
+  // Helper function to generate requirement number (works for both projects and templates)
+  async function generateRequirementNumber(
+    hierarchyId: string
+  ): Promise<string> {
+    const hierarchy = await db.requirementHierarchy.findUnique({
+      where: { id: hierarchyId },
+    });
+    if (!hierarchy) {
+      throw new Error("Hierarchy not found");
+    }
+
+    // Count both sub-hierarchies and requirements under the parent hierarchy
+    const subHierarchyCount = await db.requirementHierarchy.count({
+      where: {
+        parentId: hierarchyId,
+      },
+    });
+    
+    const requirementCount = await db.requirement.count({
+      where: { hierarchyId },
+    });
+
+    // Remove trailing period from hierarchy number for concatenation
+    const hierarchyNumberBase = hierarchy.number.endsWith('.') ? hierarchy.number.slice(0, -1) : hierarchy.number;
+    const totalCount = subHierarchyCount + requirementCount;
+    return `${hierarchyNumberBase}.${totalCount + 1}.`;
+  }
+
+  /**
+   * Get all hierarchies for a requirement template
+   */
+  fastify.get<{ Params: { id: string } }>(
+    "/admin/requirement-templates/:id/hierarchies",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Get all hierarchies for a requirement template (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            description: "Array of requirement hierarchies",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId } = request.params;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        const hierarchies = await db.requirementHierarchy.findMany({
+          where: {
+            templateId,
+            isTemplate: true,
+          },
+          select: {
+            id: true,
+            templateId: true,
+            parentId: true,
+            number: true,
+            title: true,
+            description: true,
+            order: true,
+            createdAt: true,
+            updatedAt: true,
+            parent: {
+              select: {
+                id: true,
+                templateId: true,
+                parentId: true,
+                number: true,
+                title: true,
+                description: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+            children: {
+              select: {
+                id: true,
+                templateId: true,
+                parentId: true,
+                number: true,
+                title: true,
+                description: true,
+                order: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: { order: "asc" },
+            },
+            _count: {
+              select: { requirements: true },
+            },
+          },
+          orderBy: [
+            { parentId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        return reply.send(hierarchies);
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in GET /admin/requirement-templates/:id/hierarchies");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Create hierarchy for a requirement template
+   */
+  fastify.post<{
+    Params: { id: string };
+    Body: {
+      title: string;
+      description?: string | null;
+      parentId?: string | null;
+    };
+  }>(
+    "/admin/requirement-templates/:id/hierarchies",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Create hierarchy for a requirement template (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["title"],
+          properties: {
+            title: { type: "string" },
+            description: { type: "string", nullable: true },
+            parentId: { type: "string", nullable: true },
+          },
+        },
+        response: {
+          201: {
+            description: "Created hierarchy",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId } = request.params;
+        const { title, description, parentId } = request.body;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // If parentId is provided, verify it belongs to this template
+        if (parentId) {
+          const parent = await db.requirementHierarchy.findUnique({
+            where: { id: parentId },
+          });
+          if (!parent || parent.templateId !== templateId || !parent.isTemplate) {
+            return reply.status(400).send({ error: "Invalid parent hierarchy" });
+          }
+        }
+
+        // Generate number and order
+        const number = await generateTemplateHierarchyNumber(templateId, parentId || null);
+        const maxOrder = await db.requirementHierarchy.findFirst({
+          where: {
+            templateId,
+            isTemplate: true,
+            parentId: parentId || null,
+          },
+          orderBy: { order: "desc" },
+        });
+        const order = maxOrder ? maxOrder.order + 1 : 1;
+
+        const hierarchy = await db.requirementHierarchy.create({
+          data: {
+            templateId,
+            isTemplate: true,
+            projectId: null,
+            parentId: parentId || null,
+            number,
+            title: title.trim(),
+            description: description?.trim() || null,
+            order,
+          },
+          select: {
+            id: true,
+            templateId: true,
+            parentId: true,
+            number: true,
+            title: true,
+            description: true,
+            order: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        return reply.status(201).send(hierarchy);
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in POST /admin/requirement-templates/:id/hierarchies");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Update hierarchy for a requirement template
+   */
+  fastify.put<{
+    Params: { id: string; hierarchyId: string };
+    Body: {
+      title?: string;
+      description?: string | null;
+    };
+  }>(
+    "/admin/requirement-templates/:id/hierarchies/:hierarchyId",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Update hierarchy for a requirement template (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "hierarchyId"],
+          properties: {
+            id: { type: "string" },
+            hierarchyId: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: "string", nullable: true },
+          },
+        },
+        response: {
+          200: {
+            description: "Updated hierarchy",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId, hierarchyId } = request.params;
+        const { title, description } = request.body;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Verify hierarchy belongs to this template
+        const hierarchy = await db.requirementHierarchy.findUnique({
+          where: { id: hierarchyId },
+        });
+        if (!hierarchy || hierarchy.templateId !== templateId || !hierarchy.isTemplate) {
+          return reply.status(404).send({ error: "Hierarchy not found" });
+        }
+
+        const updateData: any = { updatedAt: new Date() };
+        if (title !== undefined) updateData.title = title.trim();
+        if (description !== undefined) updateData.description = description?.trim() || null;
+
+        const updated = await db.requirementHierarchy.update({
+          where: { id: hierarchyId },
+          data: updateData,
+          select: {
+            id: true,
+            templateId: true,
+            parentId: true,
+            number: true,
+            title: true,
+            description: true,
+            order: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+
+        return reply.send(updated);
+      } catch (error: any) {
+        if (error.code === "P2025") {
+          return reply.status(404).send({ error: "Hierarchy not found" });
+        }
+        request.log.error({ err: error }, "Error in PUT /admin/requirement-templates/:id/hierarchies/:hierarchyId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Delete hierarchy for a requirement template
+   */
+  fastify.delete<{
+    Params: { id: string; hierarchyId: string };
+  }>(
+    "/admin/requirement-templates/:id/hierarchies/:hierarchyId",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Delete hierarchy for a requirement template (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "hierarchyId"],
+          properties: {
+            id: { type: "string" },
+            hierarchyId: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId, hierarchyId } = request.params;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Verify hierarchy belongs to this template
+        const hierarchy = await db.requirementHierarchy.findUnique({
+          where: { id: hierarchyId },
+        });
+        if (!hierarchy || hierarchy.templateId !== templateId || !hierarchy.isTemplate) {
+          return reply.status(404).send({ error: "Hierarchy not found" });
+        }
+
+        await db.requirementHierarchy.delete({
+          where: { id: hierarchyId },
+        });
+
+        return reply.status(204).send();
+      } catch (error: any) {
+        if (error.code === "P2025") {
+          return reply.status(404).send({ error: "Hierarchy not found" });
+        }
+        request.log.error({ err: error }, "Error in DELETE /admin/requirement-templates/:id/hierarchies/:hierarchyId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Reorder hierarchies for a requirement template
+   */
+  fastify.put<{
+    Params: { id: string };
+    Body: {
+      hierarchyIds: string[];
+      parentId?: string | null;
+    };
+  }>(
+    "/admin/requirement-templates/:id/hierarchies/reorder",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Reorder hierarchies for a requirement template (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["hierarchyIds"],
+          properties: {
+            hierarchyIds: {
+              type: "array",
+              items: { type: "string" },
+            },
+            parentId: { type: "string", nullable: true },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId } = request.params;
+        const { hierarchyIds, parentId } = request.body;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Update order for each hierarchy
+        for (let i = 0; i < hierarchyIds.length; i++) {
+          await db.requirementHierarchy.updateMany({
+            where: {
+              id: hierarchyIds[i],
+              templateId,
+              isTemplate: true,
+              parentId: parentId || null,
+            },
+            data: { order: i + 1 },
+          });
+        }
+
+        return reply.status(204).send();
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in PUT /admin/requirement-templates/:id/hierarchies/reorder");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Get all requirements for a requirement template
+   */
+  fastify.get<{ Params: { id: string } }>(
+    "/admin/requirement-templates/:id/requirements",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Get all requirements for a requirement template (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            description: "Array of requirements",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId } = request.params;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              templateId,
+              isTemplate: true,
+            },
+          },
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+          },
+          orderBy: [
+            { hierarchyId: "asc" },
+            { order: "asc" },
+          ],
+        });
+
+        return reply.send(requirements);
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in GET /admin/requirement-templates/:id/requirements");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Create requirement in template hierarchy
+   */
+  fastify.post<{
+    Params: { id: string };
+    Body: {
+      hierarchyId: string;
+      description: string;
+      type?: string;
+    };
+  }>(
+    "/admin/requirement-templates/:id/requirements",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Create requirement in template hierarchy (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["hierarchyId", "description"],
+          properties: {
+            hierarchyId: { type: "string" },
+            description: { type: "string" },
+            type: { type: "string" },
+          },
+        },
+        response: {
+          201: {
+            description: "Created requirement",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId } = request.params;
+        const { hierarchyId, description, type } = request.body;
+        const user = getUser(request);
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Verify hierarchy belongs to this template
+        const hierarchy = await db.requirementHierarchy.findUnique({
+          where: { id: hierarchyId },
+        });
+        if (!hierarchy || hierarchy.templateId !== templateId || !hierarchy.isTemplate) {
+          return reply.status(400).send({ error: "Invalid hierarchy" });
+        }
+
+        // Generate number and order
+        const number = await generateRequirementNumber(hierarchyId);
+        const maxOrder = await db.requirement.findFirst({
+          where: { hierarchyId },
+          orderBy: { order: "desc" },
+        });
+        const order = maxOrder ? maxOrder.order + 1 : 1;
+
+        // Validate and set requirement type
+        const validTypes = ["Information", "Mandatory", "Important", "Wish"];
+        const requirementType = type && validTypes.includes(type)
+          ? (type as any)
+          : "Information";
+
+        const requirement = await db.requirement.create({
+          data: {
+            hierarchyId,
+            number,
+            description: description.trim(),
+            type: requirementType,
+            status: null, // Templates don't have status
+            order,
+            createdById: user.userId,
+            lastModifiedById: user.userId,
+          },
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+          },
+        });
+
+        return reply.status(201).send(requirement);
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in POST /admin/requirement-templates/:id/requirements");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Update requirement in template hierarchy
+   */
+  fastify.put<{
+    Params: { id: string; requirementId: string };
+    Body: {
+      description?: string;
+      type?: string;
+    };
+  }>(
+    "/admin/requirement-templates/:id/requirements/:requirementId",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Update requirement in template hierarchy (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "requirementId"],
+          properties: {
+            id: { type: "string" },
+            requirementId: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          properties: {
+            description: { type: "string" },
+            type: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            description: "Updated requirement",
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId, requirementId } = request.params;
+        const { description, type } = request.body;
+        const user = getUser(request);
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Verify requirement belongs to a hierarchy in this template
+        const requirement = await db.requirement.findUnique({
+          where: { id: requirementId },
+          include: {
+            hierarchy: true,
+          },
+        });
+        if (!requirement || requirement.hierarchy.templateId !== templateId || !requirement.hierarchy.isTemplate) {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+
+        const updateData: any = {
+          updatedAt: new Date(),
+          lastModifiedById: user.userId,
+        };
+        if (description !== undefined) updateData.description = description.trim();
+        if (type !== undefined) {
+          const validTypes = ["Information", "Mandatory", "Important", "Wish"];
+          if (validTypes.includes(type)) {
+            updateData.type = type;
+          }
+        }
+
+        const updated = await db.requirement.update({
+          where: { id: requirementId },
+          data: updateData,
+          include: {
+            hierarchy: {
+              include: {
+                parent: true,
+              },
+            },
+          },
+        });
+
+        return reply.send(updated);
+      } catch (error: any) {
+        if (error.code === "P2025") {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+        request.log.error({ err: error }, "Error in PUT /admin/requirement-templates/:id/requirements/:requirementId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Delete requirement from template hierarchy
+   */
+  fastify.delete<{
+    Params: { id: string; requirementId: string };
+  }>(
+    "/admin/requirement-templates/:id/requirements/:requirementId",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Delete requirement from template hierarchy (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "requirementId"],
+          properties: {
+            id: { type: "string" },
+            requirementId: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId, requirementId } = request.params;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Verify requirement belongs to a hierarchy in this template
+        const requirement = await db.requirement.findUnique({
+          where: { id: requirementId },
+          include: {
+            hierarchy: true,
+          },
+        });
+        if (!requirement || requirement.hierarchy.templateId !== templateId || !requirement.hierarchy.isTemplate) {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+
+        await db.requirement.delete({
+          where: { id: requirementId },
+        });
+
+        return reply.status(204).send();
+      } catch (error: any) {
+        if (error.code === "P2025") {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+        request.log.error({ err: error }, "Error in DELETE /admin/requirement-templates/:id/requirements/:requirementId");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Reorder requirement in template hierarchy
+   */
+  fastify.put<{
+    Params: { id: string; requirementId: string };
+    Body: {
+      requirementIds: string[];
+      hierarchyId: string;
+    };
+  }>(
+    "/admin/requirement-templates/:id/requirements/:requirementId/reorder",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Reorder requirement in template hierarchy (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id", "requirementId"],
+          properties: {
+            id: { type: "string" },
+            requirementId: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["requirementIds", "hierarchyId"],
+          properties: {
+            requirementIds: {
+              type: "array",
+              items: { type: "string" },
+            },
+            hierarchyId: { type: "string" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { id: templateId } = request.params;
+        const { requirementIds, hierarchyId } = request.body;
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Verify hierarchy belongs to this template
+        const hierarchy = await db.requirementHierarchy.findUnique({
+          where: { id: hierarchyId },
+        });
+        if (!hierarchy || hierarchy.templateId !== templateId || !hierarchy.isTemplate) {
+          return reply.status(400).send({ error: "Invalid hierarchy" });
+        }
+
+        // Update order for each requirement
+        for (let i = 0; i < requirementIds.length; i++) {
+          await db.requirement.updateMany({
+            where: {
+              id: requirementIds[i],
+              hierarchyId,
+            },
+            data: { order: i + 1 },
+          });
+        }
+
+        return reply.status(204).send();
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in PUT /admin/requirement-templates/:id/requirements/:requirementId/reorder");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  /**
+   * Import requirements for a requirement template (non-destructive)
+   */
+  fastify.post<{
+    Params: { id: string };
+    Body: {
+      requirements: Array<{
+        level1: string;
+        level2?: string;
+        requirement: string;
+        type?: string;
+      }>;
+    };
+  }>(
+    "/admin/requirement-templates/:id/import/requirements",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Import requirements for a requirement template (non-destructive, Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["requirements"],
+          properties: {
+            requirements: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["level1", "requirement"],
+                properties: {
+                  level1: { type: "string" },
+                  level2: { type: "string" },
+                  requirement: { type: "string" },
+                  type: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              count: { type: "number" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const templateId = request.params.id;
+        const user = getUser(request);
+
+        // Verify template exists
+        const template = await db.requirementTemplate.findUnique({
+          where: { id: templateId },
+        });
+        if (!template) {
+          return reply.status(404).send({ error: "Template not found" });
+        }
+
+        // Validate request body
+        if (!request.body || !Array.isArray(request.body.requirements)) {
+          return reply.status(400).send({ error: "Invalid request body: requirements array is required" });
+        }
+
+        // Track created hierarchies to avoid duplicates
+        const level1Hierarchies = new Map<string, string>(); // level1 title -> hierarchy id
+        const level2Hierarchies = new Map<string, string>(); // "level1|level2" -> hierarchy id
+
+        let count = 0;
+
+        for (const reqData of request.body.requirements) {
+          if (!reqData.level1 || !reqData.level1.trim() || !reqData.requirement || !reqData.requirement.trim()) {
+            continue; // Skip invalid entries
+          }
+
+          const level1Title = reqData.level1.trim();
+          const level2Title = reqData.level2?.trim() || "";
+          const requirementDesc = reqData.requirement.trim();
+
+          // Get or create level 1 hierarchy
+          let level1HierarchyId = level1Hierarchies.get(level1Title);
+          if (!level1HierarchyId) {
+            // Check if it already exists
+            const existing = await db.requirementHierarchy.findFirst({
+              where: {
+                templateId,
+                isTemplate: true,
+                parentId: null,
+                title: level1Title,
+              },
+            });
+
+            if (existing) {
+              level1HierarchyId = existing.id;
+            } else {
+              // Create new level 1 hierarchy
+              const number = await generateTemplateHierarchyNumber(templateId, null);
+              const maxOrder = await db.requirementHierarchy.findFirst({
+                where: { templateId, isTemplate: true, parentId: null },
+                orderBy: { order: "desc" },
+              });
+              const order = maxOrder ? maxOrder.order + 1 : 1;
+
+              const newHierarchy = await db.requirementHierarchy.create({
+                data: {
+                  templateId,
+                  isTemplate: true,
+                  projectId: null,
+                  parentId: null,
+                  number,
+                  title: level1Title,
+                  order,
+                },
+              });
+              level1HierarchyId = newHierarchy.id;
+            }
+            level1Hierarchies.set(level1Title, level1HierarchyId);
+          }
+
+          // Get or create level 2 hierarchy if needed
+          let targetHierarchyId = level1HierarchyId;
+          if (level2Title) {
+            const level2Key = `${level1Title}|${level2Title}`;
+            let level2HierarchyId = level2Hierarchies.get(level2Key);
+            if (!level2HierarchyId) {
+              // Check if it already exists
+              const existing = await db.requirementHierarchy.findFirst({
+                where: {
+                  templateId,
+                  isTemplate: true,
+                  parentId: level1HierarchyId,
+                  title: level2Title,
+                },
+              });
+
+              if (existing) {
+                level2HierarchyId = existing.id;
+              } else {
+                // Create new level 2 hierarchy
+                const number = await generateTemplateHierarchyNumber(templateId, level1HierarchyId);
+                const maxOrder = await db.requirementHierarchy.findFirst({
+                  where: { templateId, isTemplate: true, parentId: level1HierarchyId },
+                  orderBy: { order: "desc" },
+                });
+                const order = maxOrder ? maxOrder.order + 1 : 1;
+
+                const newHierarchy = await db.requirementHierarchy.create({
+                  data: {
+                    templateId,
+                    isTemplate: true,
+                    projectId: null,
+                    parentId: level1HierarchyId,
+                    number,
+                    title: level2Title,
+                    order,
+                  },
+                });
+                level2HierarchyId = newHierarchy.id;
+              }
+              level2Hierarchies.set(level2Key, level2HierarchyId);
+            }
+            targetHierarchyId = level2HierarchyId;
+          }
+
+          // Check if requirement already exists (non-destructive)
+          const existingRequirement = await db.requirement.findFirst({
+            where: {
+              hierarchyId: targetHierarchyId,
+              description: requirementDesc,
+            },
+          });
+
+          if (existingRequirement) {
+            continue; // Skip if requirement already exists
+          }
+
+          // Create requirement
+          const hierarchy = await db.requirementHierarchy.findUnique({
+            where: { id: targetHierarchyId },
+          });
+          if (!hierarchy) {
+            continue; // Skip if hierarchy not found
+          }
+
+          const requirementNumber = await generateRequirementNumber(targetHierarchyId);
+          const maxOrder = await db.requirement.findFirst({
+            where: { hierarchyId: targetHierarchyId },
+            orderBy: { order: "desc" },
+          });
+          const order = maxOrder ? maxOrder.order + 1 : 1;
+
+          // Validate and set requirement type
+          const validTypes = ["Information", "Mandatory", "Important", "Wish"];
+          const requirementType = reqData.type && validTypes.includes(reqData.type)
+            ? (reqData.type as any)
+            : "Information";
+
+          await db.requirement.create({
+            data: {
+              hierarchyId: targetHierarchyId,
+              number: requirementNumber,
+              description: requirementDesc,
+              type: requirementType,
+              status: null, // Templates don't have status
+              order,
+              createdById: user.userId,
+              lastModifiedById: user.userId,
+            },
+          });
+
+          count++;
+        }
+
+        return reply.status(200).send({ count });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error importing template requirements");
+        return reply.status(500).send({
+          error: "Failed to import requirements",
           message: error.message || "An unexpected error occurred",
         });
       }

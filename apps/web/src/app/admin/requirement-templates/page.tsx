@@ -3,15 +3,30 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import Link from "next/link";
 import { useSearch } from "@/hooks/useSearch";
-import { Breadcrumbs, SearchBar, Card, CardBody, Button, LoadingSpinner, EmptyState, PageHeader } from "@/components/ui";
+import {
+  Breadcrumbs,
+  SearchBar,
+  Button,
+  LoadingSpinner,
+  EmptyState,
+  PageHeader,
+  Badge,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui";
+import { RequirementTemplateFormDialog } from "@/components/admin/RequirementTemplateFormDialog";
+import { ImportWizard } from "@/components/ImportWizard";
 
 interface RequirementTemplate {
   id: string;
   shortName: string;
   description?: string | null;
-  languageCode?: string | null;
+  languageCode: string;
   createdAt: string;
   updatedAt: string;
   createdBy: {
@@ -25,6 +40,11 @@ export default function RequirementTemplatesPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<RequirementTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<RequirementTemplate | undefined>(undefined);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const [importWizardOpen, setImportWizardOpen] = useState(false);
+  const [importingTemplateId, setImportingTemplateId] = useState<string | null>(null);
 
   const { searchTerm, setSearchTerm, filteredItems, clearSearch, isSearching } = useSearch(templates, {
     searchKeys: ["shortName", "description"],
@@ -33,27 +53,83 @@ export default function RequirementTemplatesPage() {
   const displayItems = isSearching ? filteredItems : templates;
 
   useEffect(() => {
-    api.admin.requirementTemplates
-      .list()
-      .then((data) => {
-        setTemplates(data);
-      })
-      .catch((err) => {
-        console.error("Failed to load templates:", err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    loadTemplates();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this template? This will also delete all associated requirement hierarchies.")) return;
+  const loadTemplates = async () => {
+    try {
+      const data = await api.admin.requirementTemplates.list();
+      setTemplates(data);
+    } catch (err) {
+      console.error("Failed to load templates:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = () => {
+    setEditingTemplate(undefined);
+    setDialogOpen(true);
+  };
+
+  const handleView = (template: RequirementTemplate) => {
+    router.push(`/admin/requirement-templates/${template.id}`);
+  };
+
+  const handleEdit = (template: RequirementTemplate) => {
+    setEditingTemplate(template);
+    setDialogOpen(true);
+  };
+
+  const handleImport = (template: RequirementTemplate) => {
+    setImportingTemplateId(template.id);
+    setImportWizardOpen(true);
+  };
+
+  const handleImportSuccess = (count: number) => {
+    // Optionally refresh the list or navigate to detail page
+    if (importingTemplateId) {
+      router.push(`/admin/requirement-templates/${importingTemplateId}`);
+    }
+  };
+
+  const handleSave = async (data: {
+    shortName: string;
+    description?: string;
+    languageCode: string;
+  }) => {
+    if (editingTemplate) {
+      await api.admin.requirementTemplates.update(editingTemplate.id, data);
+    } else {
+      await api.admin.requirementTemplates.create(data);
+    }
+    await loadTemplates();
+  };
+
+  const handleDelete = async () => {
+    if (!editingTemplate) return;
     
     try {
-      await api.admin.requirementTemplates.delete(id);
-      setTemplates(templates.filter((t) => t.id !== id));
+      await api.admin.requirementTemplates.delete(editingTemplate.id);
+      await loadTemplates();
+    } catch (err: any) {
+      throw new Error(err.message || "Failed to delete template");
+    }
+  };
+
+  const handleDeleteClick = async (template: RequirementTemplate) => {
+    if (!confirm(`Are you sure you want to delete "${template.shortName}"? This will also delete all associated requirement hierarchies. This action cannot be undone.`)) {
+      return;
+    }
+    
+    setDeletingTemplateId(template.id);
+    try {
+      await api.admin.requirementTemplates.delete(template.id);
+      await loadTemplates();
     } catch (err: any) {
       alert(err.message || "Failed to delete template");
+    } finally {
+      setDeletingTemplateId(null);
     }
   };
 
@@ -81,10 +157,7 @@ export default function RequirementTemplatesPage() {
       <PageHeader
         title="Requirements Templates"
         actions={
-          <Button
-            variant="primary"
-            onClick={() => router.push("/admin/requirement-templates/new")}
-          >
+          <Button variant="primary" onClick={handleCreate}>
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -117,41 +190,106 @@ export default function RequirementTemplatesPage() {
           description={isSearching ? "Try adjusting your search query" : "Get started by creating a new requirement template"}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayItems.map((template) => (
-            <Card key={template.id} variant="default">
-              <CardBody className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <Link href={`/admin/requirement-templates/${template.id}`} className="flex-1">
-                    <h3 className="text-lg font-semibold text-text-primary hover:text-primary-600">
-                      {template.shortName}
-                    </h3>
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(template.id)}
-                    className="text-red-600 hover:text-red-700 ml-2"
-                    title="Delete template"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-                {template.description && (
-                  <p className="text-sm text-text-secondary mb-2 line-clamp-2">
-                    {template.description}
-                  </p>
-                )}
-                <div className="space-y-1 text-xs text-text-secondary">
-                  {template.languageCode && (
-                    <p>Language: {template.languageCode.toUpperCase()}</p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Short Name</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Language Code</TableHead>
+              <TableHead>Created By</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayItems.map((template) => (
+              <TableRow key={template.id}>
+                <TableCell 
+                  className="font-medium cursor-pointer hover:text-primary-600"
+                  onClick={() => handleView(template)}
+                >
+                  {template.shortName}
+                </TableCell>
+                <TableCell
+                  className="cursor-pointer hover:text-primary-600"
+                  onClick={() => handleView(template)}
+                >
+                  {template.description ? (
+                    <span className="truncate block max-w-md" title={template.description}>
+                      {template.description}
+                    </span>
+                  ) : (
+                    "—"
                   )}
-                  <p>Created by: {template.createdBy.name || template.createdBy.email}</p>
-                </div>
-              </CardBody>
-            </Card>
-          ))}
-        </div>
+                </TableCell>
+                <TableCell>
+                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {template.languageCode.toUpperCase()}
+                  </Badge>
+                </TableCell>
+                <TableCell>{template.createdBy.name || template.createdBy.email}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleView(template)}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleImport(template)}
+                    >
+                      Import
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleEdit(template)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteClick(template)}
+                      disabled={deletingTemplateId === template.id}
+                      loading={deletingTemplateId === template.id}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <RequirementTemplateFormDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingTemplate(undefined);
+        }}
+        existingTemplate={editingTemplate}
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
+
+      {importingTemplateId && (
+        <ImportWizard
+          target={{ type: "template", id: importingTemplateId }}
+          open={importWizardOpen}
+          onOpenChange={(open) => {
+            setImportWizardOpen(open);
+            if (!open) {
+              setImportingTemplateId(null);
+            }
+          }}
+          onSuccess={handleImportSuccess}
+        />
       )}
     </div>
   );

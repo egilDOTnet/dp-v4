@@ -107,9 +107,9 @@ model Template {
 
 model RequirementTemplate {
   id           String   @id @default(cuid())
-  shortName    String   @unique
+  shortName    String
   description  String?
-  languageCode String?
+  languageCode String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   createdById  String
@@ -117,6 +117,7 @@ model RequirementTemplate {
   createdBy   User                   @relation("RequirementTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
   hierarchies RequirementHierarchy[] @relation("RequirementTemplateHierarchies")
 
+  @@unique([shortName, languageCode])
   @@index([createdById])
 }
 
@@ -136,16 +137,26 @@ model EmailTemplateLanguage {
 }
 
 model Tenant {
-  id        String     @id
-  name      String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime
-  Project   Project[]
-  Template  Template[]
-  User      User[]
-  Vendor    Vendor[]
+  id                   String            @id
+  name                 String
+  organizationNumber   String?
+  emailDomain          String?
+  subscriptionStatus   SubscriptionStatus @default(Trial)
+  subscriptionTier     SubscriptionTier?
+  subscriptionExpiresAt DateTime?
+  trialStartedAt       DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime
+  Project              Project[]
+  Template             Template[]
+  User                 User[]
+  Vendor               Vendor[]
 
+  @@unique([name])
+  @@unique([emailDomain])
   @@index([name])
+  @@index([organizationNumber])
+  @@index([subscriptionStatus])
 }
 
 model User {
@@ -280,6 +291,19 @@ enum Role {
   CompanyAdministrator
   User
   Vendor
+}
+
+enum SubscriptionStatus {
+  Trial
+  Active
+  Expired
+}
+
+enum SubscriptionTier {
+  Projects1
+  Projects2
+  Projects5
+  Unlimited
 }
 
 enum VendorStatus {

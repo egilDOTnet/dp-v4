@@ -22,7 +22,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 interface RequirementHierarchyProps {
-  projectId: string;
+  projectId?: string;
+  templateId?: string;
   hierarchies: RequirementHierarchyType[];
   requirements: Requirement[];
   selectedHierarchyId: string | null;
@@ -109,7 +110,8 @@ function SortableRequirementWrapper({
 
 // Simplified requirement item component for rendering in drag context
 interface RequirementItemProps {
-  projectId: string;
+  projectId?: string;
+  templateId?: string;
   requirement: Requirement;
   onRequirementUpdate: () => void;
   selectedHierarchyId?: string | null;
@@ -120,11 +122,12 @@ interface RequirementItemProps {
   onRequirementToggle?: (requirementId: string) => void;
 }
 
-function RequirementItem({ projectId, requirement, onRequirementUpdate, selectedHierarchyId, hierarchyLevel = 1, dragAttributes, dragListeners, selectedRequirementIds, onRequirementToggle }: RequirementItemProps) {
+function RequirementItem({ projectId, templateId, requirement, onRequirementUpdate, selectedHierarchyId, hierarchyLevel = 1, dragAttributes, dragListeners, selectedRequirementIds, onRequirementToggle }: RequirementItemProps) {
   // Use RequirementList but only for this single requirement with drag enabled if props provided
   return (
     <RequirementList
       projectId={projectId}
+      templateId={templateId}
       hierarchyId={requirement.hierarchyId}
       requirements={[requirement]}
       onRequirementUpdate={onRequirementUpdate}
@@ -143,17 +146,19 @@ function RequirementItem({ projectId, requirement, onRequirementUpdate, selected
 
 // Create form component
 interface RequirementCreateFormProps {
-  projectId: string;
+  projectId?: string;
+  templateId?: string;
   hierarchyId: string;
   onRequirementUpdate: () => void;
   onClose?: () => void;
   hierarchyLevel?: 1 | 2;
 }
 
-function RequirementCreateForm({ projectId, hierarchyId, onRequirementUpdate, onClose, hierarchyLevel = 1 }: RequirementCreateFormProps) {
+function RequirementCreateForm({ projectId, templateId, hierarchyId, onRequirementUpdate, onClose, hierarchyLevel = 1 }: RequirementCreateFormProps) {
   return (
     <RequirementList
       projectId={projectId}
+      templateId={templateId}
       hierarchyId={hierarchyId}
       requirements={[]}
       onRequirementUpdate={onRequirementUpdate}
@@ -168,6 +173,7 @@ function RequirementCreateForm({ projectId, hierarchyId, onRequirementUpdate, on
 
 export default function RequirementHierarchyComponent({
   projectId,
+  templateId,
   hierarchies,
   requirements,
   selectedHierarchyId,
@@ -184,6 +190,10 @@ export default function RequirementHierarchyComponent({
   onRequirementToggle,
   onHierarchyToggle,
 }: RequirementHierarchyProps) {
+  // Ensure either projectId or templateId is provided
+  if (!projectId && !templateId) {
+    throw new Error("Either projectId or templateId must be provided");
+  }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creatingParentId, setCreatingParentId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ title: "", description: "" });
@@ -317,11 +327,19 @@ export default function RequirementHierarchyComponent({
     setError("");
 
     try {
-      await api.requirements.hierarchies.create(projectId, {
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
-        parentId: parentId || undefined,
-      });
+      if (projectId) {
+        await api.requirements.hierarchies.create(projectId, {
+          title: formData.title.trim(),
+          description: formData.description.trim() || undefined,
+          parentId: parentId || undefined,
+        });
+      } else {
+        await api.admin.requirementTemplates.hierarchies.create(templateId!, {
+          title: formData.title.trim(),
+          description: formData.description.trim() || undefined,
+          parentId: parentId || undefined,
+        });
+      }
       setFormData({ title: "", description: "" });
       setCreatingParentId(null);
       onHierarchyUpdate();
@@ -362,17 +380,26 @@ export default function RequirementHierarchyComponent({
     setError("");
 
     try {
-      console.log("[RequirementHierarchy] Updating hierarchy:", { projectId, hierarchyId: id, title: formData.title.trim() });
-      await api.requirements.hierarchies.update(projectId, id, {
-        title: formData.title.trim(),
-        description: formData.description.trim() || null,
-      });
+      const entityId = projectId || templateId!;
+      console.log("[RequirementHierarchy] Updating hierarchy:", { entityId, hierarchyId: id, title: formData.title.trim() });
+      if (projectId) {
+        await api.requirements.hierarchies.update(projectId, id, {
+          title: formData.title.trim(),
+          description: formData.description.trim() || null,
+        });
+      } else {
+        await api.admin.requirementTemplates.hierarchies.update(templateId!, id, {
+          title: formData.title.trim(),
+          description: formData.description.trim() || null,
+        });
+      }
       setEditingId(null);
       setFormData({ title: "", description: "" });
       originalHierarchyDataRef.current = null;
       onHierarchyUpdate();
     } catch (err: any) {
-      console.error("[RequirementHierarchy] Error updating hierarchy:", { projectId, hierarchyId: id, error: err });
+      const entityId = projectId || templateId!;
+      console.error("[RequirementHierarchy] Error updating hierarchy:", { entityId, hierarchyId: id, error: err });
       setError(err.message || "Failed to update hierarchy");
     } finally {
       setLoading(false);
@@ -389,7 +416,11 @@ export default function RequirementHierarchyComponent({
     setError("");
 
     try {
-      await api.requirements.hierarchies.delete(projectId, id);
+      if (projectId) {
+        await api.requirements.hierarchies.delete(projectId, id);
+      } else {
+        await api.admin.requirementTemplates.hierarchies.delete(templateId!, id);
+      }
       if (selectedHierarchyId === id) {
         onHierarchySelect(null);
       }
@@ -463,7 +494,8 @@ export default function RequirementHierarchyComponent({
           const currentFormData = formDataRef.current;
           // Save and exit edit mode
           if (currentFormData.title.trim()) {
-            console.log("[RequirementHierarchy] Click outside detected, saving hierarchy:", { editingId, projectId, title: currentFormData.title });
+            const entityId = projectId || templateId!;
+            console.log("[RequirementHierarchy] Click outside detected, saving hierarchy:", { editingId, entityId, title: currentFormData.title });
             handleUpdate(editingId);
           } else {
             // If title is empty, just cancel
@@ -484,7 +516,7 @@ export default function RequirementHierarchyComponent({
         document.removeEventListener("mousedown", handleClickOutside);
       };
     }
-  }, [editingId, projectId]); // Removed formData from dependencies, using ref instead
+  }, [editingId, projectId, templateId]); // Removed formData from dependencies, using ref instead
 
   // Auto-focus title input when creating new hierarchy
   useEffect(() => {
@@ -556,10 +588,17 @@ export default function RequirementHierarchyComponent({
     setError("");
 
     try {
-      await api.requirements.hierarchies.reorder(projectId, {
-        hierarchyIds,
-        parentId: parentId || undefined,
-      });
+      if (projectId) {
+        await api.requirements.hierarchies.reorder(projectId, {
+          hierarchyIds,
+          parentId: parentId || undefined,
+        });
+      } else {
+        await api.admin.requirementTemplates.hierarchies.reorder(templateId!, {
+          hierarchyIds,
+          parentId: parentId || undefined,
+        });
+      }
       // Expanded state is now managed by parent - no need to save/restore
       await onHierarchyUpdate();
     } catch (err: any) {
@@ -629,10 +668,17 @@ export default function RequirementHierarchyComponent({
             newOrder = targetRequirements.length > 0 ? Math.max(...targetRequirements.map(r => r.order)) + 1 : 0;
           }
 
-          await api.requirements.move(projectId, draggedRequirement!.id, {
-            hierarchyId: targetHierarchyId,
-            order: newOrder,
-          });
+          if (projectId) {
+            await api.requirements.move(projectId, draggedRequirement!.id, {
+              hierarchyId: targetHierarchyId,
+              order: newOrder,
+            });
+          } else {
+            // For templates, moving requirements between hierarchies is not supported yet
+            setError("Moving requirements between hierarchies is not supported for templates");
+            setLoading(false);
+            return;
+          }
         } else {
           // Same hierarchy - just reorder
           const hierarchyRequirements = requirements.filter(r => r.hierarchyId === targetHierarchyId).sort((a, b) => a.order - b.order);
@@ -641,10 +687,17 @@ export default function RequirementHierarchyComponent({
 
           if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
             const reordered = arrayMove(hierarchyRequirements, oldIndex, newIndex);
-            await api.requirements.reorder(projectId, {
-              requirementIds: reordered.map(r => r.id),
-              hierarchyId: targetHierarchyId,
-            });
+            if (projectId) {
+              await api.requirements.reorder(projectId, {
+                requirementIds: reordered.map(r => r.id),
+                hierarchyId: targetHierarchyId,
+              });
+            } else {
+              await api.admin.requirementTemplates.requirements.reorder(templateId!, reordered[0]?.id || "", {
+                requirementIds: reordered.map(r => r.id),
+                hierarchyId: targetHierarchyId,
+              });
+            }
           } else if (oldIndex === -1 || newIndex === -1) {
             // If we can't find the indices, don't do anything
             setLoading(false);
@@ -725,12 +778,21 @@ export default function RequirementHierarchyComponent({
       }
       
       if (requirementItems.length > 0) {
-        promises.push(
-          api.requirements.reorder(projectId, {
-            requirementIds: requirementItems.map(r => r.id),
-            hierarchyId: parentId,
-          })
-        );
+        if (projectId) {
+          promises.push(
+            api.requirements.reorder(projectId, {
+              requirementIds: requirementItems.map(r => r.id),
+              hierarchyId: parentId,
+            })
+          );
+        } else {
+          promises.push(
+            api.admin.requirementTemplates.requirements.reorder(templateId!, requirementItems[0]?.id || "", {
+              requirementIds: requirementItems.map(r => r.id),
+              hierarchyId: parentId,
+            })
+          );
+        }
       }
       
       await Promise.all(promises);
@@ -746,6 +808,10 @@ export default function RequirementHierarchyComponent({
 
 
   const handlePreview = async () => {
+    if (!projectId) {
+      setError("PDF preview is only available for project requirements");
+      return;
+    }
     try {
       setPreviewLoading(true);
       const blob = await api.requirements.downloadPdf(projectId);
@@ -764,41 +830,43 @@ export default function RequirementHierarchyComponent({
     <div className="space-y-4">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Requirement Hierarchy</h2>
-        <button
-          onClick={handlePreview}
-          disabled={previewLoading}
-          className="px-3 py-1.5 text-sm bg-accent-600 text-white rounded-md hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {previewLoading ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              <span>Generating...</span>
-            </>
-          ) : (
-            <>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                />
-              </svg>
-              <span>Preview</span>
-            </>
-          )}
-        </button>
+        {projectId && (
+          <button
+            onClick={handlePreview}
+            disabled={previewLoading}
+            className="px-3 py-1.5 text-sm bg-accent-600 text-white rounded-md hover:bg-accent-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {previewLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                  />
+                </svg>
+                <span>Preview</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -1228,6 +1296,7 @@ export default function RequirementHierarchyComponent({
                                     {({ attributes, listeners }) => (
                                       <RequirementItem
                                         projectId={projectId}
+                                        templateId={templateId}
                                         requirement={req}
                                         onRequirementUpdate={handleRequirementUpdateWithState}
                                         selectedHierarchyId={selectedHierarchyId}
@@ -1245,6 +1314,7 @@ export default function RequirementHierarchyComponent({
                                 {createForHierarchyId === h2.id && (
                                   <RequirementCreateForm
                                     projectId={projectId}
+                                    templateId={templateId}
                                     hierarchyId={h2.id}
                                     onRequirementUpdate={handleRequirementUpdateWithState}
                                     onClose={onCreateFormClose}
@@ -1281,6 +1351,7 @@ export default function RequirementHierarchyComponent({
                             <div style={{ marginLeft: '3.5rem' }}>
                               <RequirementItem
                                 projectId={projectId}
+                                templateId={templateId}
                                 requirement={req}
                                 onRequirementUpdate={handleRequirementUpdateWithState}
                                 selectedHierarchyId={selectedHierarchyId}
@@ -1302,6 +1373,7 @@ export default function RequirementHierarchyComponent({
                       <div style={{ marginLeft: '3.5rem' }}>
                         <RequirementCreateForm
                           projectId={projectId}
+                          templateId={templateId}
                           hierarchyId={h1.id}
                           onRequirementUpdate={handleRequirementUpdateWithState}
                           onClose={onCreateFormClose}

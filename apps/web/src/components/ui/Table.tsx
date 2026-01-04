@@ -95,15 +95,18 @@ export const TableHead: React.FC<TableHeadProps> = ({
 export interface TableCellProps {
   children: React.ReactNode;
   className?: string;
+  onClick?: () => void;
 }
 
 export const TableCell: React.FC<TableCellProps> = ({
   children,
   className = "",
+  onClick,
 }) => {
   return (
     <td
       className={`px-4 py-4 text-sm text-text-primary ${className}`}
+      onClick={onClick}
     >
       {children}
     </td>

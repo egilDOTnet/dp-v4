@@ -344,6 +344,173 @@ describe("Authentication Routes", () => {
       expect(typeof body.token).toBe("string");
     });
 
+    it("should create tenant with company name derived from domain", async () => {
+      // Generate magic link for new user
+      const magicLinkResponse = await app.inject({
+        method: "POST",
+        url: "/api/auth/magic-link",
+        payload: {
+          email: "jake@acme.com",
+        },
+      });
+
+      const magicLinkBody = JSON.parse(magicLinkResponse.body);
+      const token = magicLinkBody.token;
+
+      // Set password
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/set-password",
+        payload: {
+          token,
+          password: "newpassword123",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      
+      // Check that tenant was created with correct name
+      const { db } = await import("@dp/db");
+      const tenant = await db.tenant.findUnique({
+        where: { id: body.user.tenantId },
+      });
+      
+      expect(tenant).toBeTruthy();
+      expect(tenant?.name).toBe("Acme");
+      expect(tenant?.emailDomain).toBe("acme.com");
+    });
+
+    it("should create tenant with company name from subdomain (first part)", async () => {
+      // Generate magic link for new user
+      const magicLinkResponse = await app.inject({
+        method: "POST",
+        url: "/api/auth/magic-link",
+        payload: {
+          email: "user@mail.google.com",
+        },
+      });
+
+      const magicLinkBody = JSON.parse(magicLinkResponse.body);
+      const token = magicLinkBody.token;
+
+      // Set password
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/set-password",
+        payload: {
+          token,
+          password: "newpassword123",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      
+      // Check that tenant was created with correct name (first part of domain)
+      const { db } = await import("@dp/db");
+      const tenant = await db.tenant.findUnique({
+        where: { id: body.user.tenantId },
+      });
+      
+      expect(tenant).toBeTruthy();
+      expect(tenant?.name).toBe("Mail");
+      expect(tenant?.emailDomain).toBe("mail.google.com");
+    });
+
+    it("should set emailDomain to null when domain conflict exists", async () => {
+      // Create first tenant with domain
+      const { db } = await import("@dp/db");
+      const firstTenant = await db.tenant.create({
+        data: {
+          id: `tenant-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          name: "First Company",
+          emailDomain: "acme.com",
+          updatedAt: new Date(),
+        },
+      });
+
+      // Generate magic link for new user with same domain
+      const magicLinkResponse = await app.inject({
+        method: "POST",
+        url: "/api/auth/magic-link",
+        payload: {
+          email: "jake@acme.com",
+        },
+      });
+
+      const magicLinkBody = JSON.parse(magicLinkResponse.body);
+      const token = magicLinkBody.token;
+
+      // Set password
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/set-password",
+        payload: {
+          token,
+          password: "newpassword123",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      
+      // Check that new tenant was created but emailDomain is null due to conflict
+      const newTenant = await db.tenant.findUnique({
+        where: { id: body.user.tenantId },
+      });
+      
+      expect(newTenant).toBeTruthy();
+      expect(newTenant?.id).not.toBe(firstTenant.id);
+      expect(newTenant?.emailDomain).toBeNull();
+      expect(newTenant?.name).toBe("Acme");
+    });
+
+    it("should handle name conflicts by appending suffix", async () => {
+      // Create first tenant with name "Acme"
+      const { db } = await import("@dp/db");
+      await db.tenant.create({
+        data: {
+          id: `tenant-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          name: "Acme",
+          updatedAt: new Date(),
+        },
+      });
+
+      // Generate magic link for new user that would create "Acme" tenant
+      const magicLinkResponse = await app.inject({
+        method: "POST",
+        url: "/api/auth/magic-link",
+        payload: {
+          email: "jake@acme.com",
+        },
+      });
+
+      const magicLinkBody = JSON.parse(magicLinkResponse.body);
+      const token = magicLinkBody.token;
+
+      // Set password
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/set-password",
+        payload: {
+          token,
+          password: "newpassword123",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      
+      // Check that new tenant was created with name "Acme 1" due to conflict
+      const newTenant = await db.tenant.findUnique({
+        where: { id: body.user.tenantId },
+      });
+      
+      expect(newTenant).toBeTruthy();
+      expect(newTenant?.name).toBe("Acme 1");
+    });
+
     it("should update password for existing user and return token", async () => {
       const tenant = await createTestTenant();
       const user = await createTestUser({
@@ -571,6 +738,7 @@ describe("Authentication Routes", () => {
     });
   });
 });
+
 
 
 

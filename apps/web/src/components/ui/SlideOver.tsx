@@ -1,7 +1,15 @@
 "use client";
 
 import React from "react";
-import { Dialog } from "./Dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "./Dialog";
+import { cn } from "@/lib/utils";
 
 interface SlideOverProps {
   /** Whether the slide-over is open */
@@ -20,9 +28,17 @@ interface SlideOverProps {
   size?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
+const sizeClasses = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-4xl",
+  full: "max-w-full",
+};
+
 /**
  * SlideOver is a pre-configured Dialog for form-based workflows.
- * It slides in from the right side of the screen.
+ * It displays as a centered modal dialog.
  */
 export function SlideOver({
   open,
@@ -34,18 +50,15 @@ export function SlideOver({
   size = "md",
 }: SlideOverProps) {
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title={title}
-      description={description}
-      variant="slideOver"
-      size={size}
-      footer={footer}
-      closeOnClickOutside={true}
-      closeOnEscape={true}
-    >
-      {children}
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className={cn(sizeClasses[size], "max-h-[90vh] flex flex-col")}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto min-h-0 px-1">{children}</div>
+        {footer && <DialogFooter className="mt-4">{footer}</DialogFooter>}
+      </DialogContent>
     </Dialog>
   );
 }
