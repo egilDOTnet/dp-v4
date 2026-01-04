@@ -1597,7 +1597,7 @@ export const api = {
       delete: (id: string) => apiRequest<void>(`/api/admin/users/${id}`, { method: "DELETE" }),
     },
     requirementTemplates: {
-      list: () => apiRequest<Array<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>>("/api/admin/requirement-templates"),
+      list: () => apiRequest<Array<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null }; requirementCount: number }>>("/api/admin/requirement-templates"),
       get: (id: string) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null }; hierarchies: any[] }>(`/api/admin/requirement-templates/${id}`),
       create: (data: { shortName: string; description?: string; languageCode: string }) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>("/api/admin/requirement-templates", { method: "POST", body: JSON.stringify(data) }),
       update: (id: string, data: { shortName?: string; description?: string; languageCode?: string }) => apiRequest<{ id: string; shortName: string; description?: string | null; languageCode: string; createdAt: string; updatedAt: string; createdBy: { id: string; email: string; name?: string | null } }>(`/api/admin/requirement-templates/${id}`, { method: "PUT", body: JSON.stringify(data) }),
@@ -1742,6 +1742,9 @@ export const api = {
       delete: (id: string) => apiRequest<void>(`/api/admin/email-templates/${id}`, { method: "DELETE" }),
       addLanguage: (id: string, data: { languageCode: string; subject?: string; content: string }) => apiRequest<{ id: string; languageCode: string; subject?: string | null; content: string; createdAt: string; updatedAt: string }>(`/api/admin/email-templates/${id}/languages`, { method: "POST", body: JSON.stringify(data) }),
       deleteLanguage: (id: string, languageCode: string) => apiRequest<void>(`/api/admin/email-templates/${id}/languages/${languageCode}`, { method: "DELETE" }),
+    },
+    projects: {
+      list: () => apiRequest<Array<{ id: string; name: string; type?: string | null; startDate?: string | null; endDate?: string | null; tenantId: string; tenant: { id: string; name: string }; createdAt: string; updatedAt: string; _count: { ProjectMember: number } }>>("/api/admin/projects"),
     },
     stats: () => apiRequest<{ companies: number; users: number; requirementTemplates: number; emailTemplates: number; projects: number }>("/api/admin/stats"),
   },

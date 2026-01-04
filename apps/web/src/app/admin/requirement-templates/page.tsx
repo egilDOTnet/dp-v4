@@ -34,6 +34,7 @@ interface RequirementTemplate {
     email: string;
     name?: string | null;
   };
+  requirementCount: number;
 }
 
 export default function RequirementTemplatesPage() {
@@ -196,7 +197,7 @@ export default function RequirementTemplatesPage() {
               <TableHead>Short Name</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Language Code</TableHead>
-              <TableHead>Created By</TableHead>
+              <TableHead>Requirements</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -226,7 +227,7 @@ export default function RequirementTemplatesPage() {
                     {template.languageCode.toUpperCase()}
                   </Badge>
                 </TableCell>
-                <TableCell>{template.createdBy.name || template.createdBy.email}</TableCell>
+                <TableCell>{template.requirementCount}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button

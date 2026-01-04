@@ -778,6 +778,10 @@ export default function RequirementList({
               status: requirement.status,
             };
 
+            // Check if requirement is currently Approved (check form data status if editing, otherwise original status)
+            const currentStatus = requirementFormData.status ?? requirement.status;
+            const isApproved = currentStatus === "Approved";
+
             return (
               <div
                 key={requirement.id}
@@ -861,7 +865,8 @@ export default function RequirementList({
                             }}
                             placeholder="Requirement description"
                             rows={5}
-                            className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
+                            disabled={isApproved}
+                            className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing} ${isApproved ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                             autoFocus
                           />
                       </div>
@@ -882,7 +887,8 @@ export default function RequirementList({
                               onClick={(e) => e.stopPropagation()}
                               onFocus={() => handleFieldFocus(requirement.id, "type")}
                               onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
-                              className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
+                              disabled={isApproved}
+                              className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing} ${isApproved ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                             >
                               <option value="">(Blank)</option>
                               <option value="Information">Information</option>
@@ -966,8 +972,9 @@ export default function RequirementList({
                             </button>
                             <button
                               onClick={() => handleDelete(requirement.id)}
-                              disabled={loading}
+                              disabled={loading || isApproved}
                               className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
+                              title={isApproved ? "Cannot delete requirement with Approved status" : undefined}
                             >
                               Delete
                             </button>
@@ -1281,6 +1288,10 @@ export default function RequirementList({
                   status: requirement.status,
                 };
 
+                // Check if requirement is currently Approved (check form data status if editing, otherwise original status)
+                const currentStatus = requirementFormData.status ?? requirement.status;
+                const isApproved = currentStatus === "Approved";
+
                 return (
                   <SortableRequirementItem
                     key={requirement.id}
@@ -1362,7 +1373,8 @@ export default function RequirementList({
                                   }}
                                   placeholder="Requirement description"
                                   rows={5}
-                                  className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
+                                  disabled={isApproved}
+                                  className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing} ${isApproved ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                                   autoFocus
                                 />
                               </div>
@@ -1383,7 +1395,8 @@ export default function RequirementList({
                                     onClick={(e) => e.stopPropagation()}
                                     onFocus={() => handleFieldFocus(requirement.id, "type")}
                                     onBlur={(e) => handleFieldBlur(requirement.id, "type", e)}
-                                    className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing}`}
+                                    disabled={isApproved}
+                                    className={`flex-1 px-2 py-1 border border-gray-300 rounded text-xs font-medium focus:outline-none focus:ring-2 ${colorClasses.focusRing} ${isApproved ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                                   >
                                     <option value="">(Blank)</option>
                                     <option value="Information">Information</option>
@@ -1467,8 +1480,9 @@ export default function RequirementList({
                                   </button>
                                   <button
                                     onClick={() => handleDelete(requirement.id)}
-                                    disabled={loading}
+                                    disabled={loading || isApproved}
                                     className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 flex-shrink-0"
+                                    title={isApproved ? "Cannot delete requirement with Approved status" : undefined}
                                   >
                                     Delete
                                   </button>

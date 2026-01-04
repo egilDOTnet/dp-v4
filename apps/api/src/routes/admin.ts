@@ -1047,6 +1047,7 @@ export default async function adminRoutes(fastify: FastifyInstance) {
                     name: { type: "string", nullable: true },
                   },
                 },
+                requirementCount: { type: "number" },
               },
             },
           },
@@ -1064,6 +1065,15 @@ export default async function adminRoutes(fastify: FastifyInstance) {
                 name: true,
               },
             },
+            hierarchies: {
+              include: {
+                _count: {
+                  select: {
+                    requirements: true,
+                  },
+                },
+              },
+            },
           },
           orderBy: { shortName: "asc" },
         });
@@ -1077,6 +1087,10 @@ export default async function adminRoutes(fastify: FastifyInstance) {
             createdAt: template.createdAt.toISOString(),
             updatedAt: template.updatedAt.toISOString(),
             createdBy: template.createdBy,
+            requirementCount: template.hierarchies.reduce(
+              (sum, hierarchy) => sum + hierarchy._count.requirements,
+              0
+            ),
           }))
         );
       } catch (error: any) {
@@ -3049,6 +3063,97 @@ export default async function adminRoutes(fastify: FastifyInstance) {
         request.log.error({ err: error }, "Error importing template requirements");
         return reply.status(500).send({
           error: "Failed to import requirements",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
+
+  // ============================================
+  // Projects CRUD
+  // ============================================
+
+  /**
+   * Get all projects across all companies
+   */
+  fastify.get(
+    "/admin/projects",
+    {
+      preHandler: [authenticate, requireGlobalAdmin()],
+      schema: {
+        description: "Get all projects across all companies (Global Admin Only)",
+        tags: ["admin"],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                type: { type: "string", nullable: true },
+                startDate: { type: "string", format: "date-time", nullable: true },
+                endDate: { type: "string", format: "date-time", nullable: true },
+                tenantId: { type: "string" },
+                tenant: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                  },
+                },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+                _count: {
+                  type: "object",
+                  properties: {
+                    ProjectMember: { type: "number" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const projects = await db.project.findMany({
+          include: {
+            Tenant: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            _count: {
+              select: {
+                ProjectMember: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        return reply.send(
+          projects.map((project) => ({
+            id: project.id,
+            name: project.name,
+            type: project.type,
+            startDate: project.startDate?.toISOString() ?? null,
+            endDate: project.endDate?.toISOString() ?? null,
+            tenantId: project.tenantId,
+            tenant: project.Tenant,
+            createdAt: project.createdAt.toISOString(),
+            updatedAt: project.updatedAt.toISOString(),
+            _count: project._count,
+          }))
+        );
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in GET /admin/projects");
+        return reply.status(500).send({
+          error: "Internal server error",
           message: error.message || "An unexpected error occurred",
         });
       }

@@ -220,8 +220,8 @@ export default function CompaniesPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Organization Number</TableHead>
                 <TableHead>Email Domain</TableHead>
-                <TableHead>Subscription Status</TableHead>
-                <TableHead>Subscription Tier</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Tier</TableHead>
                 <TableHead>Users</TableHead>
                 <TableHead>Projects</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
