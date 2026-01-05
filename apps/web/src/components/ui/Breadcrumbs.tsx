@@ -25,7 +25,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
         return (
           <React.Fragment key={index}>
             {item.href && !isLast ? (
-              <Link href={item.href} className="hover:text-primary-600">
+              <Link href={item.href} className="hover:text-primary-600 cursor-pointer">
                 {item.label}
               </Link>
             ) : (

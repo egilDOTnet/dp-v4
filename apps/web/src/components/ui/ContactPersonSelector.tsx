@@ -118,7 +118,7 @@ export function ContactPersonSelector({
             type="button"
             className={cn(
               "w-full px-3 py-2 rounded-md bg-background-primary text-text-primary border border-border-primary",
-              "hover:bg-background-secondary transition-colors",
+              "hover:bg-background-secondary transition-colors cursor-pointer",
               "flex items-center gap-2 text-left",
               "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             )}
@@ -200,7 +200,7 @@ export function ContactPersonSelector({
                     type="button"
                     onClick={() => handleSelect(person)}
                     className={cn(
-                      "w-full px-3 py-2 flex items-center gap-2 hover:bg-background-secondary transition-colors",
+                      "w-full px-3 py-2 flex items-center gap-2 hover:bg-background-secondary transition-colors cursor-pointer",
                       "text-left focus:outline-none focus:bg-background-secondary",
                       value?.id === person.id && "bg-background-secondary"
                     )}
@@ -245,7 +245,7 @@ export function ContactPersonSelector({
               <button
                 type="button"
                 onClick={handleClear}
-                className="w-full px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-secondary rounded transition-colors text-left"
+                className="w-full px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-secondary rounded transition-colors text-left cursor-pointer"
               >
                 Clear selection
               </button>
@@ -256,5 +256,6 @@ export function ContactPersonSelector({
     </div>
   );
 }
+
 
 

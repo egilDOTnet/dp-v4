@@ -25,7 +25,7 @@ export const Card: React.FC<CardProps> = ({
   };
 
   const buttonResetStyles = onClick
-    ? "w-full text-left p-0 m-0 font-inherit block appearance-none flex flex-col"
+    ? "w-full text-left p-0 m-0 font-inherit block appearance-none flex flex-col cursor-pointer"
     : "";
 
   const Component = onClick ? "button" : "div";

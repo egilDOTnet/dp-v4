@@ -416,7 +416,7 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
       <button
         type="button"
         onClick={() => execCommand(command, value)}
-        className={`px-2 py-1 rounded hover:bg-background-primary ${
+        className={`px-2 py-1 rounded hover:bg-background-primary cursor-pointer ${
           active ? "bg-background-secondary" : ""
         }`}
         title={title}
@@ -542,7 +542,7 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
               execCommand("createLink", url);
             }
           }}
-          className="px-2 py-1 rounded hover:bg-background-primary"
+          className="px-2 py-1 rounded hover:bg-background-primary cursor-pointer"
           title="Insert Link"
           onMouseDown={(e) => e.preventDefault()}
         >
@@ -565,7 +565,7 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
           onClick={() => {
             execCommand("formatBlock", "p");
           }}
-          className="px-2 py-1 rounded hover:bg-background-primary"
+          className="px-2 py-1 rounded hover:bg-background-primary cursor-pointer"
           title="Paragraph"
           onMouseDown={(e) => e.preventDefault()}
         >
@@ -623,7 +623,7 @@ const WysiwygEditor = forwardRef<WysiwygEditorRef, WysiwygEditorProps>(({
                   type="button"
                   onClick={() => insertMention(member)}
                   onMouseEnter={() => setSelectedMentionIndex(index)}
-                  className={`w-full text-left px-3 py-2 hover:bg-background-primary transition-colors ${
+                  className={`w-full text-left px-3 py-2 hover:bg-background-primary transition-colors cursor-pointer ${
                     index === selectedMentionIndex ? "bg-background-primary" : ""
                   }`}
                 >

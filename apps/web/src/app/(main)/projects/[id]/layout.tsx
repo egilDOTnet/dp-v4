@@ -109,7 +109,7 @@ export default function ProjectLayout({
           <div className="xl:hidden flex justify-end p-2 border-b border-border-primary">
             <button
               onClick={closeMobileMenu}
-              className="p-2 rounded-md hover:bg-background-primary transition-colors"
+              className="p-2 rounded-md hover:bg-background-primary transition-colors cursor-pointer"
               aria-label="Close menu"
             >
               <svg
@@ -131,7 +131,7 @@ export default function ProjectLayout({
           {/* Project Header - Primary color background */}
           <Link
             href={`/projects/${projectId}`}
-            className="block px-4 py-4 bg-primary-600 hover:bg-primary-700 transition-colors"
+            className="block px-4 py-4 bg-primary-600 hover:bg-primary-700 transition-colors cursor-pointer"
             onClick={closeMobileMenu}
           >
             <h2 className="text-lg font-semibold text-white mb-1">{project.name}</h2>
@@ -148,7 +148,7 @@ export default function ProjectLayout({
                 <Link
                   key={item.href}
                   href={`/projects/${projectId}/${item.href}`}
-                  className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                     isActive
                       ? "bg-primary-50 text-primary-700 border-l-4 border-primary-600"
                       : "text-text-primary hover:bg-background-primary"

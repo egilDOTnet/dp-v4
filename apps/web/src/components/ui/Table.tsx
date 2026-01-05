@@ -105,7 +105,7 @@ export const TableCell: React.FC<TableCellProps> = ({
 }) => {
   return (
     <td
-      className={`px-4 py-4 text-sm text-text-primary ${className}`}
+      className={`px-4 py-4 text-sm text-text-primary ${onClick ? "cursor-pointer" : ""} ${className}`}
       onClick={onClick}
     >
       {children}

@@ -162,7 +162,7 @@ export default function DashboardPage() {
       {/* Company Settings Tile */}
       {isAdmin && (
         <div>
-          <Link href="/company/settings">
+          <Link href="/company/settings" className="cursor-pointer">
             <Card variant="interactive" className="border-2 border-dashed">
               <CardBody>
                 <div className="flex items-center gap-4">
