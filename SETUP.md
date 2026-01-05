@@ -264,16 +264,30 @@ Invalid segment Static("contact"), catch all segment must be the last segment mo
 
 **IMPORTANT:** Tests require a separate test database to prevent accidental deletion of development/production data.
 
-#### Safety Checks
+#### Automatic Setup (Recommended)
 
-The test suite includes safety checks that:
-- **Require** the database name to contain `test` or `_test`
-- **Prevent** running tests against development/production databases
-- **Fail fast** with clear error messages if safety checks fail
+The test suite **automatically creates the test database** if it doesn't exist when you run tests. This means you typically don't need to manually set up the database.
 
-#### Setting Up Test Database
+**For Docker users:**
+- The test database (`app_test`) is automatically created when the postgres container starts for the first time
+- Just run `docker-compose up -d postgres` and the test database will be ready
 
-1. **Create a test database:**
+**For local PostgreSQL:**
+- Tests will automatically create the database if it doesn't exist
+- Make sure PostgreSQL is running and accessible at `localhost:5432`
+
+#### Manual Setup (Optional)
+
+If you prefer to set up the database manually, or if automatic setup fails:
+
+1. **Using the setup script:**
+   ```bash
+   pnpm test:setup
+   # or
+   pnpm --filter @dp/db db:setup-test
+   ```
+
+2. **Manually create the database:**
    ```bash
    # Connect to PostgreSQL
    psql -U postgres -h localhost
@@ -282,44 +296,48 @@ The test suite includes safety checks that:
    CREATE DATABASE app_test;
    ```
 
-2. **Run migrations on test database:**
+3. **Run migrations:**
    ```bash
    cd packages/db
    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test" pnpm prisma migrate deploy
    ```
 
-3. **Set TEST_DATABASE_URL environment variable:**
-   
-   Option A: In `apps/api/.env`:
-   ```
-   TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test"
-   ```
-   
-   Option B: Export in your shell:
-   ```bash
-   export TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_test"
-   ```
+#### Safety Checks
 
-4. **Run tests:**
-   ```bash
-   cd apps/api
-   pnpm test
-   ```
+The test suite includes safety checks that:
+- **Require** the database name to contain `test` or `_test`
+- **Prevent** running tests against development/production databases
+- **Fail fast** with clear error messages if safety checks fail
+- **Automatically create** the test database if it doesn't exist
 
 #### Default Behavior
 
-If `TEST_DATABASE_URL` is not set, tests will default to `app_test` database. The safety checks ensure that even with this default, tests will fail if the database name doesn't contain `test`.
+- **Default database:** `app_test` at `postgresql://postgres:postgres@localhost:5432/app_test`
+- **Custom database:** Set `TEST_DATABASE_URL` environment variable
+- **Auto-creation:** Tests automatically create the database if it doesn't exist
+- **Safety:** Tests will fail if the database name doesn't contain `test`
 
 #### Troubleshooting
 
 **Error: "SAFETY CHECK FAILED: Test database name must contain 'test'"**
 - Ensure your `TEST_DATABASE_URL` points to a database with `test` in its name
-- The default is `app_test` - create this database if it doesn't exist
+- The default is `app_test` - tests will create this automatically
 
 **Error: "Cannot cleanup non-test database"**
 - This means `cleanupDatabase()` detected a non-test database
 - Check that `DATABASE_URL` (used by tests) points to a test database
 - Never set `DATABASE_URL` to your development database when running tests
+
+**Error: "Failed to connect to test database" or "database does not exist"**
+- Make sure PostgreSQL is running:
+  - Docker: `docker-compose up -d postgres`
+  - Local: Check that PostgreSQL service is running
+- Run manual setup: `pnpm test:setup`
+- Check connection: Ensure PostgreSQL is accessible at the configured host/port
+
+**Docker users:**
+- The test database is created automatically when the postgres container starts
+- If you need to recreate it: `docker-compose down -v` then `docker-compose up -d postgres`
 
 ## Test User (if seeded)
 

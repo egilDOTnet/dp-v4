@@ -119,7 +119,7 @@ export default function VendorRFIContactPage() {
     } else if (action === "no-change" && data?.contactPerson) {
       setContact(data.contactPerson);
     }
-  }, [action, selectedContactId, newContact, contacts, data]);
+  }, [action, selectedContactId, newContact, contacts, data, contact]);
 
   const handleSubmit = async () => {
     // Validate based on action

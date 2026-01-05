@@ -85,7 +85,7 @@ export function ScoreInput({
     );
   }
 
-  const handleFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+  const handleFocus = (_e: React.FocusEvent<HTMLDivElement>) => {
     // Automatically enter edit mode when focused via Tab
     // This ensures the input is ready to receive keyboard input immediately
     if (!isEditing) {

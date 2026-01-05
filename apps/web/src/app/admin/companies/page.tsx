@@ -124,7 +124,7 @@ export default function CompaniesPage() {
     return labels[tier];
   };
 
-  const formatDate = (dateString: string | null | undefined): string => {
+  const _formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return "-";
     const date = new Date(dateString);
     return date.toLocaleDateString();

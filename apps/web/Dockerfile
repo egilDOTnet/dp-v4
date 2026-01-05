@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 # Install pnpm, wget for healthcheck, and OpenSSL for Prisma
 RUN npm install -g pnpm && \

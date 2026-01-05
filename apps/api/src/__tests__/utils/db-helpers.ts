@@ -268,16 +268,17 @@ export async function createTestTenant(overrides?: {
   name?: string;
 }) {
   const tenantId = overrides?.id || `test-tenant-${randomUUID()}`;
+  const tenantName = overrides?.name || `Test Company ${randomUUID()}`;
   
   const tenant = await db.tenant.upsert({
     where: { id: tenantId },
     create: {
       id: tenantId,
-      name: overrides?.name || "Test Company",
+      name: tenantName,
       updatedAt: new Date(),
     },
     update: {
-      name: overrides?.name || "Test Company",
+      name: tenantName,
       updatedAt: new Date(),
     },
   });

@@ -40,7 +40,7 @@ export function RequirementTemplateFormDialog({
   onClose,
   existingTemplate,
   onSave,
-  onDelete,
+  onDelete: _onDelete,
 }: RequirementTemplateFormDialogProps) {
   const [shortName, setShortName] = useState("");
   const [description, setDescription] = useState("");

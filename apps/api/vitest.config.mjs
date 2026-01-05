@@ -49,12 +49,18 @@ export default defineConfig({
     // Vitest 4.0: singleThread replaced with maxWorkers: 1 and isolate: false
     maxWorkers: 1,
     isolate: false,
+    // Only run tests from src directory, exclude compiled dist directory
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    exclude: ["node_modules", "dist", "**/dist/**"],
     // Allow mixing ESM and CommonJS
     transformMode: {
       web: [/\.[jt]sx?$/],
       ssr: [/\.[jt]sx?$/],
     },
   },
+  // Disable env file loading for tests - environment variables are set programmatically in setup.ts
+  // Set envDir to a non-existent directory to prevent Vite from trying to load .env files
+  envDir: path.resolve(__dirname, "__nonexistent__"),
   resolve: {
     alias: {
       "@dp/db": path.resolve(__dirname, "../../packages/db/src/index.ts"),
@@ -75,6 +81,7 @@ export default defineConfig({
     exclude: ["@prisma/client"],
   },
 });
+
 
 
 

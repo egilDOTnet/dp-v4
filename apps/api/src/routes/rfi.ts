@@ -162,7 +162,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
               rfiInformationTemplateId: true,
               deadline: true,
               autoPublishDate: true,
-              isPublished: true,
+              status: true,
               publishedAt: true,
               unpublishedAt: true,
               createdAt: true,
@@ -200,10 +200,15 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           });
         }
 
+        // Add computed isPublished field
+        const rfiWithComputed = {
+          ...rfi,
+          isPublished: rfi.publishedAt !== null && rfi.unpublishedAt === null,
+        };
 
         // Using select ensures we get plain JavaScript objects that serialize correctly
         // Fastify's serializer handles Date objects automatically
-        return reply.send(rfi);
+        return reply.send(rfiWithComputed);
       } catch (error: any) {
         request.log.error({ 
           err: error, 
@@ -462,7 +467,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           rfiInformationTemplateId: true,
           deadline: true,
           autoPublishDate: true,
-          isPublished: true,
+          status: true,
           publishedAt: true,
           unpublishedAt: true,
           createdAt: true,
@@ -499,9 +504,15 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
         },
         });
 
+        // Add computed isPublished field
+        const rfiWithComputed = {
+          ...rfi,
+          isPublished: rfi.publishedAt !== null && rfi.unpublishedAt === null,
+        };
+
         // Using select ensures we get plain JavaScript objects that serialize correctly
         // Fastify's serializer handles Date objects automatically
-        return reply.send(rfi);
+        return reply.send(rfiWithComputed);
       } catch (error: any) {
         request.log.error({ 
           err: error, 
@@ -3273,7 +3284,7 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           rfiInformationTemplateId: true,
           deadline: true,
           autoPublishDate: true,
-          isPublished: true,
+          status: true,
           publishedAt: true,
           unpublishedAt: true,
           createdAt: true,
@@ -3314,9 +3325,15 @@ export default async function rfiRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: "RFI not found" });
         }
 
+        // Add computed isPublished field
+        const rfiWithComputed = {
+          ...rfi,
+          isPublished: rfi.publishedAt !== null && rfi.unpublishedAt === null,
+        };
+
         // Using select ensures we get plain JavaScript objects that serialize correctly
         // Fastify's serializer handles Date objects automatically
-        return reply.send(rfi);
+        return reply.send(rfiWithComputed);
       } catch (error: any) {
         request.log.error({ err: error }, "Error in GET /:id/rfi/preview");
         return reply.status(500).send({

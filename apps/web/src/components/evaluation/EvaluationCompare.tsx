@@ -9,7 +9,7 @@ interface EvaluationCompareProps {
 }
 
 export function EvaluationCompare({ projectId }: EvaluationCompareProps) {
-  const [comparison, setComparison] = useState<EvaluationComparison[]>([]);
+  const [_comparison, setComparison] = useState<EvaluationComparison[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

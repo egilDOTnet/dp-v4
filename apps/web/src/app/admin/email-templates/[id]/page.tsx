@@ -201,7 +201,7 @@ export default function EmailTemplateDetailPage() {
   }
 
   const availableLanguages = Object.keys(languageContents);
-  const allLanguages = [...new Set([...availableLanguages, ...commonLanguages.map(l => l.code)])];
+  const _allLanguages = [...new Set([...availableLanguages, ...commonLanguages.map(l => l.code)])];
 
   return (
     <div className="space-y-6">

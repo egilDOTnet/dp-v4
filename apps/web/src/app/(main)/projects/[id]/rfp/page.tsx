@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { api, Project, RFP } from "@/lib/api";
 import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner, Breadcrumbs } from "@/components/ui";
@@ -39,29 +39,7 @@ export default function RFPPage() {
     }
   }, [searchParams, rfp]);
 
-  useEffect(() => {
-    if (projectId) {
-      // Prevent duplicate calls (React Strict Mode protection)
-      if (loadingProjectIdRef.current === projectId) {
-        return;
-      }
-      
-      loadingProjectIdRef.current = projectId;
-      Promise.all([
-        loadProject(),
-        loadRFP()
-      ]).finally(() => {
-        // Only clear if we're still loading the same projectId
-        if (loadingProjectIdRef.current === projectId) {
-          loadingProjectIdRef.current = null;
-        }
-      });
-    }
-    // No cleanup needed - the ref check at the start handles projectId changes
-    // and the finally block clears it when load completes
-  }, [projectId]);
-
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       const projectData = await api.projects.get(projectId);
       // Only update state if we're still loading the same projectId
@@ -74,9 +52,9 @@ export default function RFPPage() {
         setError(err.message || "Failed to load project");
       }
     }
-  };
+  }, [projectId]);
 
-  const loadRFP = async (skipLoadingState = false) => {
+  const loadRFP = useCallback(async (skipLoadingState = false) => {
     try {
       const isInitialLoad = loadingProjectIdRef.current === projectId;
       if (!skipLoadingState && isInitialLoad) {
@@ -106,7 +84,29 @@ export default function RFPPage() {
         setLoading(false);
       }
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) {
+      // Prevent duplicate calls (React Strict Mode protection)
+      if (loadingProjectIdRef.current === projectId) {
+        return;
+      }
+      
+      loadingProjectIdRef.current = projectId;
+      Promise.all([
+        loadProject(),
+        loadRFP()
+      ]).finally(() => {
+        // Only clear if we're still loading the same projectId
+        if (loadingProjectIdRef.current === projectId) {
+          loadingProjectIdRef.current = null;
+        }
+      });
+    }
+    // No cleanup needed - the ref check at the start handles projectId changes
+    // and the finally block clears it when load completes
+  }, [projectId, loadProject, loadRFP]);
 
   const handleSaveAbout = async () => {
     setIsSaving(true);

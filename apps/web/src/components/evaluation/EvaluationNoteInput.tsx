@@ -58,7 +58,6 @@ export function EvaluationNoteInput({
         onChangeRef.current(trimmed === "" ? null : trimmed);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run cleanup on unmount
 
   const handleClick = () => {

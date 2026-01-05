@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api, Project, RFI } from "@/lib/api";
 import QuestionList from "@/components/QuestionList";
@@ -30,7 +30,7 @@ export default function RFIPage() {
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const loadingProjectIdRef = useRef<string | null>(null);
 
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       const projectData = await api.projects.get(projectId);
       // Only update state if we're still loading the same projectId
@@ -43,9 +43,9 @@ export default function RFIPage() {
         setError(err.message || "Failed to load project");
       }
     }
-  };
+  }, [projectId]);
 
-  const loadRFI = async (skipLoadingState = false) => {
+  const loadRFI = useCallback(async (skipLoadingState = false) => {
     try {
       const isInitialLoad = loadingProjectIdRef.current === projectId;
       if (!skipLoadingState && isInitialLoad) {
@@ -114,7 +114,7 @@ export default function RFIPage() {
         setLoading(false);
       }
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) {
@@ -137,7 +137,7 @@ export default function RFIPage() {
     }
     // No cleanup needed - the ref check at the start handles projectId changes
     // and the finally block clears it when load completes
-  }, [projectId]);
+  }, [projectId, loadProject, loadRFI]);
 
   const handleUpdateDeadline = async (newDeadline: string) => {
     try {

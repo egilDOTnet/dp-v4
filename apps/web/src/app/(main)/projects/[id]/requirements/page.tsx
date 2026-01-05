@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
@@ -111,7 +111,7 @@ export default function RequirementsPage() {
   // Filter requirements to only show matches when searching or filtering
   const displayRequirements = isFilteringOrSearching ? finalFilteredRequirements : requirements;
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [projectData, hierarchiesData, requirementsData] = await Promise.all([
@@ -128,7 +128,7 @@ export default function RequirementsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) {
@@ -148,7 +148,7 @@ export default function RequirementsPage() {
     }
     // No cleanup needed - the ref check at the start handles projectId changes
     // and the finally block clears it when load completes
-  }, [projectId]);
+  }, [projectId, loadData]);
 
   const handleHierarchyUpdate = () => {
     loadData();

@@ -79,8 +79,12 @@ if (globalForPrisma.prisma) {
 // Now import db - it will use the test database URL we just set
 import { db } from "@dp/db";
 import { cleanupDatabase } from "./utils/db-helpers";
+import { ensureTestDatabase } from "./utils/ensure-test-db";
 
 beforeAll(async () => {
+  // Ensure test database exists before connecting
+  // This prevents connection errors and automatically creates the database if needed
+  await ensureTestDatabase(testDbUrl);
   // Wait for any pending disconnect from top-level cleanup
   const globalForPrisma = globalThis as unknown as {
     prisma: any;
@@ -188,9 +192,53 @@ beforeAll(async () => {
       console.warn(`⚠️  Migration deployment warning:`, migrationError.message);
       console.warn(`   Tests may still run if database schema is already up-to-date`);
     }
-  } catch (error) {
-    console.error("❌ Failed to connect to test database:", error);
-    throw error;
+  } catch (error: any) {
+    // Extract detailed error information
+    const errorCode = error.code || error.cause?.code;
+    const errorMessage = error.message || error.cause?.message || String(error);
+    
+    // If connection fails, the database might not exist
+    // ensureTestDatabase should have created it, but if it didn't, provide helpful error
+    if (errorMessage?.includes("does not exist") || errorCode === "3D000") {
+      throw new Error(
+        `❌ Test database '${dbName}' does not exist.\n` +
+          `   Run: pnpm --filter @dp/db db:setup-test\n` +
+          `   Or ensure PostgreSQL is running: docker-compose up -d postgres`
+      );
+    }
+
+    // Check for specific PostgreSQL error codes and provide targeted messages
+    let troubleshooting = "";
+    if (errorCode === "ECONNREFUSED") {
+      troubleshooting = `PostgreSQL server is not running or not accessible.\n` +
+        `   - Start PostgreSQL: docker-compose up -d postgres\n` +
+        `   - Or start your local PostgreSQL service\n` +
+        `   - Check if PostgreSQL is running on a different port`;
+    } else if (errorCode === "ETIMEDOUT") {
+      troubleshooting = `Connection to PostgreSQL timed out.\n` +
+        `   - Check if PostgreSQL is running: docker-compose ps\n` +
+        `   - Verify network connectivity\n` +
+        `   - Check firewall settings`;
+    } else if (errorCode === "28P01") {
+      troubleshooting = `Authentication failed for PostgreSQL.\n` +
+        `   - Check username and password in TEST_DATABASE_URL\n` +
+        `   - Verify PostgreSQL user credentials\n` +
+        `   - Check pg_hba.conf configuration`;
+    } else {
+      troubleshooting = `Connection failed with error code: ${errorCode || "unknown"}\n` +
+        `   - Ensure PostgreSQL is running: docker-compose up -d postgres\n` +
+        `   - Check connection string: ${testDbUrl.replace(/:[^:@]+@/, ":****@")}\n` +
+        `   - Run: pnpm --filter @dp/db db:setup-test`;
+    }
+
+    console.error("❌ Failed to connect to test database:");
+    console.error(`   Error code: ${errorCode || "unknown"}`);
+    console.error(`   Error message: ${errorMessage}`);
+    
+    throw new Error(
+      `❌ Failed to connect to test database '${dbName}'\n` +
+      `   ${troubleshooting}`
+    );
   }
 });
 

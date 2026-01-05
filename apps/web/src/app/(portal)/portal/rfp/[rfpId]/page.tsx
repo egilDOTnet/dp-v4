@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api, RFPDetail, RFPProposalFile, VendorContactPerson } from "@/lib/api";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -50,11 +50,7 @@ export default function RFPDetailPage() {
     invalidAnswers?: Array<{ requirementNumber: string; invalidValue: string; row: number }>;
   } | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [rfpId, previewToken]);
-
-  const loadProposalData = async () => {
+  const loadProposalData = useCallback(async () => {
     if (isPreviewMode) {
       // Don't load proposal data in preview mode
       return;
@@ -85,9 +81,9 @@ export default function RFPDetailPage() {
     } catch (err: any) {
       console.error("Failed to load proposal data:", err);
     }
-  };
+  }, [rfpId, isPreviewMode]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       if (previewToken) {
         // Preview mode - use preview token to get RFP data
@@ -127,7 +123,11 @@ export default function RFPDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [rfpId, previewToken, loadProposalData]);
+
+  useEffect(() => {
+    loadData();
+  }, [rfpId, previewToken, loadData]);
 
   const handleReload = async () => {
     await loadData();

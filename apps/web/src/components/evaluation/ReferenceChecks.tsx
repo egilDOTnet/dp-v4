@@ -165,7 +165,7 @@ export function ReferenceChecks({ projectId }: ReferenceChecksProps) {
       if (templateData.content) {
         setNewFormData((prev) => ({ ...prev, content: templateData.content }));
       }
-    } catch (err: any) {
+    } catch (_err: any) {
       // Template might not exist yet, that's okay
       console.log("No reference check template found");
     }
@@ -286,7 +286,7 @@ export function ReferenceChecks({ projectId }: ReferenceChecksProps) {
     });
   };
 
-  const handleFieldBlur = (refId: string, field: string, e: React.FocusEvent) => {
+  const handleFieldBlur = (refId: string, field: string, _e: React.FocusEvent) => {
     const data = formData[refId];
     const refCheck = referenceChecks.find((r) => r.id === refId);
 

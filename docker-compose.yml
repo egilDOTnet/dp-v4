@@ -10,6 +10,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Initialize test database on first startup
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d
     networks:
       - appnet
     healthcheck:

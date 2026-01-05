@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { api, Project, Phase, Task } from "@/lib/api";
 import PhaseTimeline from "@/components/PhaseTimeline";
@@ -32,7 +32,7 @@ export default function TasksPage() {
   // Display items - use tasks directly if not searching, otherwise use filteredItems
   const displayTasks = isSearching ? filteredTasks : tasks;
 
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       const data = await api.projects.get(projectId);
       // Only update state if we're still loading the same projectId
@@ -45,9 +45,9 @@ export default function TasksPage() {
         setError(err.message || "Failed to load project");
       }
     }
-  };
+  }, [projectId]);
 
-  const loadPhases = async () => {
+  const loadPhases = useCallback(async () => {
     try {
       const data = await api.projects.phases.list(projectId);
       // Only update state if we're still loading the same projectId
@@ -70,9 +70,9 @@ export default function TasksPage() {
       console.error("Failed to load phases:", err);
       // Error handling is silent for phases to not block the UI
     }
-  };
+  }, [projectId, phaseParam, selectedPhaseId]);
 
-  const loadTasks = (phaseId: string) => {
+  const loadTasks = useCallback((phaseId: string) => {
     api.projects.phases
       .getTasks(projectId, phaseId)
       .then((data) => {
@@ -81,7 +81,7 @@ export default function TasksPage() {
       .catch((err) => {
         console.error("Failed to load tasks:", err);
       });
-  };
+  }, [projectId]);
 
   useEffect(() => {
     // Prevent duplicate calls (React Strict Mode protection)
@@ -103,7 +103,7 @@ export default function TasksPage() {
     });
     // No cleanup needed - the ref check at the start handles projectId changes
     // and the finally block clears it when load completes
-  }, [projectId]);
+  }, [projectId, loadProject, loadPhases]);
 
   useEffect(() => {
     if (selectedPhaseId) {
@@ -111,7 +111,7 @@ export default function TasksPage() {
     } else {
       setTasks([]);
     }
-  }, [selectedPhaseId, projectId]);
+  }, [selectedPhaseId, projectId, loadTasks]);
 
   const handlePhaseClick = (phaseId: string) => {
     setSelectedPhaseId(phaseId);

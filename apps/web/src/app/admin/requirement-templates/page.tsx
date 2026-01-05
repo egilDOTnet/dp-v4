@@ -87,7 +87,7 @@ export default function RequirementTemplatesPage() {
     setImportWizardOpen(true);
   };
 
-  const handleImportSuccess = (count: number) => {
+  const handleImportSuccess = (_count: number) => {
     // Optionally refresh the list or navigate to detail page
     if (importingTemplateId) {
       router.push(`/admin/requirement-templates/${importingTemplateId}`);

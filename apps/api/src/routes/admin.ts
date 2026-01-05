@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { FastifyInstance } from "fastify";
 import { db } from "@dp/db";
 import { authenticate, getUser, requireGlobalAdmin } from "../middleware/auth";
 import { Role } from "@prisma/client";

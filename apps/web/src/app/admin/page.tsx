@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Card, CardBody, LoadingSpinner, Breadcrumbs } from "@/components/ui";
 
 export default function AdminDashboardPage() {
-  const router = useRouter();
+  const _router = useRouter();
   const [stats, setStats] = useState<{
     companies: number;
     users: number;

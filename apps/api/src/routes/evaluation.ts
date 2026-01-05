@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { FastifyInstance } from "fastify";
 import { db } from "@dp/db";
 import { authenticate, getUser, requireRole } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
@@ -20,13 +20,6 @@ function getAnonymizedVendorId(vendorId: string, vendorOrder: Map<string, number
   return `V${order + 1}`;
 }
 
-/**
- * Convert score from 1-5 scale to 0-100 scale
- */
-function scoreToPercentage(score: number | null): number | null {
-  if (score === null) return null;
-  return ((score - 1) / 4) * 100;
-}
 
 export default async function evaluationRoutes(fastify: FastifyInstance) {
   /**

@@ -96,7 +96,7 @@ export default function UsersPage() {
     await loadUsers();
   };
 
-  const handleDelete = async () => {
+  const _handleDelete = async () => {
     if (!editingUser) return;
     
     try {

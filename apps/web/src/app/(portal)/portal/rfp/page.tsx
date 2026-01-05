@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, RFPListItem } from "@/lib/api";
@@ -14,11 +14,7 @@ export default function RFPListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadRFPs();
-  }, []);
-
-  const loadRFPs = async () => {
+  const loadRFPs = useCallback(async () => {
     try {
       const data = await api.vendorRfp.rfps.list();
       setRfps(data);
@@ -33,7 +29,11 @@ export default function RFPListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadRFPs();
+  }, [loadRFPs]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not set";

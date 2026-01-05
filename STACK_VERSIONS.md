@@ -2,13 +2,13 @@
 
 This document tracks the current versions of all major dependencies in the dp-v4 project.
 
-**Last Updated:** January 2025
+**Last Updated:** January 2026
 
 ## Core Framework Versions
 
 | Package | Version | Notes |
 |---------|---------|-------|
-| **Node.js** | 20.9.0+ | LTS version required |
+| **Node.js** | 24.0.0+ | LTS version (upgraded from 20.x due to EOL April 2026) |
 | **pnpm** | 10.26.1 | Package manager |
 | **TypeScript** | 5.9.3 | Latest 5.9.x |
 
@@ -66,6 +66,22 @@ This document tracks the current versions of all major dependencies in the dp-v4
 - ✅ Removed unused `@eslint/eslintrc` dependency (ESLint 9 uses flat config)
 - ✅ Added `*.tsbuildinfo` to `.gitignore` and cleaned up build artifacts
 
+### Phase 5: Critical Node.js Upgrade (January 2026)
+- ✅ Node.js 20.x → 24 LTS (URGENT: Node.js 20 EOL April 30, 2026)
+- ✅ Updated `package.json` engines field: `>=20.9.0` → `>=24.0.0`
+- ✅ Updated Dockerfiles: `node:20-alpine` → `node:24-alpine` (apps/api, apps/web)
+- ✅ Updated `@types/node`: `^20.19.25` → `^24.0.0` (apps/api, apps/web, packages/lib)
+
+### Phase 6: Security Vulnerability Fixes (January 2026)
+- ✅ Fixed `qs` vulnerability (CVE via GHSA-6rw7-vpxm-498p): Added pnpm override to force `qs@>=6.14.1`
+  - **Vulnerability**: DoS via memory exhaustion in arrayLimit bypass
+  - **Path**: `shadcn > @modelcontextprotocol/sdk > express > qs`
+  - **Solution**: Added `pnpm.overrides` to force patched version across all transitive dependencies
+- ✅ Fixed React 19 peer dependency warnings: Added `@types/react: "19"` to `peerDependencyRules`
+
+### Phase 7: Patch Updates (January 2026)
+- ✅ Turbo 2.7.0 → 2.7.2 (patch update)
+
 ## Breaking Changes & Migration Notes
 
 ### Zod 4.2.1
@@ -88,10 +104,17 @@ This document tracks the current versions of all major dependencies in the dp-v4
 - **Status**: ✅ Security update - No breaking changes
 - **Security Fixes**: CVE-2025-55184, CVE-2025-67779 (DoS), CVE-2025-55183 (Source code exposure)
 
+### Node.js 24 LTS (January 2026)
+- **Status**: ✅ Critical upgrade - Node.js 20 EOL April 30, 2026
+- **Upgrade Reason**: Node.js 20 LTS reaches end-of-life in April 2026, requiring upgrade to maintain security updates
+- **Target Version**: Node.js 24 LTS (entered LTS October 2025, supported until April 2028)
+- **Changes**: Updated engines field, Dockerfiles, and @types/node across all packages
+- **Breaking Changes**: None expected - Node.js 24 is backward compatible with Node.js 20 code
+
 ## Version Requirements
 
 ### Minimum Requirements
-- Node.js: >=20.9.0
+- Node.js: >=24.0.0 (upgraded from 20.9.0+ due to EOL)
 - pnpm: >=10.0.0
 
 ### Engine Requirements
@@ -99,7 +122,7 @@ See `package.json` for exact engine requirements:
 ```json
 {
   "engines": {
-    "node": ">=20.9.0",
+    "node": ">=24.0.0",
     "pnpm": ">=10.0.0"
   }
 }

@@ -124,7 +124,7 @@ describe("Authentication Routes", () => {
 
       expect(response.statusCode).toBe(404);
       const body = JSON.parse(response.body);
-      expect(body.error).toBe("User not found");
+      expect(body.error).toBe("User not found. Please log out and log back in.");
     });
 
     it("should return 401 for invalid password", async () => {
@@ -698,7 +698,7 @@ describe("Authentication Routes", () => {
       // The authenticate middleware returns 401 when user is not found
       expect(response.statusCode).toBe(401);
       const body = JSON.parse(response.body);
-      expect(body.error).toBe("User not found");
+      expect(body.error).toBe("User not found. Please log out and log back in.");
     });
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useState, useMemo } from "react";
+import { ReactNode, useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PortalHeader } from "@/components/portal/PortalHeader";
 import { PortalFooter } from "@/components/portal/PortalFooter";
@@ -88,9 +88,9 @@ export default function PortalLayout({
 
     // Load vendor contact info (works for both normal and impersonation mode)
     loadContactPerson();
-  }, [pathname, previewToken, isImpersonating, router]);
+  }, [pathname, previewToken, isImpersonating, router, loadContactPerson]);
 
-  const loadContactPerson = async () => {
+  const loadContactPerson = useCallback(async () => {
     try {
       setError(null);
       const data = await api.vendorRfp.auth.me();
@@ -115,7 +115,7 @@ export default function PortalLayout({
     } finally {
       setLoading(false);
     }
-  };
+  }, [isImpersonating, router]);
 
   const handleLogout = () => {
     // If impersonating, restore admin token and go back to RFP Overview

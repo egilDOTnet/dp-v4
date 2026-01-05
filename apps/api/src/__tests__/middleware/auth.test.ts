@@ -129,7 +129,7 @@ describe("Auth Middleware", () => {
       await authenticate(mockRequest, mockReply);
 
       expect(statusCode).toBe(401);
-      expect(responseBody).toEqual({ error: "User not found" });
+      expect(responseBody).toEqual({ error: "User not found. Please log out and log back in." });
     });
 
     it("should update user data from database even if token has stale data", async () => {
@@ -371,6 +371,7 @@ describe("Auth Middleware", () => {
     });
   });
 });
+
 
 
 

@@ -51,7 +51,7 @@ export function CompanyFormDialog({
   onClose,
   existingCompany,
   onSave,
-  onDelete,
+  onDelete: _onDelete,
 }: CompanyFormDialogProps) {
   const [name, setName] = useState("");
   const [organizationNumber, setOrganizationNumber] = useState("");

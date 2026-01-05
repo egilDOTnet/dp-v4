@@ -43,7 +43,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
   });
   const [focusedCell, setFocusedCell] = useState<FocusedCell | null>(null);
   const [scores, setScores] = useState<Map<string, EvaluationScore>>(new Map());
-  const [saving, setSaving] = useState<Set<string>>(new Set());
+  const [_saving, setSaving] = useState<Set<string>>(new Set());
   const [showCelebration, setShowCelebration] = useState(false);
   const hasShownCelebration = useRef(false);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -202,7 +202,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
   };
 
   // Helper function to get first N characters without spaces
-  const getFirstNCharsWithoutSpaces = (str: string, n: number): string => {
+  const _getFirstNCharsWithoutSpaces = (str: string, n: number): string => {
     let result = '';
     let charCount = 0;
     for (const char of str) {
@@ -218,7 +218,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
   };
 
   // Helper function to create shortened name from words
-  const createShortenedName = (name: string, maxChars: number): string => {
+  const _createShortenedName = (name: string, maxChars: number): string => {
     const words = name.split(/\s+/).filter(w => w.length > 0);
     if (words.length === 0) return name;
     
@@ -320,7 +320,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
     });
 
     // Resolve conflicts by creating unique shortened names (4+4 from words)
-    nameToVendors.forEach((vendorIds, shortName) => {
+    nameToVendors.forEach((vendorIds, _shortName) => {
       if (vendorIds.length > 1) {
         // Conflict detected - need to make unique
         vendorIds.forEach((vendorResponseId) => {
@@ -353,10 +353,10 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
       finalNameToVendors.get(shortName)!.push(vendorResponseId);
     });
 
-    finalNameToVendors.forEach((vendorIds, shortName) => {
+    finalNameToVendors.forEach((vendorIds, _shortName) => {
       if (vendorIds.length > 1) {
         // Still have conflicts - make them unique by taking more chars
-        vendorIds.forEach((vendorResponseId, index) => {
+        vendorIds.forEach((vendorResponseId, _index) => {
           const vendorEntry = vendors.find(v => v.vendorResponseId === vendorResponseId);
           if (!vendorEntry) return;
           
@@ -1051,8 +1051,8 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                     )}
                     {/* Requirements */}
                     {group.requirements.map((req, reqIndex) => {
-                      const globalReqIndex = allRequirements.findIndex((r) => r.id === req.id);
-                      const isFirstRequirement = reqIndex === 0;
+                      const _globalReqIndex = allRequirements.findIndex((r) => r.id === req.id);
+                      const _isFirstRequirement = reqIndex === 0;
                       const isLastRequirement = reqIndex === group.requirements.length - 1;
                       const isLastGroup = groupIndex === filteredGroups.length - 1;
                       const isLastRow = isLastGroup && isLastRequirement;
@@ -1085,7 +1085,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                               const hasAnswer = score && score.score !== null;
                               const hasNote = score && score.note && score.note.trim() !== "";
                               const hasQuestion = score && score.question && score.question.trim() !== "";
-                              const key = `${vendorResponse.vendorResponseId}-${req.id}`;
+                              const _key = `${vendorResponse.vendorResponseId}-${req.id}`;
 
                               const cellKey = `${req.id}-${vendorResponse.vendorResponseId}`;
                               const isFocused = focusedCell?.requirementId === req.id &&
@@ -1104,7 +1104,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
                                   data-requirement-id={req.id}
                                   data-vendor-response-id={vendorResponse.vendorResponseId}
                                   className={`px-4 py-4 text-sm text-text-primary text-center align-top ${isFocused ? 'bg-background-tertiary border-b-0 border-l border-r border-border-primary' : 'border-b border-border-primary'} ${isLastRow && isLastVendor && !isFocused ? "rounded-br-lg" : ""}`}
-                                  onFocus={(e) => {
+                                  onFocus={(_e) => {
                                     // Update focusedCell when this cell or any child receives focus
                                     // This handles both direct td focus and focus on ScoreInput
                                     setFocusedCell({

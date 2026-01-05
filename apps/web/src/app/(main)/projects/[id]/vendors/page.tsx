@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { api, Project, ProjectVendor, VendorStatus } from "@/lib/api";
 import VendorList from "@/components/VendorList";
@@ -36,7 +36,7 @@ export default function VendorsPage() {
   // Display items - use vendors directly if not searching, otherwise use filteredItems
   const displayItems = isSearching ? filteredItems : vendors;
 
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       const projectData = await api.projects.get(projectId);
       // Only update state if we're still loading the same projectId
@@ -49,9 +49,9 @@ export default function VendorsPage() {
         setError(err.message || "Failed to load project");
       }
     }
-  };
+  }, [projectId]);
 
-  const loadVendors = async (forceUpdate = false) => {
+  const loadVendors = useCallback(async (forceUpdate = false) => {
     try {
       const vendorsData = await api.projects.vendors.list(projectId);
       // Update state if we're still loading the same projectId, or if forceUpdate is true
@@ -70,7 +70,7 @@ export default function VendorsPage() {
         setLoading(false);
       }
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     if (projectId) {
@@ -94,7 +94,7 @@ export default function VendorsPage() {
     }
     // No cleanup needed - the ref check at the start handles projectId changes
     // and the finally block clears it when load completes
-  }, [projectId]);
+  }, [projectId, loadProject, loadVendors]);
 
   const handleAddVendor = async (data: {
     name: string;

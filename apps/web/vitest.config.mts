@@ -53,6 +53,9 @@ export default defineConfig({
       },
     },
   ],
+  // Disable env file loading for tests - environment variables are set programmatically in setup.ts
+  // Set envDir to a non-existent directory to prevent Vite from trying to load .env files
+  envDir: resolve(__dirname, '__nonexistent__'),
   test: {
     // Use jsdom environment for component tests (default)
     // Integration tests can override this per-file using // @vitest-environment node

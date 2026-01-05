@@ -14,7 +14,8 @@
     "db:seed": "tsx src/seed.ts",
     "db:mock-rfi": "tsx src/mock-rfi-data.ts",
     "db:publish-rfi": "tsx src/publish-rfi.ts",
-    "db:cleanup-duplicate-rfp": "tsx src/cleanup-duplicate-rfp-schedule.ts"
+    "db:cleanup-duplicate-rfp": "tsx src/cleanup-duplicate-rfp-schedule.ts",
+    "db:setup-test": "./scripts/setup-test-db.sh"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
