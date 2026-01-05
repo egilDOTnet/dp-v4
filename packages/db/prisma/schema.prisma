@@ -204,6 +204,7 @@ model User {
   referenceChecks             ReferenceCheck[]
   referenceCheckTemplates     ReferenceCheckTemplate[]
   requirementTemplates        RequirementTemplate[]       @relation("RequirementTemplateCreator")
+  requirementComments         RequirementComment[]       @relation("RequirementCommentCreator")
 
   @@index([email])
   @@index([tenantId])
@@ -243,6 +244,7 @@ model Requirement {
   type             RequirementType
   status           RequirementStatus?
   order            Int
+  commentsSolved   Boolean            @default(false)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   createdById      String
@@ -252,6 +254,7 @@ model Requirement {
   createdBy               User                     @relation("RequirementCreator", fields: [createdById], references: [id], onDelete: Restrict)
   lastModifiedBy          User                     @relation("RequirementModifier", fields: [lastModifiedById], references: [id], onDelete: Restrict)
   history                 RequirementHistory[]
+  comments                RequirementComment[]
   rfpRequirementResponses RFPRequirementResponse[]
   evaluationScores        EvaluationScore[]
 
@@ -411,6 +414,8 @@ enum NotificationType {
   TASK_MENTION
   TASK_COMMENT
   RFP_QUESTION
+  REQUIREMENT_MENTION
+  REQUIREMENT_COMMENT
 }
 
 enum RFIStatus {
@@ -571,6 +576,22 @@ model TaskComment {
   @@index([createdById])
 }
 
+model RequirementComment {
+  id            String   @id @default(cuid())
+  requirementId String
+  content       String // HTML content from WYSIWYG editor
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  createdBy    User       @relation("RequirementCommentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  notifications Notification[]
+
+  @@index([requirementId])
+  @@index([createdById])
+}
+
 model Notification {
   id                String           @id @default(cuid())
   userId            String
@@ -578,20 +599,25 @@ model Notification {
   taskId            String?
   commentId         String?
   rfpQuestionId     String?
+  requirementId     String?
+  requirementCommentId String?
   mentionedByUserId String?
   read              Boolean          @default(false)
   createdAt         DateTime         @default(now())
 
-  user        User         @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
-  task        Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  comment     TaskComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  rfpQuestion RFPQuestion? @relation(fields: [rfpQuestionId], references: [id], onDelete: Cascade)
-  mentionedBy User?        @relation("NotificationMentionedBy", fields: [mentionedByUserId], references: [id], onDelete: SetNull)
+  user                User                 @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  task                Task?                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  comment             TaskComment?         @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  requirementComment  RequirementComment?  @relation(fields: [requirementCommentId], references: [id], onDelete: Cascade)
+  rfpQuestion         RFPQuestion?         @relation(fields: [rfpQuestionId], references: [id], onDelete: Cascade)
+  mentionedBy         User?                @relation("NotificationMentionedBy", fields: [mentionedByUserId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([read])
   @@index([taskId])
   @@index([rfpQuestionId])
+  @@index([requirementId])
+  @@index([requirementCommentId])
 }
 
 model RFP {

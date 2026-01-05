@@ -5,6 +5,7 @@ import { authenticate, getUser } from "../middleware/auth";
 import { verifyProjectAccess } from "../middleware/project-access";
 import { generateRequirementsPDF } from "../utils/requirements-pdf";
 import { generateRequirementsExcel } from "../utils/requirements-excel";
+import { createId } from "@paralleldrive/cuid2";
 
 // Helper function to generate hierarchy number
 async function generateHierarchyNumber(
@@ -1106,6 +1107,11 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
               firstName: true,
               lastName: true,
               name: true,
+            },
+          },
+          _count: {
+            select: {
+              comments: true,
             },
           },
         },
@@ -3488,6 +3494,579 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         return reply.status(500).send({
           error: "Internal server error",
           message: error.message || "Failed to generate Excel",
+        });
+      }
+    }
+  );
+
+  // Helper function to extract @-mentions from HTML content
+  function extractMentions(html: string): string[] {
+    const mentions: string[] = [];
+    // Match spans with data-mention="true" and extract data-user-id
+    const mentionRegex = /<span[^>]*data-mention=["']true["'][^>]*data-user-id=["']([^"']+)["'][^>]*>/gi;
+    let match;
+    while ((match = mentionRegex.exec(html)) !== null) {
+      const userId = match[1];
+      if (userId && !mentions.includes(userId)) {
+        mentions.push(userId);
+      }
+    }
+    return mentions;
+  }
+
+  /**
+   * Get comments for a requirement
+   */
+  fastify.get<{
+    Params: { projectId: string; id: string };
+  }>(
+    "/:projectId/requirements/:id/comments",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get all comments for a requirement",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: { type: "string" },
+            id: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                content: { type: "string" },
+                createdBy: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string", nullable: true },
+                    firstName: { type: "string", nullable: true },
+                    lastName: { type: "string", nullable: true },
+                  },
+                },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { projectId, id: requirementId } = request.params as { projectId: string; id: string };
+
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Verify requirement belongs to project
+        const requirement = await db.requirement.findUnique({
+          where: { id: requirementId },
+          include: {
+            hierarchy: true,
+          },
+        });
+
+        if (!requirement || requirement.hierarchy.projectId !== projectId) {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+
+        const comments = await db.requirementComment.findMany({
+          where: { requirementId },
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        });
+
+        return reply.send(
+          comments.map((comment) => ({
+            id: comment.id,
+            content: comment.content,
+            createdBy: {
+              id: comment.createdBy.id,
+              email: comment.createdBy.email,
+              name: comment.createdBy.name,
+              firstName: comment.createdBy.firstName,
+              lastName: comment.createdBy.lastName,
+            },
+            createdAt: comment.createdAt,
+            updatedAt: comment.updatedAt,
+          }))
+        );
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error fetching requirement comments");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to fetch comments",
+        });
+      }
+    }
+  );
+
+  /**
+   * Create a comment for a requirement
+   */
+  fastify.post<{
+    Params: { projectId: string; id: string };
+    Body: { content: string; notifyOption?: "none" | "all_members" | "mentions" };
+  }>(
+    "/:projectId/requirements/:id/comments",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Create a comment for a requirement",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: { type: "string" },
+            id: { type: "string" },
+          },
+        },
+        body: {
+          type: "object",
+          required: ["content"],
+          properties: {
+            content: { type: "string" },
+            notifyOption: {
+              type: "string",
+              enum: ["none", "all_members", "mentions"],
+              default: "mentions",
+            },
+          },
+        },
+        response: {
+          201: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              content: { type: "string" },
+              createdBy: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  email: { type: "string" },
+                  name: { type: "string", nullable: true },
+                  firstName: { type: "string", nullable: true },
+                  lastName: { type: "string", nullable: true },
+                },
+              },
+              createdAt: { type: "string", format: "date-time" },
+              updatedAt: { type: "string", format: "date-time" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { projectId, id: requirementId } = request.params as { projectId: string; id: string };
+        const currentUser = getUser(request);
+
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Verify requirement belongs to project
+        const requirement = await db.requirement.findUnique({
+          where: { id: requirementId },
+          include: {
+            hierarchy: true,
+          },
+        });
+
+        if (!requirement || requirement.hierarchy.projectId !== projectId) {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+
+        // Create comment
+        const comment = await db.requirementComment.create({
+          data: {
+            id: createId(),
+            requirementId,
+            content: request.body.content,
+            createdById: currentUser.userId,
+          },
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+
+        // Extract @-mentions from content
+        const mentionedUserIds = extractMentions(request.body.content);
+
+        // Create notifications
+        const notifyOption = request.body.notifyOption || "mentions";
+        if (notifyOption !== "none") {
+          try {
+            const projectMembers =
+              notifyOption === "all_members"
+                ? await db.projectMember.findMany({
+                    where: { projectId },
+                    include: { User: true },
+                  })
+                : [];
+
+            const userIdsToNotify = new Set<string>();
+
+            if (notifyOption === "all_members") {
+              for (const member of projectMembers) {
+                userIdsToNotify.add(member.userId);
+              }
+            }
+
+            if (notifyOption === "mentions" || notifyOption === "all_members") {
+              for (const mentionedUserId of mentionedUserIds) {
+                userIdsToNotify.add(mentionedUserId);
+              }
+            }
+
+            // Remove the comment creator from notifications
+            userIdsToNotify.delete(currentUser.userId);
+
+            // Create notifications
+            for (const userId of userIdsToNotify) {
+              const notificationType = mentionedUserIds.includes(userId)
+                ? "REQUIREMENT_MENTION"
+                : "REQUIREMENT_COMMENT";
+
+              await db.notification.create({
+                data: {
+                  id: createId(),
+                  userId,
+                  type: notificationType,
+                  requirementId,
+                  requirementCommentId: comment.id,
+                  mentionedByUserId: mentionedUserIds.includes(userId) ? currentUser.userId : null,
+                },
+              });
+            }
+          } catch (notifErr: any) {
+            request.log.warn("Notification creation skipped:", notifErr);
+          }
+        }
+
+        return reply.status(201).send({
+          id: comment.id,
+          content: comment.content,
+          createdBy: {
+            id: comment.createdBy.id,
+            email: comment.createdBy.email,
+            name: comment.createdBy.name,
+            firstName: comment.createdBy.firstName,
+            lastName: comment.createdBy.lastName,
+          },
+          createdAt: comment.createdAt,
+          updatedAt: comment.updatedAt,
+        });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error creating requirement comment");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to create comment",
+        });
+      }
+    }
+  );
+
+  /**
+   * Delete a comment
+   */
+  fastify.delete<{
+    Params: { projectId: string; id: string; commentId: string };
+  }>(
+    "/:projectId/requirements/:id/comments/:commentId",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Delete a requirement comment",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id", "commentId"],
+          properties: {
+            projectId: { type: "string" },
+            id: { type: "string" },
+            commentId: { type: "string" },
+          },
+        },
+        response: {
+          204: { type: "null" },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { projectId, id: requirementId, commentId } = request.params as {
+          projectId: string;
+          id: string;
+          commentId: string;
+        };
+        const currentUser = getUser(request);
+
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Verify requirement belongs to project
+        const requirement = await db.requirement.findUnique({
+          where: { id: requirementId },
+          include: {
+            hierarchy: true,
+          },
+        });
+
+        if (!requirement || requirement.hierarchy.projectId !== projectId) {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+
+        // Get comment
+        const comment = await db.requirementComment.findUnique({
+          where: { id: commentId },
+        });
+
+        if (!comment || comment.requirementId !== requirementId) {
+          return reply.status(404).send({ error: "Comment not found" });
+        }
+
+        // Check permissions: user can delete own comments, or project admins can delete any
+        const project = (request as any).project;
+        const isProjectAdmin =
+          currentUser.role === "GlobalAdministrator" ||
+          (currentUser.role === "CompanyAdministrator" && currentUser.tenantId === project.tenantId);
+        const isOwner = comment.createdById === currentUser.userId;
+
+        if (!isOwner && !isProjectAdmin) {
+          return reply.status(403).send({ error: "Access denied - cannot delete this comment" });
+        }
+
+        // Delete comment (notifications will be cascade deleted)
+        await db.requirementComment.delete({
+          where: { id: commentId },
+        });
+
+        return reply.status(204).send();
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error deleting requirement comment");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to delete comment",
+        });
+      }
+    }
+  );
+
+  /**
+   * Toggle solved/unsolved flag for requirement comments
+   */
+  fastify.put<{
+    Params: { projectId: string; id: string };
+  }>(
+    "/:projectId/requirements/:id/comments-solved",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Toggle solved/unsolved flag for requirement comments",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId", "id"],
+          properties: {
+            projectId: { type: "string" },
+            id: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              commentsSolved: { type: "boolean" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { projectId, id: requirementId } = request.params as { projectId: string; id: string };
+
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Verify requirement belongs to project
+        const requirement = await db.requirement.findUnique({
+          where: { id: requirementId },
+          include: {
+            hierarchy: true,
+          },
+        });
+
+        if (!requirement || requirement.hierarchy.projectId !== projectId) {
+          return reply.status(404).send({ error: "Requirement not found" });
+        }
+
+        // Toggle the flag
+        const updated = await db.requirement.update({
+          where: { id: requirementId },
+          data: {
+            commentsSolved: !requirement.commentsSolved,
+          },
+        });
+
+        return reply.send({ commentsSolved: updated.commentsSolved });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error toggling comments solved");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to toggle comments solved",
+        });
+      }
+    }
+  );
+
+  /**
+   * Get requirement statistics
+   */
+  fastify.get<{
+    Params: { projectId: string };
+  }>(
+    "/:projectId/requirements/statistics",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get requirement statistics for a project",
+        tags: ["requirements"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["projectId"],
+          properties: {
+            projectId: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              total: { type: "number" },
+              byType: {
+                type: "object",
+                properties: {
+                  Information: { type: "number" },
+                  Mandatory: { type: "number" },
+                  Important: { type: "number" },
+                  Wish: { type: "number" },
+                },
+              },
+              byStatus: {
+                type: "object",
+                properties: {
+                  Approved: { type: "number" },
+                  ForReview: { type: "number" },
+                  New: { type: "number" },
+                  Imported: { type: "number" },
+                },
+              },
+              withUnsolvedComments: { type: "number" },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        const { projectId } = request.params as { projectId: string };
+
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Get all requirements for the project
+        const requirements = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+          },
+        });
+
+        // Calculate statistics
+        const total = requirements.length;
+
+        const byType = {
+          Information: requirements.filter((r) => r.type === "Information").length,
+          Mandatory: requirements.filter((r) => r.type === "Mandatory").length,
+          Important: requirements.filter((r) => r.type === "Important").length,
+          Wish: requirements.filter((r) => r.type === "Wish").length,
+        };
+
+        const byStatus = {
+          Approved: requirements.filter((r) => r.status === "Approved").length,
+          ForReview: requirements.filter((r) => r.status === "ForReview").length,
+          New: requirements.filter((r) => r.status === "New").length,
+          Imported: requirements.filter((r) => r.status === "Imported").length,
+        };
+
+        // Count requirements with unsolved comments
+        const requirementsWithComments = await db.requirement.findMany({
+          where: {
+            hierarchy: {
+              projectId,
+            },
+          },
+          include: {
+            comments: true,
+          },
+        });
+
+        const withUnsolvedComments = requirementsWithComments.filter(
+          (r) => !r.commentsSolved && r.comments.length > 0
+        ).length;
+
+        return reply.send({
+          total,
+          byType,
+          byStatus,
+          withUnsolvedComments,
+        });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error fetching requirement statistics");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "Failed to fetch statistics",
         });
       }
     }

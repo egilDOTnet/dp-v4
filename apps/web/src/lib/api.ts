@@ -607,6 +607,79 @@ export const api = {
       apiRequest<RequirementHistory[]>(
         `/api/projects/${projectId}/requirements/${id}/history`
       ),
+    comments: {
+      list: (projectId: string, requirementId: string) =>
+        apiRequest<
+          Array<{
+            id: string;
+            content: string;
+            createdBy: {
+              id: string;
+              email: string;
+              name: string | null;
+              firstName: string | null;
+              lastName: string | null;
+            };
+            createdAt: string;
+            updatedAt: string;
+          }>
+        >(`/api/projects/${projectId}/requirements/${requirementId}/comments`),
+      create: (
+        projectId: string,
+        requirementId: string,
+        data: {
+          content: string;
+          notifyOption?: "none" | "all_members" | "mentions";
+        }
+      ) =>
+        apiRequest<{
+          id: string;
+          content: string;
+          createdBy: {
+            id: string;
+            email: string;
+            name: string | null;
+            firstName: string | null;
+            lastName: string | null;
+          };
+          createdAt: string;
+          updatedAt: string;
+        }>(`/api/projects/${projectId}/requirements/${requirementId}/comments`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      delete: (projectId: string, requirementId: string, commentId: string) =>
+        apiRequest<void>(
+          `/api/projects/${projectId}/requirements/${requirementId}/comments/${commentId}`,
+          {
+            method: "DELETE",
+          }
+        ),
+      toggleSolved: (projectId: string, requirementId: string) =>
+        apiRequest<{ commentsSolved: boolean }>(
+          `/api/projects/${projectId}/requirements/${requirementId}/comments-solved`,
+          {
+            method: "PUT",
+          }
+        ),
+    },
+    statistics: (projectId: string) =>
+      apiRequest<{
+        total: number;
+        byType: {
+          Information: number;
+          Mandatory: number;
+          Important: number;
+          Wish: number;
+        };
+        byStatus: {
+          Approved: number;
+          ForReview: number;
+          New: number;
+          Imported: number;
+        };
+        withUnsolvedComments: number;
+      }>(`/api/projects/${projectId}/requirements/statistics`),
   },
   rfi: {
     get: (projectId: string) =>
@@ -1529,6 +1602,10 @@ export const api = {
     references: {
       list: (projectId: string) =>
         apiRequest<ReferenceCheck[]>(`/api/projects/${projectId}/rfp/evaluation/references`),
+      getTemplate: (projectId: string) =>
+        apiRequest<ReferenceCheckTemplate>(
+          `/api/projects/${projectId}/rfp/evaluation/reference-check-template`
+        ),
       get: (projectId: string, vendorId: string) =>
         apiRequest<ReferenceCheck[]>(
           `/api/projects/${projectId}/rfp/evaluation/references/${vendorId}`
@@ -1976,8 +2053,9 @@ export interface Requirement {
   number: string;
   description: string;
   type: "Information" | "Mandatory" | "Important" | "Wish";
-  status: "Approved" | "ForReview" | "New" | null;
+  status: "Approved" | "ForReview" | "New" | "Imported" | null;
   order: number;
+  commentsSolved?: boolean;
   createdAt: string;
   updatedAt: string;
   createdById: string;
@@ -1996,6 +2074,9 @@ export interface Requirement {
     name: string | null;
     firstName: string | null;
     lastName: string | null;
+  };
+  _count?: {
+    comments?: number;
   };
 }
 

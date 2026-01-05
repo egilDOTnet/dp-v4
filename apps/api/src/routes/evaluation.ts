@@ -1899,5 +1899,95 @@ export default async function evaluationRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  /**
+   * Get reference check template (available to all authenticated users with project access)
+   */
+  fastify.get<{
+    Params: { id: string };
+  }>(
+    "/:id/rfp/evaluation/reference-check-template",
+    {
+      preHandler: [authenticate],
+      schema: {
+        description: "Get reference check template (available to all authenticated users with project access)",
+        tags: ["evaluation"],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string", description: "Project ID" },
+          },
+        },
+        response: {
+          200: { description: "Reference check template" },
+          401: { type: "object", properties: { error: { type: "string" } } },
+          403: { type: "object", properties: { error: { type: "string" } } },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        await verifyProjectAccess(request, reply);
+        if (reply.sent) return;
+
+        // Get or create template (single template for now)
+        let template = await db.referenceCheckTemplate.findFirst();
+
+        if (!template) {
+          // Create default template
+          const user = getUser(request);
+          template = await db.referenceCheckTemplate.create({
+            data: {
+              content: "<p>Reference Check Template</p>",
+              updatedById: user.userId,
+            },
+            include: {
+              updatedBy: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                  name: true,
+                },
+              },
+            },
+          });
+        } else {
+          // Include updatedBy
+          template = await db.referenceCheckTemplate.findFirst({
+            include: {
+              updatedBy: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                  name: true,
+                },
+              },
+            },
+          });
+        }
+
+        return reply.send({
+          id: template!.id,
+          content: template!.content,
+          updatedById: template!.updatedById,
+          createdAt: template!.createdAt.toISOString(),
+          updatedAt: template!.updatedAt.toISOString(),
+          updatedBy: template!.updatedBy,
+        });
+      } catch (error: any) {
+        request.log.error({ err: error }, "Error in GET /:id/rfp/evaluation/reference-check-template");
+        return reply.status(500).send({
+          error: "Internal server error",
+          message: error.message || "An unexpected error occurred",
+        });
+      }
+    }
+  );
 }
 

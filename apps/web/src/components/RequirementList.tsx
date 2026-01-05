@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Requirement, api, RequirementHistory } from "@/lib/api";
+import { Requirement, api, RequirementHistory, ProjectMember } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import WysiwygEditor from "@/components/WysiwygEditor";
 import {
   DndContext,
   closestCenter,
@@ -96,6 +98,7 @@ export default function RequirementList({
   if (!projectId && !templateId) {
     throw new Error("Either projectId or templateId must be provided");
   }
+  const { user } = useAuth();
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newRequirement, setNewRequirement] = useState<RequirementFormData>({
     description: "",
@@ -112,9 +115,30 @@ export default function RequirementList({
   const [newlyCreatedRequirementId, setNewlyCreatedRequirementId] = useState<string | null>(null);
   const [isNewRequirementAnimating, setIsNewRequirementAnimating] = useState(false);
   const [cancelingRequirementId, setCancelingRequirementId] = useState<string | null>(null);
+  const [showCommentsId, setShowCommentsId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, Array<{
+    id: string;
+    content: string;
+    createdBy: {
+      id: string;
+      email: string;
+      name: string | null;
+      firstName: string | null;
+      lastName: string | null;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }>>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [commentsSolved, setCommentsSolved] = useState<Record<string, boolean>>({});
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([]);
+  const [newCommentContent, setNewCommentContent] = useState<Record<string, string>>({});
+  const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set());
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const descriptionTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const newRequirementTextareaRef = useRef<HTMLTextAreaElement>(null);
   const requirementRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const commentEditorRefs = useRef<Record<string, { focus: () => void } | null>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -157,7 +181,7 @@ export default function RequirementList({
 
   const colorClasses = getColorClasses();
 
-  // Initialize form data for all requirements when they change
+  // Initialize form data and comment counts for all requirements when they change
   useEffect(() => {
     requirements.forEach((requirement) => {
       if (requirement && requirement.id && !formData[requirement.id]) {
@@ -168,6 +192,20 @@ export default function RequirementList({
             type: requirement.type,
             status: requirement.status,
           },
+        }));
+      }
+      // Initialize comment counts from requirements if available
+      if (requirement._count?.comments !== undefined && commentCounts[requirement.id] === undefined) {
+        setCommentCounts((prev) => ({
+          ...prev,
+          [requirement.id]: requirement._count!.comments!,
+        }));
+      }
+      // Initialize commentsSolved from requirements if available
+      if (requirement.commentsSolved !== undefined && commentsSolved[requirement.id] === undefined) {
+        setCommentsSolved((prev) => ({
+          ...prev,
+          [requirement.id]: requirement.commentsSolved!,
         }));
       }
     });
@@ -229,6 +267,121 @@ export default function RequirementList({
       });
     };
   }, []);
+
+  // Load project members when component mounts (only for project requirements)
+  useEffect(() => {
+    if (projectId) {
+      api.projects
+        .get(projectId)
+        .then((project) => {
+          if (project.members) {
+            setProjectMembers(project.members);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load project members:", err);
+        });
+    }
+  }, [projectId]);
+
+  // Load comments when showing comments section
+  const loadComments = async (requirementId: string) => {
+    if (!projectId || comments[requirementId]) {
+      setShowCommentsId(showCommentsId === requirementId ? null : requirementId);
+      return;
+    }
+
+    try {
+      const commentsData = await api.requirements.comments.list(projectId, requirementId);
+      setComments((prev) => ({ ...prev, [requirementId]: commentsData }));
+      setCommentCounts((prev) => ({ ...prev, [requirementId]: commentsData.length }));
+      setShowCommentsId(requirementId);
+    } catch (err: any) {
+      setError(err.message || "Failed to load comments");
+    }
+  };
+
+  // Handle comment creation
+  const handleCreateComment = async (requirementId: string) => {
+    if (!projectId || !newCommentContent[requirementId]?.trim()) return;
+
+    setLoadingComments((prev) => new Set(prev).add(requirementId));
+    setError("");
+
+    try {
+      const comment = await api.requirements.comments.create(projectId, requirementId, {
+        content: newCommentContent[requirementId],
+        notifyOption: "mentions",
+      });
+
+      setComments((prev) => ({
+        ...prev,
+        [requirementId]: [...(prev[requirementId] || []), comment],
+      }));
+      setCommentCounts((prev) => ({
+        ...prev,
+        [requirementId]: (prev[requirementId] || 0) + 1,
+      }));
+      setNewCommentContent((prev) => ({ ...prev, [requirementId]: "" }));
+      if (commentEditorRefs.current[requirementId]) {
+        commentEditorRefs.current[requirementId]?.focus();
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to create comment");
+    } finally {
+      setLoadingComments((prev) => {
+        const next = new Set(prev);
+        next.delete(requirementId);
+        return next;
+      });
+    }
+  };
+
+  // Handle comment deletion
+  const handleDeleteComment = async (requirementId: string, commentId: string) => {
+    if (!projectId) return;
+
+    if (!confirm("Are you sure you want to delete this comment?")) {
+      return;
+    }
+
+    setDeletingCommentId(commentId);
+    setError("");
+
+    try {
+      await api.requirements.comments.delete(projectId, requirementId, commentId);
+      setComments((prev) => ({
+        ...prev,
+        [requirementId]: (prev[requirementId] || []).filter((c) => c.id !== commentId),
+      }));
+      setCommentCounts((prev) => ({
+        ...prev,
+        [requirementId]: Math.max(0, (prev[requirementId] || 0) - 1),
+      }));
+    } catch (err: any) {
+      setError(err.message || "Failed to delete comment");
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  // Handle toggle solved/unsolved
+  const handleToggleSolved = async (requirementId: string) => {
+    if (!projectId) return;
+
+    try {
+      const result = await api.requirements.comments.toggleSolved(projectId, requirementId);
+      // Update local state immediately to reflect the change without closing the form
+      setCommentsSolved((prev) => ({
+        ...prev,
+        [requirementId]: result.commentsSolved,
+      }));
+      // Refresh requirements in the background without closing the form
+      onRequirementUpdate();
+    } catch (err: any) {
+      setError(err.message || "Failed to toggle solved status");
+    }
+  };
 
   // Add native event listeners to editable elements to stop propagation
   useEffect(() => {
@@ -796,10 +949,10 @@ export default function RequirementList({
                     : ""
                 }`}
               >
-                {/* Checkbox - positioned to the left of the number */}
+                {/* Checkbox - positioned to the left of the number, top-aligned */}
                 {onRequirementToggle && (
                   <div
-                    className={`absolute -left-8 top-1/2 -translate-y-1/2 transition-opacity z-10 flex items-center justify-center ${
+                    className={`absolute -left-8 top-4 transition-opacity z-10 flex items-center justify-center ${
                       selectedRequirementIds.has(requirement.id)
                         ? "opacity-100"
                         : "opacity-0 group-hover:opacity-100"
@@ -829,7 +982,7 @@ export default function RequirementList({
                   className={`${colorClasses.bg} text-white flex items-start justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg ${dragAttributes ? 'cursor-grab active:cursor-grabbing hover:brightness-110 transition-all' : ''}`}
                   title={dragAttributes ? "Drag to reorder" : undefined}
                 >
-                  <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-1`}>
+                  <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-2`}>
                     {requirement.number.endsWith('.') ? requirement.number.slice(0, -1) : requirement.number}
                   </span>
                 </div>
@@ -869,6 +1022,17 @@ export default function RequirementList({
                             className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing} ${isApproved ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                             autoFocus
                           />
+                          {/* Show Comments button - left side, underneath textarea */}
+                          {projectId && (
+                            <div className="pt-2">
+                              <button
+                                onClick={() => loadComments(requirement.id)}
+                                className="text-xs text-primary-600 hover:text-primary-500 underline"
+                              >
+                                {showCommentsId === requirement.id ? "Hide" : "Show"} Comments ({commentCounts[requirement.id] || 0})
+                              </button>
+                            </div>
+                          )}
                       </div>
 
                       {/* Metadata area - 1 column */}
@@ -1068,21 +1232,161 @@ export default function RequirementList({
                           </div>
                         </div>
                       )}
+
+                      {/* Comments display - spans all 4 columns */}
+                      {showCommentsId === requirement.id && projectId && (
+                        <div className="col-span-4 border-t border-gray-200 pt-4 mt-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-medium text-sm">Comments</h4>
+                            {comments[requirement.id] && comments[requirement.id].length > 0 && (
+                              <button
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleToggleSolved(requirement.id);
+                                }}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                  (commentsSolved[requirement.id] ?? requirement.commentsSolved)
+                                    ? "bg-primary-600 text-white hover:bg-primary-700"
+                                    : "bg-background-secondary text-text-primary border border-border-primary hover:bg-background-tertiary"
+                                }`}
+                              >
+                                {(commentsSolved[requirement.id] ?? requirement.commentsSolved) ? "Solved" : "Mark as Solved"}
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-3 mb-4">
+                            {comments[requirement.id] && comments[requirement.id].length > 0 ? (
+                              comments[requirement.id].map((comment) => {
+                                const displayName = comment.createdBy.firstName && comment.createdBy.lastName
+                                  ? `${comment.createdBy.firstName} ${comment.createdBy.lastName}`
+                                  : comment.createdBy.firstName || comment.createdBy.lastName || comment.createdBy.name || comment.createdBy.email;
+                                const date = new Date(comment.createdAt).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                });
+                                const time = new Date(comment.createdAt).toLocaleTimeString('en-GB', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  hour12: false
+                                });
+                                // Check if user can delete: own comment or project admin
+                                const isOwner = user?.id === comment.createdBy.id;
+                                // TODO: Check project admin status properly
+                                const canDelete = isOwner;
+
+                                return (
+                                  <div
+                                    key={comment.id}
+                                    className="bg-background-secondary rounded p-3 text-sm grid grid-cols-4 gap-4"
+                                  >
+                                    {/* Comment content - 3 columns */}
+                                    <div className="col-span-3">
+                                      <div
+                                        className="text-gray-700 prose prose-sm max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: comment.content }}
+                                      />
+                                    </div>
+
+                                    {/* Metadata - 1 column */}
+                                    <div className="col-span-1 text-xs text-gray-500 space-y-2">
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-medium text-gray-700">Date:</span>
+                                        <span>{date} {time}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-medium text-gray-700">Commenter:</span>
+                                        <span>{displayName}</span>
+                                      </div>
+                                      {canDelete && (
+                                        <div className="text-right pt-2">
+                                          <button
+                                            onClick={() => handleDeleteComment(requirement.id, comment.id)}
+                                            disabled={deletingCommentId === comment.id}
+                                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                          >
+                                            {deletingCommentId === comment.id ? "Deleting..." : "Delete"}
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="text-sm text-gray-500">No comments yet.</p>
+                            )}
+                          </div>
+
+                          {/* New comment form */}
+                          <div className="space-y-3">
+                            <WysiwygEditor
+                              ref={(el) => {
+                                commentEditorRefs.current[requirement.id] = el;
+                              }}
+                              value={newCommentContent[requirement.id] || ""}
+                              onChange={(value) => {
+                                setNewCommentContent((prev) => ({
+                                  ...prev,
+                                  [requirement.id]: value,
+                                }));
+                              }}
+                              placeholder="Add a comment... Use @ to mention team members"
+                              projectMembers={projectMembers}
+                              onSubmit={() => handleCreateComment(requirement.id)}
+                            />
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => handleCreateComment(requirement.id)}
+                                disabled={loadingComments.has(requirement.id) || !newCommentContent[requirement.id]?.trim()}
+                                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {loadingComments.has(requirement.id) ? "Posting..." : "Post comment"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-start justify-between gap-4">
                       {/* Description area */}
                       <div className="flex-1 min-w-0">
                         <p 
-                          className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-500`}
+                          className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-500 pt-0.5`}
                           onClick={() => enterEditMode(requirement.id)}
                         >
                           {requirement.description}
                         </p>
                       </div>
 
-                      {/* Right side: Type and Status */}
+                      {/* Right side: Comment count, Type, and Status */}
                       <div className="flex items-start gap-2 flex-shrink-0">
+                        {projectId && (commentCounts[requirement.id] || 0) > 0 && (
+                          <span
+                            className={`w-6 h-6 rounded-full text-xs font-medium flex items-center justify-center cursor-pointer hover:opacity-80 ${
+                              (commentsSolved[requirement.id] ?? requirement.commentsSolved)
+                                ? "bg-primary-600 text-white"
+                                : "bg-background-secondary text-text-primary border border-border-primary"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              enterEditMode(requirement.id);
+                              // Use setTimeout to ensure edit mode state has updated before showing comments
+                              setTimeout(() => {
+                                loadComments(requirement.id);
+                              }, 0);
+                            }}
+                            title={`${commentCounts[requirement.id]} comment${commentCounts[requirement.id] !== 1 ? 's' : ''}`}
+                          >
+                            {commentCounts[requirement.id]}
+                          </span>
+                        )}
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
                             requirementFormData.type
@@ -1310,10 +1614,10 @@ export default function RequirementList({
                             : ""
                         }`}
                       >
-                        {/* Checkbox - positioned to the left of the number */}
+                        {/* Checkbox - positioned to the left of the number, top-aligned */}
                         {onRequirementToggle && (
                           <div
-                            className={`absolute -left-8 top-1/2 -translate-y-1/2 transition-opacity z-10 flex items-center justify-center ${
+                            className={`absolute -left-8 top-4 transition-opacity z-10 flex items-center justify-center ${
                               selectedRequirementIds.has(requirement.id)
                                 ? "opacity-100"
                                 : "opacity-0 group-hover:opacity-100"
@@ -1343,7 +1647,7 @@ export default function RequirementList({
                           className={`${colorClasses.bg} text-white flex items-start justify-center min-w-[3.5rem] px-3 pt-3 pb-3 -ml-[2px] -mt-[2px] -mb-[2px] rounded-tl-lg rounded-bl-lg cursor-grab active:cursor-grabbing hover:brightness-110 transition-all`}
                           title="Drag to reorder"
                         >
-                          <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-1`}>
+                          <span className={`font-semibold ${colorClasses.numberSize} leading-none mt-2`}>
                             {requirement.number.endsWith('.') ? requirement.number.slice(0, -1) : requirement.number}
                           </span>
                         </div>
@@ -1377,6 +1681,17 @@ export default function RequirementList({
                                   className={`w-full px-2 py-1 border border-gray-300 rounded ${colorClasses.descriptionSize} focus:outline-none focus:ring-2 ${colorClasses.focusRing} ${isApproved ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                                   autoFocus
                                 />
+                                {/* Show Comments button - left side, underneath textarea */}
+                                {projectId && (
+                                  <div className="pt-2">
+                                    <button
+                                      onClick={() => loadComments(requirement.id)}
+                                      className="text-xs text-primary-600 hover:text-primary-500 underline"
+                                    >
+                                      {showCommentsId === requirement.id ? "Hide" : "Show"} Comments ({commentCounts[requirement.id] || 0})
+                                    </button>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Metadata area - 1 column */}
@@ -1576,21 +1891,159 @@ export default function RequirementList({
                                   </div>
                                 </div>
                               )}
+
+                              {/* Comments display - spans all 4 columns */}
+                              {showCommentsId === requirement.id && projectId && (
+                                <div className="col-span-4 border-t border-gray-200 pt-4 mt-4">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <h4 className="font-medium text-sm">Comments</h4>
+                                    {comments[requirement.id] && comments[requirement.id].length > 0 && (
+                                      <button
+                                        onMouseDown={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          handleToggleSolved(requirement.id);
+                                        }}
+                                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                                          (commentsSolved[requirement.id] ?? requirement.commentsSolved)
+                                            ? "bg-primary-600 text-white hover:bg-primary-700"
+                                            : "bg-background-secondary text-text-primary border border-border-primary hover:bg-background-tertiary"
+                                        }`}
+                                      >
+                                        {(commentsSolved[requirement.id] ?? requirement.commentsSolved) ? "Solved" : "Mark as Solved"}
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="space-y-3 mb-4">
+                                    {comments[requirement.id] && comments[requirement.id].length > 0 ? (
+                                      comments[requirement.id].map((comment) => {
+                                        const displayName = comment.createdBy.firstName && comment.createdBy.lastName
+                                          ? `${comment.createdBy.firstName} ${comment.createdBy.lastName}`
+                                          : comment.createdBy.firstName || comment.createdBy.lastName || comment.createdBy.name || comment.createdBy.email;
+                                        const date = new Date(comment.createdAt).toLocaleDateString('en-GB', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric'
+                                        });
+                                        const time = new Date(comment.createdAt).toLocaleTimeString('en-GB', {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                          hour12: false
+                                        });
+                                        const isOwner = user?.id === comment.createdBy.id;
+                                        const canDelete = isOwner;
+
+                                        return (
+                                          <div
+                                            key={comment.id}
+                                            className="bg-background-secondary rounded p-3 text-sm grid grid-cols-4 gap-4"
+                                          >
+                                            {/* Comment content - 3 columns */}
+                                            <div className="col-span-3">
+                                              <div
+                                                className="text-gray-700 prose prose-sm max-w-none"
+                                                dangerouslySetInnerHTML={{ __html: comment.content }}
+                                              />
+                                            </div>
+
+                                            {/* Metadata - 1 column */}
+                                            <div className="col-span-1 text-xs text-gray-500 space-y-2">
+                                              <div className="flex items-center gap-1">
+                                                <span className="font-medium text-gray-700">Date:</span>
+                                                <span>{date} {time}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <span className="font-medium text-gray-700">Commenter:</span>
+                                                <span>{displayName}</span>
+                                              </div>
+                                              {canDelete && (
+                                                <div className="text-right pt-2">
+                                                  <button
+                                                    onClick={() => handleDeleteComment(requirement.id, comment.id)}
+                                                    disabled={deletingCommentId === comment.id}
+                                                    className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                                  >
+                                                    {deletingCommentId === comment.id ? "Deleting..." : "Delete"}
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <p className="text-sm text-gray-500">No comments yet.</p>
+                                    )}
+                                  </div>
+
+                                  {/* New comment form */}
+                                  <div className="space-y-3">
+                                    <WysiwygEditor
+                                      ref={(el) => {
+                                        commentEditorRefs.current[requirement.id] = el;
+                                      }}
+                                      value={newCommentContent[requirement.id] || ""}
+                                      onChange={(value) => {
+                                        setNewCommentContent((prev) => ({
+                                          ...prev,
+                                          [requirement.id]: value,
+                                        }));
+                                      }}
+                                      placeholder="Add a comment... Use @ to mention team members"
+                                      projectMembers={projectMembers}
+                                      onSubmit={() => handleCreateComment(requirement.id)}
+                                    />
+                                    <div className="flex justify-end">
+                                      <button
+                                        onClick={() => handleCreateComment(requirement.id)}
+                                        disabled={loadingComments.has(requirement.id) || !newCommentContent[requirement.id]?.trim()}
+                                        className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {loadingComments.has(requirement.id) ? "Posting..." : "Post comment"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="flex items-start justify-between gap-4">
                               {/* Description area */}
                               <div className="flex-1 min-w-0">
                                 <p 
-                                  className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-500`}
+                                  className={`${colorClasses.descriptionSize} text-gray-900 cursor-pointer hover:text-primary-500 pt-0.5`}
                                   onClick={() => enterEditMode(requirement.id)}
                                 >
                                   {requirement.description}
                                 </p>
                               </div>
 
-                            {/* Right side: Type and Status */}
+                            {/* Right side: Comment count, Type, and Status */}
                             <div className="flex items-start gap-2 flex-shrink-0">
+                                {projectId && (commentCounts[requirement.id] || 0) > 0 && (
+                                  <span
+                                    className={`w-6 h-6 rounded-full text-xs font-medium flex items-center justify-center cursor-pointer hover:opacity-80 ${
+                                      (commentsSolved[requirement.id] ?? requirement.commentsSolved)
+                                        ? "bg-primary-600 text-white"
+                                        : "bg-background-secondary text-text-primary border border-border-primary"
+                                    }`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      enterEditMode(requirement.id);
+                                      // Use setTimeout to ensure edit mode state has updated before showing comments
+                                      setTimeout(() => {
+                                        loadComments(requirement.id);
+                                      }, 0);
+                                    }}
+                                    title={`${commentCounts[requirement.id]} comment${commentCounts[requirement.id] !== 1 ? 's' : ''}`}
+                                  >
+                                    {commentCounts[requirement.id]}
+                                  </span>
+                                )}
                                 <span
                                   className={`px-2 py-1 rounded text-xs font-medium cursor-pointer hover:opacity-80 ${getTypeColor(
                                     requirementFormData.type
@@ -1607,7 +2060,7 @@ export default function RequirementList({
                                 >
                                   {requirementFormData.status || "New"}
                                 </span>
-                              </div>
+                            </div>
                             </div>
                           )}
                         </div>

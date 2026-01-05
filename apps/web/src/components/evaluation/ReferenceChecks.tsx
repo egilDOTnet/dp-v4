@@ -92,6 +92,8 @@ export function ReferenceChecks({ projectId }: ReferenceChecksProps) {
 
   // Load template on mount
   useEffect(() => {
+    if (!projectId) return;
+
     // Prevent duplicate calls (React Strict Mode protection)
     if (templateLoadingRef.current || templateLoadedRef.current) {
       return;
@@ -99,8 +101,8 @@ export function ReferenceChecks({ projectId }: ReferenceChecksProps) {
 
     templateLoadingRef.current = true;
 
-    api.admin.referenceCheckTemplate
-      .get()
+    api.evaluation.references
+      .getTemplate(projectId)
       .then((templateData) => {
         // Only update if template hasn't been loaded yet
         if (!templateLoadedRef.current) {
@@ -119,7 +121,7 @@ export function ReferenceChecks({ projectId }: ReferenceChecksProps) {
       .finally(() => {
         templateLoadingRef.current = false;
       });
-  }, []);
+  }, [projectId]);
 
   // Handle clicks outside of editing reference checks to exit edit mode
   useEffect(() => {

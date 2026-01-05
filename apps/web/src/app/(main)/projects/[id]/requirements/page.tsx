@@ -6,6 +6,13 @@ import { api, RequirementHierarchy, Requirement, Project } from "@/lib/api";
 import RequirementHierarchyComponent from "@/components/RequirementHierarchy";
 import { useSearch } from "@/hooks/useSearch";
 import { SearchBar, HeroBanner, Breadcrumbs } from "@/components/ui";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
+import { Filter } from "lucide-react";
 import MultiEditRequirementModal from "@/components/MultiEditRequirementModal";
 import MultiDeleteRequirementModal from "@/components/MultiDeleteRequirementModal";
 
@@ -25,6 +32,7 @@ export default function RequirementsPage() {
   const [showMultiDeleteModal, setShowMultiDeleteModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"Approved" | "ForReview" | "New" | "Imported" | null>(null);
   const [filterType, setFilterType] = useState<"Information" | "Mandatory" | "Important" | "Wish" | null>(null);
+  const [filterComments, setFilterComments] = useState<"unsolved" | "solved" | null>(null);
   const loadingProjectIdRef = useRef<string | null>(null);
 
   // Search functionality
@@ -34,7 +42,7 @@ export default function RequirementsPage() {
     });
 
   // Check if filtering is active
-  const isFiltering = filterStatus !== null || filterType !== null;
+  const isFiltering = filterStatus !== null || filterType !== null || filterComments !== null;
   const isFilteringOrSearching = isSearching || isFiltering;
 
   // Apply filters to requirements
@@ -44,9 +52,19 @@ export default function RequirementsPage() {
     return requirements.filter((req) => {
       const statusMatch = filterStatus === null || req.status === filterStatus;
       const typeMatch = filterType === null || req.type === filterType;
-      return statusMatch && typeMatch;
+      // Comments filter:
+      // - "unsolved": has comments (count > 0) AND commentsSolved === false
+      // - "solved": commentsSolved === true
+      let commentsMatch = true;
+      if (filterComments === "unsolved") {
+        const hasComments = (req._count?.comments ?? 0) > 0;
+        commentsMatch = hasComments && req.commentsSolved === false;
+      } else if (filterComments === "solved") {
+        commentsMatch = req.commentsSolved === true;
+      }
+      return statusMatch && typeMatch && commentsMatch;
     });
-  }, [requirements, filterStatus, filterType, isFiltering]);
+  }, [requirements, filterStatus, filterType, filterComments, isFiltering]);
 
   // Combine search and filter results
   const finalFilteredRequirements = useMemo(() => {
@@ -346,52 +364,118 @@ export default function RequirementsPage() {
         <div className="flex items-center gap-2 ml-auto">
           {/* Filter Component - hidden when requirements are selected */}
           {selectedRequirementIds.size === 0 && (
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-md border border-border-primary transition-colors ${
-              isFiltering ? 'bg-accent-600' : 'bg-background-secondary'
-            }`}>
-              <svg
-                className={`h-4 w-4 ${isFiltering ? 'text-white' : 'text-text-primary'}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                />
-              </svg>
-              <span className={`text-sm ${isFiltering ? 'text-white' : 'text-text-primary'}`}>
-                Filter by
-              </span>
-              <select
-                value={filterType || ""}
-                onChange={(e) => setFilterType(e.target.value as typeof filterType || null)}
-                className={`text-sm rounded px-1.5 py-0.5 border border-border-primary h-7 ${
-                  isFiltering ? 'bg-white text-text-primary' : 'bg-background-tertiary text-text-primary'
-                }`}
-              >
-                <option value="">Type:</option>
-                <option value="Information">Information</option>
-                <option value="Mandatory">Mandatory</option>
-                <option value="Important">Important</option>
-                <option value="Wish">Wish</option>
-              </select>
-              <select
-                value={filterStatus || ""}
-                onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus || null)}
-                className={`text-sm rounded px-1.5 py-0.5 border border-border-primary h-7 ${
-                  isFiltering ? 'bg-white text-text-primary' : 'bg-background-tertiary text-text-primary'
-                }`}
-              >
-                <option value="">Status:</option>
-                <option value="Approved">Approved</option>
-                <option value="ForReview">For Review</option>
-                <option value="New">New</option>
-                <option value="Imported">Imported</option>
-              </select>
-            </div>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`px-4 py-2 border border-border-primary rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 flex items-center gap-2 ${
+                    isFiltering
+                      ? "bg-accent-600 text-white hover:bg-accent-700"
+                      : "bg-background-secondary text-text-primary hover:bg-background-tertiary"
+                  }`}
+                >
+                  <Filter className="h-4 w-4" />
+                  Filter
+                  {isFiltering && (
+                    <span className="px-1.5 py-0.5 bg-white text-black text-xs rounded-full font-semibold">
+                      {(filterType ? 1 : 0) + (filterStatus ? 1 : 0) + (filterComments ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48" onCloseAutoFocus={(e) => e.preventDefault()}>
+                <DropdownMenuCheckboxItem
+                  checked={filterType === "Information"}
+                  onCheckedChange={(checked) =>
+                    setFilterType(checked ? "Information" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Type: Information
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterType === "Mandatory"}
+                  onCheckedChange={(checked) =>
+                    setFilterType(checked ? "Mandatory" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Type: Mandatory
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterType === "Important"}
+                  onCheckedChange={(checked) =>
+                    setFilterType(checked ? "Important" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Type: Important
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterType === "Wish"}
+                  onCheckedChange={(checked) =>
+                    setFilterType(checked ? "Wish" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Type: Wish
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus === "Approved"}
+                  onCheckedChange={(checked) =>
+                    setFilterStatus(checked ? "Approved" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Status: Approved
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus === "ForReview"}
+                  onCheckedChange={(checked) =>
+                    setFilterStatus(checked ? "ForReview" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Status: For Review
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus === "New"}
+                  onCheckedChange={(checked) =>
+                    setFilterStatus(checked ? "New" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Status: New
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterStatus === "Imported"}
+                  onCheckedChange={(checked) =>
+                    setFilterStatus(checked ? "Imported" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Status: Imported
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterComments === "unsolved"}
+                  onCheckedChange={(checked) =>
+                    setFilterComments(checked ? "unsolved" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Comments: Unsolved
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={filterComments === "solved"}
+                  onCheckedChange={(checked) =>
+                    setFilterComments(checked ? "solved" : null)
+                  }
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Comments: Solved
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {/* Multi edit and delete - only when selected */}
           {selectedRequirementIds.size > 0 && (
@@ -459,27 +543,40 @@ export default function RequirementsPage() {
       <div className="space-y-6">
         {/* Hierarchy Structure */}
         <div className="bg-background-secondary rounded-lg shadow-md p-6">
-          <RequirementHierarchyComponent
-            projectId={projectId}
-            hierarchies={displayHierarchies}
-            requirements={displayRequirements}
-            selectedHierarchyId={selectedHierarchyId}
-            onHierarchySelect={handleHierarchySelect}
-            onHierarchyUpdate={handleHierarchyUpdate}
-            onRequirementUpdate={handleRequirementUpdate}
-            onAddRequirement={(hierarchyId) => {
-              setSelectedHierarchyId(hierarchyId);
-              setCreateForHierarchyId(hierarchyId);
-            }}
-            createForHierarchyId={createForHierarchyId}
-            onCreateFormClose={() => setCreateForHierarchyId(null)}
-            expandedHierarchies={isFilteringOrSearching ? searchExpandedHierarchies : expandedHierarchies}
-            onExpandedHierarchiesChange={setExpandedHierarchies}
-            disableDragAndDrop={isFilteringOrSearching}
-            selectedRequirementIds={selectedRequirementIds}
-            onRequirementToggle={handleRequirementToggle}
-            onHierarchyToggle={handleHierarchyToggle}
-          />
+          {isFilteringOrSearching && finalFilteredRequirements.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-text-secondary text-lg">
+                {isSearching && filterStatus === null && filterType === null && filterComments === null
+                  ? "No requirements match your search."
+                  : "No requirements match your filter or search criteria."}
+              </p>
+              <p className="text-text-tertiary text-sm mt-2">
+                Try adjusting your filters or search terms.
+              </p>
+            </div>
+          ) : (
+            <RequirementHierarchyComponent
+              projectId={projectId}
+              hierarchies={displayHierarchies}
+              requirements={displayRequirements}
+              selectedHierarchyId={selectedHierarchyId}
+              onHierarchySelect={handleHierarchySelect}
+              onHierarchyUpdate={handleHierarchyUpdate}
+              onRequirementUpdate={handleRequirementUpdate}
+              onAddRequirement={(hierarchyId) => {
+                setSelectedHierarchyId(hierarchyId);
+                setCreateForHierarchyId(hierarchyId);
+              }}
+              createForHierarchyId={createForHierarchyId}
+              onCreateFormClose={() => setCreateForHierarchyId(null)}
+              expandedHierarchies={isFilteringOrSearching ? searchExpandedHierarchies : expandedHierarchies}
+              onExpandedHierarchiesChange={setExpandedHierarchies}
+              disableDragAndDrop={isFilteringOrSearching}
+              selectedRequirementIds={selectedRequirementIds}
+              onRequirementToggle={handleRequirementToggle}
+              onHierarchyToggle={handleHierarchyToggle}
+            />
+          )}
         </div>
       </div>
 
