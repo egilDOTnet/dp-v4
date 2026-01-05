@@ -88,3 +88,70 @@ export async function verifyProjectAccess(
   (request as any).project = project;
   (request as any).userWithMemberships = userWithMemberships;
 }
+
+/**
+ * Middleware to require project admin privileges.
+ * - GlobalAdministrator: Always allowed (no tenant restriction)
+ * - CompanyAdministrator: Only allowed if user's tenant matches project's tenant
+ * - Other roles: Denied
+ * 
+ * @returns Middleware function that verifies project admin access
+ * @throws 403 if user doesn't have admin access
+ * @throws 404 if project doesn't exist
+ */
+export function requireProjectAdmin() {
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (!request.user) {
+      reply.status(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    const user = getUser(request);
+    
+    const params = request.params as { id?: string; projectId?: string };
+    // Prefer projectId over id, since id might be a resource ID
+    const projectId = params.projectId || params.id;
+
+    if (!projectId) {
+      request.log?.warn({ params: request.params, url: request.url }, "Project ID not found in request params");
+      reply.status(400).send({ error: "Project ID required" });
+      return;
+    }
+
+    // Fetch project to get tenant info
+    const project = await db.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, tenantId: true },
+    });
+
+    if (!project) {
+      request.log?.warn({ projectId, params: request.params, url: request.url }, "Project not found in database");
+      reply.status(404).send({ error: "Project not found" });
+      return;
+    }
+
+    // Global Administrators have access to all projects
+    if (user.role === "GlobalAdministrator") {
+      // Attach project to request for use in route handlers
+      (request as any).project = project;
+      return;
+    }
+
+    // For Company Administrators, we need to check tenant match
+    if (user.role !== "CompanyAdministrator") {
+      reply.status(403).send({ error: "Forbidden - admin role required" });
+      return;
+    }
+
+    // Company Administrators can only admin projects in their own tenant
+    if (user.tenantId !== project.tenantId) {
+      reply.status(403).send({ error: "Forbidden - Company Administrators can only manage projects in their own company" });
+      return;
+    }
+
+    // Attach project to request for use in route handlers
+    // Note: This is a minimal project object with just id and tenantId
+    // Handlers may need to fetch the full project with relations
+    (request as any).project = project;
+  };
+}

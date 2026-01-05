@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { Filter } from "lucide-react";
+import { Filter, Info } from "lucide-react";
 import { api, EvaluationRequirement, EvaluationProgress, EvaluationScore } from "@/lib/api";
-import { LoadingSpinner, SearchBar, Card } from "@/components/ui";
+import { LoadingSpinner, SearchBar, Card, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -45,6 +45,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
   const [scores, setScores] = useState<Map<string, EvaluationScore>>(new Map());
   const [_saving, setSaving] = useState<Set<string>>(new Set());
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showScoringHelp, setShowScoringHelp] = useState(false);
   const hasShownCelebration = useRef(false);
   const tableRef = useRef<HTMLDivElement>(null);
   // Map to store refs for expanded rows, keyed by "requirementId-vendorResponseId"
@@ -106,28 +107,56 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
   }, []);
 
   // Load initial data
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
+
   useEffect(() => {
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `scoring-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+    setError(null);
+
     Promise.all([
       api.evaluation.requirements(projectId),
       api.evaluation.progress(projectId),
       api.evaluation.scores.list(projectId),
     ])
       .then(([reqs, prog, scoreList]) => {
-        setRequirements(reqs);
-        setProgress(prog);
-        // Convert scores array to Map for quick lookup
-        const scoresMap = new Map<string, EvaluationScore>();
-        scoreList.forEach((score) => {
-          const key = `${score.vendorResponseId}-${score.requirementId}`;
-          scoresMap.set(key, score);
-        });
-        setScores(scoresMap);
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setRequirements(reqs);
+          setProgress(prog);
+          // Convert scores array to Map for quick lookup
+          const scoresMap = new Map<string, EvaluationScore>();
+          scoreList.forEach((score) => {
+            const key = `${score.vendorResponseId}-${score.requirementId}`;
+            scoresMap.set(key, score);
+          });
+          setScores(scoresMap);
+        }
       })
       .catch((err) => {
-        setError(err.message || "Failed to load evaluation data");
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setError(err.message || "Failed to load evaluation data");
+        }
       })
       .finally(() => {
-        setLoading(false);
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
       });
   }, [projectId]);
 
@@ -807,7 +836,7 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
       {/* Status Bar */}
       {progress && (
         <div className="bg-background-secondary p-4 rounded-lg border border-border-primary">
-          <div className="grid grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-sm">
             <div>
               <div className="text-text-secondary">Total Needed</div>
               <div className="text-lg font-bold text-text-primary">{totalNeeded}</div>
@@ -825,6 +854,16 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
             <div>
               <div className="text-text-secondary">Questions</div>
               <div className="text-lg font-bold text-text-primary">{progress.questionsCount}</div>
+            </div>
+            <div>
+              <div className="text-text-secondary">Scoring</div>
+              <button
+                onClick={() => setShowScoringHelp(true)}
+                className="px-3 py-1.5 text-sm bg-accent-600 text-white rounded-md hover:bg-accent-700 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 flex items-center gap-2 mt-1"
+              >
+                <Info className="h-4 w-4" />
+                View info
+              </button>
             </div>
           </div>
         </div>
@@ -1284,6 +1323,85 @@ export function EvaluationScoring({ projectId }: EvaluationScoringProps) {
         open={showCelebration}
         onClose={() => setShowCelebration(false)}
       />
+
+      {/* Scoring Help Dialog */}
+      <Dialog open={showScoringHelp} onOpenChange={setShowScoringHelp}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Scoring Guide</DialogTitle>
+            <DialogDescription>
+              Understanding the evaluation scoring system and indicators
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div>
+              <h3 className="text-base font-semibold text-text-primary mb-3">Scoring Scale (1-5)</h3>
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <span className="text-lg font-bold text-primary-600 min-w-[2rem]">1</span>
+                  <span className="text-sm text-text-primary">Significant deficiencies</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-lg font-bold text-primary-600 min-w-[2rem]">2</span>
+                  <span className="text-sm text-text-primary">Some deficiencies</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-lg font-bold text-primary-600 min-w-[2rem]">3</span>
+                  <span className="text-sm text-text-primary">Adequate</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-lg font-bold text-primary-600 min-w-[2rem]">4</span>
+                  <span className="text-sm text-text-primary">Good, but not complete</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-lg font-bold text-primary-600 min-w-[2rem]">5</span>
+                  <span className="text-sm text-text-primary">Good and comprehensive</span>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-border-primary pt-4">
+              <h3 className="text-base font-semibold text-text-primary mb-3">Indicators</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold">
+                    n
+                  </div>
+                  <span className="text-sm text-text-primary">
+                    The <strong>n</strong> indicator appears when you have created a note for this evaluation.
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary-600 text-white text-xs font-semibold">
+                    q
+                  </div>
+                  <span className="text-sm text-text-primary">
+                    The <strong>q</strong> indicator appears when you have created a question for this evaluation.
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-border-primary pt-4">
+              <h3 className="text-base font-semibold text-text-primary mb-3">Keyboard Navigation</h3>
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <kbd className="px-2 py-1 text-xs font-semibold text-text-primary bg-background-tertiary border border-border-primary rounded">Tab</kbd>
+                  <span className="text-sm text-text-primary">
+                    Move to the next score field
+                  </span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <kbd className="px-2 py-1 text-xs font-semibold text-text-primary bg-background-tertiary border border-border-primary rounded">Shift</kbd>
+                  <span className="text-sm text-text-primary">+</span>
+                  <kbd className="px-2 py-1 text-xs font-semibold text-text-primary bg-background-tertiary border border-border-primary rounded">Tab</kbd>
+                  <span className="text-sm text-text-primary">
+                    Move to the previous score field
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

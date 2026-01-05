@@ -334,7 +334,35 @@ export default async function vendorRoutes(fastify: FastifyInstance) {
           return reply.status(502).send({ error: "Failed to fetch company details" });
         }
 
-        const entity = await response.json() as BrregEntity;
+        let entity: BrregEntity;
+        try {
+          entity = await response.json() as BrregEntity;
+        } catch (jsonError: unknown) {
+          const responseText = await response.text().catch(() => "Unable to read response");
+          request.log.error(
+            {
+              err: jsonError,
+              responseText: responseText.substring(0, 500), // Limit log size
+              orgNumber,
+              url: detailsUrl,
+            },
+            "Failed to parse brreg.no API response as JSON"
+          );
+          return reply.status(502).send({ error: "Invalid response from company registry" });
+        }
+
+        // Validate entity structure
+        if (!entity || typeof entity !== "object" || !entity.organisasjonsnummer || !entity.navn) {
+          request.log.error(
+            {
+              entity: entity ? JSON.stringify(entity).substring(0, 500) : "null",
+              orgNumber,
+              url: detailsUrl,
+            },
+            "Invalid entity structure from brreg.no API"
+          );
+          return reply.status(502).send({ error: "Invalid response structure from company registry" });
+        }
 
         // Return detailed information
         return reply.send({

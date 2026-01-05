@@ -17,11 +17,13 @@ import rfpRoutes from "./routes/rfp";
 import notificationRoutes from "./routes/notifications";
 import evaluationRoutes from "./routes/evaluation";
 import adminRoutes from "./routes/admin";
+import companyRoutes from "./routes/company";
 import { errorHandler } from "./middleware/error-handler";
 import { swaggerOptions, swaggerUiOptions } from "./config/swagger";
 
 const fastify = Fastify({
   logger: true,
+  bodyLimit: 15 * 1024 * 1024, // 15MB - increased to support base64 image data in company settings
 });
 
 // Set error handler
@@ -89,6 +91,7 @@ const start = async () => {
     await fastify.register(notificationRoutes, { prefix: "/api/notifications" });
     await fastify.register(evaluationRoutes, { prefix: "/api/projects" });
     await fastify.register(adminRoutes, { prefix: "/api" });
+    await fastify.register(companyRoutes, { prefix: "/api/company" });
 
     const port = Number(process.env.PORT) || 3001;
     await fastify.listen({ port, host: "0.0.0.0" });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, RFP, RFPQuestion, ProjectVendor } from "@/lib/api";
 import { Button, Card, CardHeader, CardBody, SearchBar, EmptyState, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui";
 import { useSearch } from "@/hooks/useSearch";
@@ -25,13 +25,52 @@ export default function RFPQuestions({ projectId, rfp: _rfp, scrollToQuestionId 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<RFPQuestion | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
 
   const { searchTerm, setSearchTerm, filteredItems } = useSearch(questions, {
     searchKeys: ["question", "cleanedQuestion", "vendor.name", "contactPerson.firstName", "contactPerson.lastName"],
   });
 
   useEffect(() => {
-    loadData();
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `questions-${projectId}-${filter}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
+    Promise.all([
+      api.rfp.questions.list(projectId, filter),
+      api.projects.vendors.list(projectId),
+    ])
+      .then(([questionsData, vendorsData]) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setQuestions(questionsData);
+          setVendors(vendorsData);
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          console.error("Error loading questions:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
   }, [projectId, filter]);
 
   // Scroll to specific question when it loads
@@ -53,18 +92,39 @@ export default function RFPQuestions({ projectId, rfp: _rfp, scrollToQuestionId 
   }, [scrollToQuestionId, questions]);
 
   const loadData = async () => {
+    // Create a unique key for this load
+    const loadKey = `questions-${projectId}-${filter}`;
+    
+    // Prevent duplicate calls
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
     try {
-      setLoading(true);
       const [questionsData, vendorsData] = await Promise.all([
         api.rfp.questions.list(projectId, filter),
         api.projects.vendors.list(projectId),
       ]);
-      setQuestions(questionsData);
-      setVendors(vendorsData);
+      // Only update if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setQuestions(questionsData);
+        setVendors(vendorsData);
+      }
     } catch (err: any) {
-      console.error("Error loading questions:", err);
+      // Only log error if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        console.error("Error loading questions:", err);
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   };
 

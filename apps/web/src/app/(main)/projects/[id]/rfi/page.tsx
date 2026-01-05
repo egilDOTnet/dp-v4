@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, RFI } from "@/lib/api";
 import QuestionList from "@/components/QuestionList";
 import RFIStatusTable from "@/components/RFIStatusTable";
@@ -14,6 +15,7 @@ type TabType = "email" | "rfi-info" | "questionnaire" | "status";
 
 export default function RFIPage() {
   const params = useParams();
+  const { user } = useAuth();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [rfi, setRfi] = useState<RFI | null>(null);
@@ -29,6 +31,13 @@ export default function RFIPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const loadingProjectIdRef = useRef<string | null>(null);
+
+  // Check if user is a project admin for THIS specific project
+  // Global Admins are always project admins
+  // Company Admins are only project admins if their tenant matches the project's tenant
+  const isProjectAdmin =
+    user?.role === "GlobalAdministrator" ||
+    (user?.role === "CompanyAdministrator" && user?.tenantId === project?.tenantId);
 
   const loadProject = useCallback(async () => {
     try {
@@ -257,7 +266,6 @@ export default function RFIPage() {
 
   const breadcrumbItems = [
     { label: "Home", href: "/dashboard?noAutoRedirect=true" },
-    { label: "Projects", href: "/projects" },
     { label: project?.name || "Project", href: `/projects/${projectId}` },
     { label: "RFI" },
   ];
@@ -402,21 +410,23 @@ export default function RFIPage() {
             >
               Preview
             </button>
-            {rfi?.status === "Published" ? (
-              <button
-                onClick={handleUnpublish}
-                disabled={isPublishing}
-                className="px-4 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-              >
-                {isPublishing ? "Unpublishing..." : "Unpublish"}
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsPublishDialogOpen(true)}
-                className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
-              >
-                Publish
-              </button>
+            {isProjectAdmin && (
+              rfi?.status === "Published" ? (
+                <button
+                  onClick={handleUnpublish}
+                  disabled={isPublishing}
+                  className="px-4 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isPublishing ? "Unpublishing..." : "Unpublish"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsPublishDialogOpen(true)}
+                  className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                >
+                  Publish
+                </button>
+              )
             )}
           </div>
         </div>
@@ -523,6 +533,7 @@ export default function RFIPage() {
                   projectId={projectId} 
                   rfiId={rfi.id} 
                   onQuestionsChange={loadRFI}
+                  initialQuestions={rfi.questions}
                 />
               </div>
             ) : (

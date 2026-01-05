@@ -289,20 +289,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
           ],
         });
 
-        request.log.info({ count: hierarchies.length, projectId, sample: hierarchies[0] }, "Found requirement hierarchies");
-
         if (hierarchies.length === 0) {
           request.log.warn({ projectId }, "No hierarchies found for project");
           return reply.send([]);
         }
-
-        // Return Prisma results directly - using select ensures clean objects
-        request.log.info({ 
-          sendingCount: hierarchies.length,
-          firstItemKeys: hierarchies[0] ? Object.keys(hierarchies[0]) : [],
-          firstItemId: hierarchies[0]?.id,
-          firstItemTitle: hierarchies[0]?.title
-        }, "Sending hierarchies response");
         
         return reply.send(hierarchies);
       } catch (error: any) {
@@ -1125,20 +1115,10 @@ export default async function requirementRoutes(fastify: FastifyInstance) {
         ],
       });
 
-        request.log.info({ count: requirements.length, projectId, sample: requirements[0] }, "Found requirements");
-
         if (requirements.length === 0) {
           request.log.warn({ projectId }, "No requirements found for project");
           return reply.send([]);
         }
-
-        // Return Prisma results directly - using select ensures clean objects
-        request.log.info({ 
-          sendingCount: requirements.length,
-          firstItemKeys: requirements[0] ? Object.keys(requirements[0]) : [],
-          firstItemId: requirements[0]?.id,
-          firstItemDescription: requirements[0]?.description?.substring(0, 50)
-        }, "Sending requirements response");
         
         return reply.send(requirements);
       } catch (error: any) {

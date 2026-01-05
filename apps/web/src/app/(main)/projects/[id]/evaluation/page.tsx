@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, Project } from "@/lib/api";
@@ -17,44 +17,99 @@ export default function EvaluationPage() {
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<string>("score");
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
+  const summaryLoadingRef = useRef(false);
+  const lastSummaryLoadKeyRef = useRef<string>("");
 
-  const isAdmin =
-    user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
+  // Check if user is a project admin for THIS specific project
+  // Global Admins are always project admins
+  // Company Admins are only project admins if their tenant matches the project's tenant
+  const isProjectAdmin =
+    user?.role === "GlobalAdministrator" ||
+    (user?.role === "CompanyAdministrator" && user?.tenantId === project?.tenantId);
 
   useEffect(() => {
-    if (projectId) {
-      api.projects
-        .get(projectId)
-        .then(setProject)
-        .catch((err) => console.error("Failed to load project:", err));
+    if (!projectId) return;
+
+    // Create a unique key for this load
+    const loadKey = `project-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
     }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+
+    api.projects
+      .get(projectId)
+      .then((data) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setProject(data);
+        }
+      })
+      .catch((err) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          console.error("Failed to load project:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          loadingRef.current = false;
+        }
+      });
   }, [projectId]);
 
   // Check if scoring is completed and set default tab to overview if so
   useEffect(() => {
-    if (!projectId || !isAdmin) {
+    if (!projectId || !isProjectAdmin) {
       return;
     }
 
-    const checkCompletion = async () => {
-      try {
-        const summary = await api.evaluation.summary(projectId);
-        // If all evaluations are completed, default to overview
-        if (summary.stats.evaluationsCompleted === summary.stats.totalNeeded && summary.stats.totalNeeded > 0) {
-          setActiveTab("overview");
-        }
-      } catch (err) {
-        // If summary fails (e.g., no RFP yet), just use default "score" tab
-        console.error("Failed to check evaluation completion:", err);
-      }
-    };
+    // Create a unique key for this load
+    const loadKey = `summary-${projectId}`;
 
-    checkCompletion();
-  }, [projectId, isAdmin]);
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (summaryLoadingRef.current && lastSummaryLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    summaryLoadingRef.current = true;
+    lastSummaryLoadKeyRef.current = loadKey;
+
+    api.evaluation
+      .summary(projectId)
+      .then((summary) => {
+        // Only update if this is still the current load
+        if (lastSummaryLoadKeyRef.current === loadKey) {
+          // If all evaluations are completed, default to overview
+          if (summary.stats.evaluationsCompleted === summary.stats.totalNeeded && summary.stats.totalNeeded > 0) {
+            setActiveTab("overview");
+          }
+        }
+      })
+      .catch((err) => {
+        // Only log error if this is still the current load
+        if (lastSummaryLoadKeyRef.current === loadKey) {
+          // If summary fails (e.g., no RFP yet), just use default "score" tab
+          console.error("Failed to check evaluation completion:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastSummaryLoadKeyRef.current === loadKey) {
+          summaryLoadingRef.current = false;
+        }
+      });
+  }, [projectId, isProjectAdmin]);
 
   const breadcrumbItems = [
     { label: "Home", href: "/dashboard?noAutoRedirect=true" },
-    { label: "Projects", href: "/projects" },
     { label: project?.name || "Project", href: `/projects/${projectId}` },
     { label: "Evaluation" },
   ];
@@ -107,7 +162,7 @@ export default function EvaluationPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="border-b border-gray-200">
             <TabsList>
-              {isAdmin && (
+              {isProjectAdmin && (
                 <>
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="compare">Compare</TabsTrigger>
@@ -119,7 +174,7 @@ export default function EvaluationPage() {
             </TabsList>
           </div>
 
-          {isAdmin && (
+          {isProjectAdmin && (
             <>
               <TabsContent value="overview">
                 <EvaluationOverview projectId={projectId} />

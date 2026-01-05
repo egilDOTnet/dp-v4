@@ -43,14 +43,82 @@ export function ReferenceChecks({ projectId }: ReferenceChecksProps) {
 
   const refs = useRef<Record<string, HTMLDivElement | null>>({});
   const newFormRef = useRef<HTMLDivElement | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
+  const templateLoadingRef = useRef(false);
+  const templateLoadedRef = useRef(false);
 
   useEffect(() => {
-    loadData();
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `references-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+    setError(null);
+
+    Promise.all([
+      api.evaluation.references.list(projectId),
+      api.projects.vendors.list(projectId),
+    ])
+      .then(([checksData, vendorsData]) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setReferenceChecks(checksData);
+          setVendors(vendorsData);
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setError(err.message || "Failed to load reference checks");
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
   }, [projectId]);
 
   // Load template on mount
   useEffect(() => {
-    loadTemplate();
+    // Prevent duplicate calls (React Strict Mode protection)
+    if (templateLoadingRef.current || templateLoadedRef.current) {
+      return;
+    }
+
+    templateLoadingRef.current = true;
+
+    api.admin.referenceCheckTemplate
+      .get()
+      .then((templateData) => {
+        // Only update if template hasn't been loaded yet
+        if (!templateLoadedRef.current) {
+          setTemplate(templateData);
+          // Pre-populate new form content with template
+          if (templateData.content) {
+            setNewFormData((prev) => ({ ...prev, content: templateData.content }));
+          }
+          templateLoadedRef.current = true;
+        }
+      })
+      .catch((_err: any) => {
+        // Template might not exist yet, that's okay
+        console.log("No reference check template found");
+      })
+      .finally(() => {
+        templateLoadingRef.current = false;
+      });
   }, []);
 
   // Handle clicks outside of editing reference checks to exit edit mode
@@ -141,33 +209,42 @@ export function ReferenceChecks({ projectId }: ReferenceChecksProps) {
   }, [isCreatingNew, editingFields, formData, referenceChecks, vendorDropdownJustClosed]);
 
   const loadData = async () => {
+    if (!projectId) return;
+
+    // Create a unique key for this load
+    const loadKey = `references-${projectId}`;
+    
+    // Prevent duplicate calls
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
       const [checksData, vendorsData] = await Promise.all([
         api.evaluation.references.list(projectId),
         api.projects.vendors.list(projectId),
       ]);
-      setReferenceChecks(checksData);
-      setVendors(vendorsData);
-    } catch (err: any) {
-      setError(err.message || "Failed to load reference checks");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTemplate = async () => {
-    try {
-      const templateData = await api.admin.referenceCheckTemplate.get();
-      setTemplate(templateData);
-      // Pre-populate new form content with template
-      if (templateData.content) {
-        setNewFormData((prev) => ({ ...prev, content: templateData.content }));
+      // Only update if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setReferenceChecks(checksData);
+        setVendors(vendorsData);
       }
-    } catch (_err: any) {
-      // Template might not exist yet, that's okay
-      console.log("No reference check template found");
+    } catch (err: any) {
+      // Only log error if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setError(err.message || "Failed to load reference checks");
+      }
+    } finally {
+      // Only update loading state if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   };
 

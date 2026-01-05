@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, EvaluationSummary } from "@/lib/api";
 import { Card, CardBody, LoadingSpinner } from "@/components/ui";
 
@@ -12,16 +12,45 @@ export function EvaluationOverview({ projectId }: EvaluationOverviewProps) {
   const [summary, setSummary] = useState<EvaluationSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
 
   useEffect(() => {
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `overview-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+    setError(null);
+
     api.evaluation
       .summary(projectId)
-      .then(setSummary)
+      .then((data) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setSummary(data);
+        }
+      })
       .catch((err) => {
-        setError(err.message || "Failed to load evaluation summary");
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setError(err.message || "Failed to load evaluation summary");
+        }
       })
       .finally(() => {
-        setLoading(false);
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
       });
   }, [projectId]);
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { api, Project, RFP } from "@/lib/api";
 import { Tabs, TabsList, TabsTrigger, TabsContent, HeroBanner, Breadcrumbs } from "@/components/ui";
 import RFPOverview from "@/components/rfp/RFPOverview";
@@ -18,6 +19,7 @@ type TabType = "overview" | "about" | "schedule" | "documents" | "changelog" | "
 export default function RFPPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [rfp, setRfp] = useState<RFP | null>(null);
@@ -29,6 +31,13 @@ export default function RFPPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const loadingProjectIdRef = useRef<string | null>(null);
+
+  // Check if user is a project admin for THIS specific project
+  // Global Admins are always project admins
+  // Company Admins are only project admins if their tenant matches the project's tenant
+  const isProjectAdmin =
+    user?.role === "GlobalAdministrator" ||
+    (user?.role === "CompanyAdministrator" && user?.tenantId === project?.tenantId);
   
   // Check for question query parameter to navigate to specific question
   useEffect(() => {
@@ -180,7 +189,6 @@ export default function RFPPage() {
 
   const breadcrumbItems = [
     { label: "Home", href: "/dashboard?noAutoRedirect=true" },
-    { label: "Projects", href: "/projects" },
     { label: project?.name || "Project", href: `/projects/${projectId}` },
     { label: "RFP" },
   ];
@@ -271,26 +279,30 @@ export default function RFPPage() {
             <div className="flex items-end gap-3 pb-2">
               <button
                 onClick={handlePreview}
+                disabled={!rfp?.contactPersonId}
                 className="px-4 py-1.5 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
+                title={!rfp?.contactPersonId ? "A main contact person must be assigned before previewing" : ""}
               >
                 Preview
               </button>
-              {rfp?.status === "Published" ? (
-                <button
-                  onClick={handleUnpublish}
-                  disabled={isPublishing}
-                  className="px-4 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
-                >
-                  {isPublishing ? "Unpublishing..." : "Unpublish"}
-                </button>
-              ) : (
-                <button
-                  onClick={handlePublish}
-                  disabled={isPublishing}
-                  className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-                >
-                  {isPublishing ? "Publishing..." : "Publish"}
-                </button>
+              {isProjectAdmin && (
+                rfp?.status === "Published" ? (
+                  <button
+                    onClick={handleUnpublish}
+                    disabled={isPublishing}
+                    className="px-4 py-1.5 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isPublishing ? "Unpublishing..." : "Unpublish"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handlePublish}
+                    disabled={isPublishing}
+                    className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {isPublishing ? "Publishing..." : "Publish"}
+                  </button>
+                )
               )}
             </div>
           </div>

@@ -428,6 +428,110 @@ export default async function userRoutes(fastify: FastifyInstance) {
   );
 
   /**
+   * Look up a user by email address
+   * Requires CompanyAdministrator or GlobalAdministrator role
+   * Returns user details if found, null if not found
+   */
+  fastify.get<{ Querystring: { email: string } }>(
+    "/lookup",
+    {
+      preHandler: [
+        authenticate,
+        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+      ],
+      schema: {
+        description: "Look up a user by email address. Requires CompanyAdministrator or GlobalAdministrator role.",
+        tags: ["users"],
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object",
+          required: ["email"],
+          properties: {
+            email: {
+              type: "string",
+              format: "email",
+              description: "User email address to look up",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "string" },
+              email: { type: "string" },
+              name: { type: "string", nullable: true },
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              role: { type: "string" },
+              tenantId: { type: "string", nullable: true },
+            },
+            description: "User found, or null if not found",
+          },
+          400: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Invalid email format",
+          },
+          401: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Unauthorized",
+          },
+          403: {
+            type: "object",
+            properties: {
+              error: { type: "string" },
+            },
+            description: "Forbidden - requires admin role",
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Querystring: { email: string } }>, reply: FastifyReply) => {
+      const { email } = request.query;
+
+      if (!email || typeof email !== "string") {
+        return reply.status(400).send({ error: "Email is required" });
+      }
+
+      const user = await db.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          name: true,
+          role: true,
+          tenantId: true,
+        },
+      });
+
+      if (!user) {
+        return reply.send(null);
+      }
+
+      return reply.send(
+        formatUserResponse({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          name: user.name,
+          role: user.role,
+          tenantId: user.tenantId,
+        })
+      );
+    }
+  );
+
+  /**
    * Create a new user in the current company
    * Requires CompanyAdministrator or GlobalAdministrator role
    * New user will need to set password via magic link

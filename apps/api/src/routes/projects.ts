@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { db, RequirementStatus, VendorStatus } from "@dp/db";
 import { createProjectSchema, addProjectMembersSchema } from "@dp/lib";
 import { authenticate, requireTenant, requireRole, getUser } from "../middleware/auth";
-import { verifyProjectAccess } from "../middleware/project-access";
+import { verifyProjectAccess, requireProjectAdmin } from "../middleware/project-access";
 import { computeDisplayName } from "../utils/user-utils";
 import { createId } from "@paralleldrive/cuid2";
 
@@ -360,6 +360,14 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                 bannerFileName: { type: "string", nullable: true },
                 bannerFileType: { type: "string", nullable: true },
                 tenantId: { type: "string", nullable: true },
+                tenant: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                  },
+                },
                 createdAt: { type: "string", format: "date-time" },
                 updatedAt: { type: "string", format: "date-time" },
                 members: {
@@ -395,44 +403,62 @@ export default async function projectRoutes(fastify: FastifyInstance) {
 
       const user = await db.user.findUnique({
         where: { id: getUser(request).userId },
-        include: {
-          projectMembers: {
-            include: {
-              Project: {
-                include: {
-                  Tenant: true,
-                },
-              },
-            },
-          },
-        },
       });
 
       if (!user) {
         return reply.status(404).send({ error: "User not found" });
       }
 
-      // Company admins see all company projects, regular users see only their projects
+      // Company admins see all company projects + projects they're members of (including cross-company)
+      // Regular users see only their projects (including cross-company)
       let projects;
       if (
         user.role === "CompanyAdministrator" ||
         user.role === "GlobalAdministrator"
       ) {
-        if (!user.tenantId) {
+        // Get project IDs from user's project memberships (including cross-company projects)
+        const projectMemberRecords = await db.projectMember.findMany({
+          where: { userId: user.id },
+          select: { projectId: true },
+        });
+        
+        const memberProjectIds = projectMemberRecords.map((pm) => pm.projectId);
+        
+        // Build where clause: projects from user's tenant OR projects user is a member of
+        const whereClause: any = {};
+        
+        if (user.tenantId) {
+          if (memberProjectIds.length > 0) {
+            // Admin sees: (projects from their tenant) OR (projects they're a member of)
+            whereClause.OR = [
+              { tenantId: user.tenantId },
+              { id: { in: memberProjectIds } },
+            ];
+          } else {
+            // No memberships, just show tenant projects
+            whereClause.tenantId = user.tenantId;
+          }
+        } else if (memberProjectIds.length > 0) {
+          // No tenant but has memberships
+          whereClause.id = { in: memberProjectIds };
+        } else {
+          // No tenant and no memberships
           return reply.send([]);
         }
+        
         projects = await db.project.findMany({
-          where: { tenantId: user.tenantId },
+          where: whereClause,
           include: {
-          ProjectMember: {
-            include: {
-              User: {
-                select: {
-                  id: true,
-                  email: true,
-                  name: true,
-                  firstName: true,
-                  lastName: true,
+            Tenant: true,
+            ProjectMember: {
+              include: {
+                User: {
+                  select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
@@ -441,19 +467,45 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           orderBy: { createdAt: "desc" },
         });
       } else {
-        const projectIds = user.projectMembers.map((pm) => pm.projectId);
+        // Get project IDs from user's project memberships (including cross-company projects)
+        // Always query ProjectMember directly to ensure we get all memberships
+        const projectMemberRecords = await db.projectMember.findMany({
+          where: { userId: user.id },
+          select: { projectId: true },
+        });
+        
+        const projectIds = projectMemberRecords.map((pm) => pm.projectId);
+        
+        // Log for debugging
+        request.log?.info({ 
+          userId: user.id, 
+          userEmail: user.email,
+          userRole: user.role,
+          projectMembersCount: projectMemberRecords.length,
+          projectIds,
+          projectMemberRecords: projectMemberRecords.map(pm => pm.projectId)
+        }, "Regular user project memberships - querying ProjectMember table");
+        
+        // If user has no project memberships, return empty array
+        if (projectIds.length === 0) {
+          request.log?.info({ userId: user.id }, "User has no project memberships");
+          return reply.send([]);
+        }
+        
+        // Query all projects with those IDs - no tenant filtering
         projects = await db.project.findMany({
           where: { id: { in: projectIds } },
           include: {
-          ProjectMember: {
-            include: {
-              User: {
-                select: {
-                  id: true,
-                  email: true,
-                  name: true,
-                  firstName: true,
-                  lastName: true,
+            Tenant: true,
+            ProjectMember: {
+              include: {
+                User: {
+                  select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    firstName: true,
+                    lastName: true,
                   },
                 },
               },
@@ -461,39 +513,78 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           },
           orderBy: { createdAt: "desc" },
         });
+        
+        // Log the projects found
+        request.log?.info({ 
+          userId: user.id,
+          projectsFound: projects.length,
+          projectIds: projects.map(p => ({ id: p.id, name: p.name, tenantId: p.tenantId }))
+        }, "Projects found for regular user");
       }
 
-      return reply.send(
-        projects.map((p) => ({
-          id: p.id,
-          name: p.name,
-          type: p.type,
-          startDate: p.startDate,
-          endDate: p.endDate,
-          logoData: p.logoData,
-          logoFileName: p.logoFileName,
-          logoFileType: p.logoFileType,
-          logoShape: p.logoShape,
-          logoPlacement: p.logoPlacement,
-          logoBorder: p.logoBorder,
-          bannerData: p.bannerData,
-          bannerFileName: p.bannerFileName,
-          bannerFileType: p.bannerFileType,
-          tenantId: p.tenantId,
-          createdAt: p.createdAt,
-          updatedAt: p.updatedAt,
-          members: "ProjectMember" in p && p.ProjectMember ? p.ProjectMember.map((m: any) => {
-            const user = m.User as { id: string; email: string; name: string | null; firstName: string | null; lastName: string | null };
-            return {
-              id: user.id,
-              email: user.email,
-              name: computeDisplayName(user),
-              firstName: user.firstName,
-              lastName: user.lastName,
-            };
-          }) : [],
-        }))
-      );
+      // Sort projects: company projects first (alphabetically), then cross-company projects (alphabetically)
+      const sortedProjects = [...projects].sort((a, b) => {
+        const aIsCompanyProject = a.tenantId === user.tenantId;
+        const bIsCompanyProject = b.tenantId === user.tenantId;
+        
+        // Company projects come first
+        if (aIsCompanyProject && !bIsCompanyProject) return -1;
+        if (!aIsCompanyProject && bIsCompanyProject) return 1;
+        
+        // Within each group, sort alphabetically by name
+        return a.name.localeCompare(b.name);
+      });
+
+      const response = sortedProjects
+        .filter((p) => p.id) // Filter out any projects without an ID (shouldn't happen, but safety check)
+        .map((p) => {
+          const projectWithTenant = p as any;
+          
+          // Debug logging to verify Tenant relation is loaded
+          request.log?.info({ 
+            projectId: p.id, 
+            hasTenant: !!projectWithTenant.Tenant,
+            tenantId: p.tenantId,
+            tenantName: projectWithTenant.Tenant?.name 
+          }, "Project tenant info");
+          
+          const tenant = projectWithTenant.Tenant 
+            ? { id: projectWithTenant.Tenant.id, name: projectWithTenant.Tenant.name }
+            : null;
+          
+          return {
+            id: p.id,
+            name: p.name,
+            type: p.type,
+            startDate: p.startDate,
+            endDate: p.endDate,
+            logoData: p.logoData,
+            logoFileName: p.logoFileName,
+            logoFileType: p.logoFileType,
+            logoShape: p.logoShape,
+            logoPlacement: p.logoPlacement,
+            logoBorder: p.logoBorder,
+            bannerData: p.bannerData,
+            bannerFileName: p.bannerFileName,
+            bannerFileType: p.bannerFileType,
+            tenantId: p.tenantId,
+            tenant: tenant,
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt,
+            members: "ProjectMember" in p && p.ProjectMember ? p.ProjectMember.map((m: any) => {
+              const user = m.User as { id: string; email: string; name: string | null; firstName: string | null; lastName: string | null };
+              return {
+                id: user.id,
+                email: user.email,
+                name: computeDisplayName(user),
+                firstName: user.firstName,
+                lastName: user.lastName,
+              };
+            }) : [],
+          };
+        });
+      
+      return reply.send(response);
     }
   );
 
@@ -538,6 +629,14 @@ export default async function projectRoutes(fastify: FastifyInstance) {
               bannerFileName: { type: "string", nullable: true },
               bannerFileType: { type: "string", nullable: true },
               tenantId: { type: "string", nullable: true },
+              tenant: {
+                type: "object",
+                nullable: true,
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                },
+              },
               createdAt: { type: "string", format: "date-time" },
               updatedAt: { type: "string", format: "date-time" },
               members: {
@@ -614,6 +713,20 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Project not found" });
       }
 
+      // Map tenant information
+      const projectWithTenant = project as any;
+      const tenant = projectWithTenant.Tenant 
+        ? { id: projectWithTenant.Tenant.id, name: projectWithTenant.Tenant.name }
+        : null;
+
+      // Debug logging to verify Tenant relation is loaded
+      request.log?.info({ 
+        projectId: project.id, 
+        hasTenant: !!projectWithTenant.Tenant,
+        tenantId: project.tenantId,
+        tenantName: projectWithTenant.Tenant?.name 
+      }, "Project tenant info (GET /:id)");
+
       return reply.send({
         id: project.id,
         name: project.name,
@@ -630,6 +743,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         bannerFileName: project.bannerFileName,
         bannerFileType: project.bannerFileType,
         tenantId: project.tenantId,
+        tenant: tenant,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
         members: (project.ProjectMember || []).map((m) => {
@@ -769,6 +883,22 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Get tenant to inherit default graphics
+      const tenant = await db.tenant.findUnique({
+        where: { id: currentUser.tenantId },
+        select: {
+          logoData: true,
+          logoFileName: true,
+          logoFileType: true,
+          logoShape: true,
+          logoPlacement: true,
+          logoBorder: true,
+          bannerData: true,
+          bannerFileName: true,
+          bannerFileType: true,
+        },
+      });
+
       const project = await db.project.create({
         data: {
           id: createId(),
@@ -777,6 +907,16 @@ export default async function projectRoutes(fastify: FastifyInstance) {
           startDate: body.startDate ? new Date(body.startDate) : null,
           endDate: body.endDate ? new Date(body.endDate) : null,
           tenantId: currentUser.tenantId,
+          // Inherit graphics from tenant if available
+          logoData: tenant?.logoData || null,
+          logoFileName: tenant?.logoFileName || null,
+          logoFileType: tenant?.logoFileType || null,
+          logoShape: tenant?.logoShape || null,
+          logoPlacement: tenant?.logoPlacement || null,
+          logoBorder: tenant?.logoBorder || null,
+          bannerData: tenant?.bannerData || null,
+          bannerFileName: tenant?.bannerFileName || null,
+          bannerFileType: tenant?.bannerFileType || null,
           updatedAt: new Date(),
           ProjectMember: {
             create: (body.memberIds?.map((userId) => ({
@@ -836,8 +976,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     {
       preHandler: [
         authenticate,
-        requireTenant,
-        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+        requireProjectAdmin(),
       ],
       schema: {
         description: "Add members to a project. Requires CompanyAdministrator or GlobalAdministrator role. Automatically sends email notifications to newly added members.",
@@ -889,6 +1028,11 @@ export default async function projectRoutes(fastify: FastifyInstance) {
                   },
                 },
               },
+              warning: {
+                type: "string",
+                nullable: true,
+                description: "Warning message if members from different tenant were added",
+              },
             },
             description: "Project with updated members list",
           },
@@ -927,13 +1071,10 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       const currentUser = getUser(request);
       const projectId = request.params.id;
 
-      if (!currentUser.tenantId) {
-        return reply.status(403).send({ error: "Tenant required" });
-      }
-
       const body = addProjectMembersSchema.parse(request.body);
 
-      // Verify project exists and belongs to same tenant
+      // Note: requireProjectAdmin middleware already verified project exists and user has admin access
+      // Fetch project with members for the logic below
       const project = await db.project.findUnique({
         where: { id: projectId },
         include: { ProjectMember: true },
@@ -943,27 +1084,42 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Project not found" });
       }
 
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Note: requireProjectAdmin middleware already verified:
+      // - User is GlobalAdministrator OR
+      // - User is CompanyAdministrator from the same tenant as the project
+      // So we can safely proceed with admin operations
 
-      // Verify all member IDs belong to the same tenant
-      const members = await db.user.findMany({
+      // Verify all member IDs exist
+      const allMembers = await db.user.findMany({
         where: {
           id: { in: body.memberIds },
-          tenantId: currentUser.tenantId,
         },
       });
 
-      if (members.length !== body.memberIds.length) {
-        return reply.status(400).send({ error: "Some members not found or belong to different tenant" });
+      if (allMembers.length !== body.memberIds.length) {
+        return reply.status(400).send({ error: "Some members not found" });
+      }
+
+      // Check if any members belong to different tenant
+      const sameTenantMembers = allMembers.filter((m) => m.tenantId === project.tenantId);
+      const differentTenantMembers = allMembers.filter((m) => m.tenantId !== project.tenantId);
+      let warning: string | null = null;
+
+      if (differentTenantMembers.length > 0) {
+        // Only Global Administrators can add members from different tenants
+        if (currentUser.role === "GlobalAdministrator") {
+          warning = "Some members belong to a different tenant. They have been added to the project.";
+        } else {
+          // Company Administrators can only add members from their own tenant
+          return reply.status(400).send({ error: "Some members belong to a different tenant. Company Administrators can only add members from their own company." });
+        }
       }
 
       // Get existing member IDs to avoid duplicates
       const existingMemberIds = project.ProjectMember.map((m) => m.userId);
       const newMemberIds = body.memberIds.filter((id) => !existingMemberIds.includes(id));
 
-      // Add new members
+      // Add new members (including those from different tenants if admin)
       if (newMemberIds.length > 0) {
         await db.projectMember.createMany({
           data: newMemberIds.map((userId) => ({
@@ -974,7 +1130,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         });
 
         // Send email notifications for newly added members
-        const newMembers = members.filter((m) => newMemberIds.includes(m.id));
+        const newMembers = allMembers.filter((m) => newMemberIds.includes(m.id));
         for (const member of newMembers) {
           notifyUserAddedToProject(member.email, project.name);
         }
@@ -1004,7 +1160,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "Project not found after update" });
       }
 
-      return reply.send({
+      const response: any = {
         id: updatedProject.id,
         name: updatedProject.name,
         type: updatedProject.type,
@@ -1026,7 +1182,14 @@ export default async function projectRoutes(fastify: FastifyInstance) {
             lastName: user.lastName,
           };
         }),
-      });
+      };
+
+      // Include warning if members from different tenant were added
+      if (warning) {
+        response.warning = warning;
+      }
+
+      return reply.send(response);
     }
   );
 
@@ -1040,8 +1203,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     {
       preHandler: [
         authenticate,
-        requireTenant,
-        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+        requireProjectAdmin(),
       ],
       schema: {
         description: "Remove members from a project. Requires CompanyAdministrator or GlobalAdministrator role. Prevents removal if it would leave the project with no administrators.",
@@ -1131,30 +1293,28 @@ export default async function projectRoutes(fastify: FastifyInstance) {
       const currentUser = getUser(request);
       const projectId = request.params.id;
 
-      if (!currentUser.tenantId) {
-        return reply.status(403).send({ error: "Tenant required" });
-      }
-
       const body = request.body;
       if (!body.memberIds || !Array.isArray(body.memberIds) || body.memberIds.length === 0) {
         return reply.status(400).send({ error: "memberIds array is required" });
       }
 
-      // Verify project exists and belongs to same tenant
+      // Note: requireProjectAdmin middleware already verified project exists and user has admin access
+      // Fetch project for the logic below
       const project = await db.project.findUnique({
         where: { id: projectId },
-        include: { ProjectMember: true },
+        select: { id: true, tenantId: true },
       });
 
       if (!project) {
         return reply.status(404).send({ error: "Project not found" });
       }
 
-      if (project.tenantId !== currentUser.tenantId) {
-        return reply.status(403).send({ error: "Access denied" });
-      }
+      // Note: requireProjectAdmin middleware already verified:
+      // - User is GlobalAdministrator OR
+      // - User is CompanyAdministrator from the same tenant as the project
+      // So we can safely proceed with admin operations
 
-      // Get current project members with their user roles
+      // Get current project members with their user roles and tenant info
       const currentMembers = await db.projectMember.findMany({
         where: { projectId },
         include: {
@@ -1162,25 +1322,42 @@ export default async function projectRoutes(fastify: FastifyInstance) {
             select: {
               id: true,
               role: true,
+              tenantId: true,
             },
           },
         },
       });
 
+      // Check if current user is trying to remove themselves
+      const isRemovingSelf = body.memberIds.includes(currentUser.userId);
+      
       // Check if any of the members being removed are admins
+      // For Company Admins, only count admins from the same tenant as the project
+      // For Global Admins, count all admins
       const membersToRemove = currentMembers.filter((m) => body.memberIds.includes(m.userId));
-      const adminMembersToRemove = membersToRemove.filter(
-        (m) => m.User.role === "CompanyAdministrator" || m.User.role === "GlobalAdministrator"
-      );
+      const adminMembersToRemove = membersToRemove.filter((m) => {
+        if (m.User.role === "GlobalAdministrator") return true;
+        if (m.User.role === "CompanyAdministrator" && m.User.tenantId === project.tenantId) return true;
+        return false;
+      });
 
       // Count remaining admin members after removal
+      // Only count admins that are relevant for the project's tenant
       const remainingAdminMembers = currentMembers.filter(
         (m) =>
           !body.memberIds.includes(m.userId) &&
-          (m.User.role === "CompanyAdministrator" || m.User.role === "GlobalAdministrator")
+          (m.User.role === "GlobalAdministrator" || 
+           (m.User.role === "CompanyAdministrator" && m.User.tenantId === project.tenantId))
       );
 
-      // Prevent removal if it would leave no admin members
+      // Prevent the last admin from removing themselves
+      if (isRemovingSelf && remainingAdminMembers.length === 0) {
+        return reply.status(400).send({
+          error: "You cannot remove yourself from the project. You are the last remaining administrator. A project must have at least one administrator.",
+        });
+      }
+
+      // Prevent removal if it would leave no admin members (for removing other admins)
       if (adminMembersToRemove.length > 0 && remainingAdminMembers.length === 0) {
         return reply.status(400).send({
           error: "Cannot remove the last company administrator from the project. A project must have at least one administrator.",
@@ -2754,8 +2931,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     {
       preHandler: [
         authenticate,
-        requireTenant,
-        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+        requireProjectAdmin(),
       ],
       schema: {
         description: "Update a project. Requires CompanyAdministrator or GlobalAdministrator role. All fields are optional - only provided fields are updated.",
@@ -2949,8 +3125,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     {
       preHandler: [
         authenticate,
-        requireTenant,
-        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+        requireProjectAdmin(),
       ],
       schema: {
         description: "Delete a project. Requires CompanyAdministrator or GlobalAdministrator role. Cascades to delete all phases, tasks, and related data.",
@@ -3046,8 +3221,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     {
       preHandler: [
         authenticate,
-        requireTenant,
-        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+        requireProjectAdmin(),
       ],
       schema: {
         description: "Update project graphics (logo and/or banner). Requires CompanyAdministrator or GlobalAdministrator role. All fields are optional - only provided fields are updated.",
@@ -3292,8 +3466,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     {
       preHandler: [
         authenticate,
-        requireTenant,
-        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+        requireProjectAdmin(),
       ],
       schema: {
         description: "Delete project logo. Requires CompanyAdministrator or GlobalAdministrator role.",
@@ -3394,8 +3567,7 @@ export default async function projectRoutes(fastify: FastifyInstance) {
     {
       preHandler: [
         authenticate,
-        requireTenant,
-        requireRole(["CompanyAdministrator", "GlobalAdministrator"]),
+        requireProjectAdmin(),
       ],
       schema: {
         description: "Delete project banner. Requires CompanyAdministrator or GlobalAdministrator role.",

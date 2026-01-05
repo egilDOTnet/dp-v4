@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, RFP, ProjectVendor, Project } from "@/lib/api";
@@ -26,8 +26,18 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
   const [_isSavingAlternativeContact, setIsSavingAlternativeContact] = useState(false);
   const [impersonatingContactId, setImpersonatingContactId] = useState<string | null>(null);
   const [scheduleItems, setScheduleItems] = useState<RFPScheduleItem[]>([]);
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
+  const scheduleLoadingRef = useRef(false);
+  const lastScheduleLoadKeyRef = useRef<string>("");
+  const initialLoadCompleteRef = useRef(false);
 
-  const isAdmin = user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
+  // Check if user is a project admin for THIS specific project
+  // Global Admins are always project admins
+  // Company Admins are only project admins if their tenant matches the project's tenant
+  const isProjectAdmin =
+    user?.role === "GlobalAdministrator" ||
+    (user?.role === "CompanyAdministrator" && user?.tenantId === project?.tenantId);
 
   // Convert project members to ContactPerson format
   const contactOptions: ContactPerson[] = (project?.members || []).map((member) => ({
@@ -59,42 +69,108 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
       }
     : null;
 
+  // Load data when projectId changes
   useEffect(() => {
-    loadData();
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `overview-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    // Reset initial load flag when projectId changes
+    initialLoadCompleteRef.current = false;
+    lastScheduleLoadKeyRef.current = "";
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
+    Promise.all([
+      api.projects.vendors.list(projectId),
+      api.rfp.questions.list(projectId, "unanswered"),
+      api.rfp.schedule.list(projectId),
+    ])
+      .then(([vendorsData, questionsData, scheduleData]) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          // Filter vendors to only show those marked as shallReceiveRFP
+          const filteredVendors = vendorsData.filter((pv) => pv.vendor.shallReceiveRFP);
+          setVendors(filteredVendors);
+          setUnansweredCount(questionsData.length);
+          setScheduleItems(scheduleData);
+          // Mark initial load as complete and set initial schedule key
+          initialLoadCompleteRef.current = true;
+          if (rfp) {
+            const initialScheduleKey = `schedule-${projectId}-${rfp.publishDate || ""}-${rfp.deliveryDate || ""}`;
+            lastScheduleLoadKeyRef.current = initialScheduleKey;
+          }
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          console.error("Error loading overview data:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
   }, [projectId]);
 
-  // Reload schedule items when RFP changes (e.g., after schedule updates)
+  // Reload schedule items when RFP dates change (but not on initial load)
   useEffect(() => {
-    const loadScheduleItems = async () => {
-      try {
-        const scheduleData = await api.rfp.schedule.list(projectId);
-        setScheduleItems(scheduleData);
-      } catch (err: any) {
-        console.error("Error loading schedule items:", err);
-      }
-    };
-    loadScheduleItems();
-  }, [projectId, rfp.publishDate, rfp.deliveryDate]);
+    if (!projectId || !rfp) return;
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [vendorsData, questionsData, scheduleData] = await Promise.all([
-        api.projects.vendors.list(projectId),
-        api.rfp.questions.list(projectId, "unanswered"),
-        api.rfp.schedule.list(projectId),
-      ]);
-      // Filter vendors to only show those marked as shallReceiveRFP
-      const filteredVendors = vendorsData.filter((pv) => pv.vendor.shallReceiveRFP);
-      setVendors(filteredVendors);
-      setUnansweredCount(questionsData.length);
-      setScheduleItems(scheduleData);
-    } catch (err: any) {
-      console.error("Error loading overview data:", err);
-    } finally {
-      setLoading(false);
+    // Create a unique key for this schedule load based on dates
+    const scheduleLoadKey = `schedule-${projectId}-${rfp.publishDate || ""}-${rfp.deliveryDate || ""}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (scheduleLoadingRef.current && lastScheduleLoadKeyRef.current === scheduleLoadKey) {
+      return;
     }
-  };
+
+    // Skip if initial load hasn't completed yet (schedule will be loaded by main effect)
+    if (!initialLoadCompleteRef.current) {
+      return;
+    }
+
+    // Skip if this is the same key as the last load (dates haven't changed)
+    if (lastScheduleLoadKeyRef.current === scheduleLoadKey) {
+      return;
+    }
+
+    scheduleLoadingRef.current = true;
+    lastScheduleLoadKeyRef.current = scheduleLoadKey;
+
+    api.rfp.schedule
+      .list(projectId)
+      .then((scheduleData) => {
+        // Only update if this is still the current load
+        if (lastScheduleLoadKeyRef.current === scheduleLoadKey) {
+          setScheduleItems(scheduleData);
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastScheduleLoadKeyRef.current === scheduleLoadKey) {
+          console.error("Error loading schedule items:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastScheduleLoadKeyRef.current === scheduleLoadKey) {
+          scheduleLoadingRef.current = false;
+        }
+      });
+  }, [projectId, rfp?.publishDate, rfp?.deliveryDate]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -184,7 +260,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
   };
 
   const handleImpersonate = async (contactPersonId: string) => {
-    if (!isAdmin) return;
+    if (!isProjectAdmin) return;
     
     try {
       setImpersonatingContactId(contactPersonId);
@@ -319,7 +395,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
         <CardBody>
           <h2 className="text-xl font-semibold mb-4">Vendors</h2>
           {vendors.length === 0 ? (
-            <p className="text-text-secondary">Only vendors marked as 'shall receive RFP' will appear here.</p>
+            <p className="text-text-secondary">Only vendors marked as 'Shall receive RFP' will appear here.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -328,7 +404,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
                   <TableHead>Main Contact</TableHead>
                   <TableHead>Last Logged In</TableHead>
                   <TableHead>Status</TableHead>
-                  {isAdmin && <TableHead>Actions</TableHead>}
+                  {isProjectAdmin && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -353,7 +429,7 @@ export default function RFPOverview({ projectId, rfp, project, onTabChange, onRf
                       <TableCell>
                         <Badge variant={getVendorStatusColor(pv.status)}>{formatVendorStatus(pv.status)}</Badge>
                       </TableCell>
-                      {isAdmin && (
+                      {isProjectAdmin && (
                         <TableCell>
                           {mainContact ? (
                             <Button

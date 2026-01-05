@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, RFP, RFPAnnouncement } from "@/lib/api";
 import { Button, Card, CardBody, CardHeader, EmptyState } from "@/components/ui";
 import { formatISODateTime } from "@/lib/utils";
@@ -17,20 +17,77 @@ export default function RFPAnnouncements({ projectId }: RFPAnnouncementsProps) {
   const [showModal, setShowModal] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<RFPAnnouncement | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
 
   useEffect(() => {
-    loadAnnouncements();
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `announcements-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
+    api.rfp.announcements
+      .list(projectId)
+      .then((data) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setAnnouncements(data);
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          console.error("Error loading announcements:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
   }, [projectId]);
 
   const loadAnnouncements = async () => {
+    // Create a unique key for this load
+    const loadKey = `announcements-${projectId}`;
+    
+    // Prevent duplicate calls
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
     try {
-      setLoading(true);
       const data = await api.rfp.announcements.list(projectId);
-      setAnnouncements(data);
+      // Only update if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setAnnouncements(data);
+      }
     } catch (err: any) {
-      console.error("Error loading announcements:", err);
+      // Only log error if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        console.error("Error loading announcements:", err);
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   };
 

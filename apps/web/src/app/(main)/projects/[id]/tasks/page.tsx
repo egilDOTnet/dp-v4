@@ -21,7 +21,14 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isCreatingNewTask, setIsCreatingNewTask] = useState(false);
-  const loadingProjectIdRef = useRef<string | null>(null);
+  const projectLoadingRef = useRef(false);
+  const lastProjectLoadKeyRef = useRef<string>("");
+  const phasesLoadingRef = useRef(false);
+  const lastPhasesLoadKeyRef = useRef<string>("");
+  const tasksLoadingRef = useRef(false);
+  const lastTasksLoadKeyRef = useRef<string>("");
+  const initialLoadingRef = useRef(false);
+  const lastInitialLoadKeyRef = useRef<string>("");
 
   // Search functionality for tasks
   const { searchTerm, setSearchTerm, filteredItems: filteredTasks, clearSearch, isSearching } =
@@ -33,25 +40,56 @@ export default function TasksPage() {
   const displayTasks = isSearching ? filteredTasks : tasks;
 
   const loadProject = useCallback(async () => {
+    if (!projectId) return;
+
+    // Create a unique key for this load
+    const loadKey = `project-${projectId}`;
+    
+    // Prevent duplicate calls
+    if (projectLoadingRef.current && lastProjectLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    projectLoadingRef.current = true;
+    lastProjectLoadKeyRef.current = loadKey;
+
     try {
       const data = await api.projects.get(projectId);
-      // Only update state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Only update if this is still the current load
+      if (lastProjectLoadKeyRef.current === loadKey) {
         setProject(data);
       }
     } catch (err: any) {
-      // Only set error if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Only set error if this is still the current load
+      if (lastProjectLoadKeyRef.current === loadKey) {
         setError(err.message || "Failed to load project");
+      }
+    } finally {
+      // Only update loading state if this is still the current load
+      if (lastProjectLoadKeyRef.current === loadKey) {
+        projectLoadingRef.current = false;
       }
     }
   }, [projectId]);
 
   const loadPhases = useCallback(async () => {
+    if (!projectId) return;
+
+    // Create a unique key for this load
+    const loadKey = `phases-${projectId}`;
+    
+    // Prevent duplicate calls
+    if (phasesLoadingRef.current && lastPhasesLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    phasesLoadingRef.current = true;
+    lastPhasesLoadKeyRef.current = loadKey;
+
     try {
       const data = await api.projects.phases.list(projectId);
-      // Only update state if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
+      // Only update if this is still the current load
+      if (lastPhasesLoadKeyRef.current === loadKey) {
         setPhases(data);
         // If phase parameter is provided in URL, use it
         if (phaseParam && data.some(p => p.id === phaseParam)) {
@@ -67,42 +105,88 @@ export default function TasksPage() {
         }
       }
     } catch (err: any) {
-      console.error("Failed to load phases:", err);
+      // Only log error if this is still the current load
+      if (lastPhasesLoadKeyRef.current === loadKey) {
+        console.error("Failed to load phases:", err);
+      }
       // Error handling is silent for phases to not block the UI
+    } finally {
+      // Only update loading state if this is still the current load
+      if (lastPhasesLoadKeyRef.current === loadKey) {
+        phasesLoadingRef.current = false;
+      }
     }
   }, [projectId, phaseParam, selectedPhaseId]);
 
   const loadTasks = useCallback((phaseId: string) => {
+    if (!projectId || !phaseId) return;
+
+    // Create a unique key for this load
+    const loadKey = `tasks-${projectId}-${phaseId}`;
+    
+    // Prevent duplicate calls
+    if (tasksLoadingRef.current && lastTasksLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    tasksLoadingRef.current = true;
+    lastTasksLoadKeyRef.current = loadKey;
+
     api.projects.phases
       .getTasks(projectId, phaseId)
       .then((data) => {
-        setTasks(data);
+        // Only update if this is still the current load
+        if (lastTasksLoadKeyRef.current === loadKey) {
+          setTasks(data);
+        }
       })
       .catch((err) => {
-        console.error("Failed to load tasks:", err);
+        // Only log error if this is still the current load
+        if (lastTasksLoadKeyRef.current === loadKey) {
+          console.error("Failed to load tasks:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastTasksLoadKeyRef.current === loadKey) {
+          tasksLoadingRef.current = false;
+        }
       });
   }, [projectId]);
 
   useEffect(() => {
-    // Prevent duplicate calls (React Strict Mode protection)
-    if (loadingProjectIdRef.current === projectId) {
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `initial-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (initialLoadingRef.current && lastInitialLoadKeyRef.current === loadKey) {
       return;
     }
-    
-    loadingProjectIdRef.current = projectId;
+
+    initialLoadingRef.current = true;
+    lastInitialLoadKeyRef.current = loadKey;
     setLoading(true);
+    setError("");
+
     Promise.all([
       loadProject(),
       loadPhases()
-    ]).finally(() => {
-      // Only clear if we're still loading the same projectId
-      if (loadingProjectIdRef.current === projectId) {
-        setLoading(false);
-        loadingProjectIdRef.current = null;
-      }
-    });
-    // No cleanup needed - the ref check at the start handles projectId changes
-    // and the finally block clears it when load completes
+    ])
+      .catch((err) => {
+        // Only set error if this is still the current load
+        if (lastInitialLoadKeyRef.current === loadKey) {
+          setError(err.message || "Failed to load data");
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastInitialLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          initialLoadingRef.current = false;
+        }
+      });
   }, [projectId, loadProject, loadPhases]);
 
   useEffect(() => {
@@ -145,7 +229,6 @@ export default function TasksPage() {
 
   const breadcrumbItems = [
     { label: "Home", href: "/dashboard?noAutoRedirect=true" },
-    { label: "Projects", href: "/projects" },
     { label: project.name, href: `/projects/${projectId}` },
     { label: "Tasks" },
   ];

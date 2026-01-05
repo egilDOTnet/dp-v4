@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { ImageCropper } from "./ImageCropper";
+import { generateRandomBanner } from "@/lib/banner-generator";
 
 interface GraphicsUploadProps {
   type: "logo" | "banner";
@@ -26,13 +27,20 @@ export function GraphicsUpload({
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [color1, setColor1] = useState("#65d405");
+  const [color2, setColor2] = useState("#0891b2");
+  const [color3, setColor3] = useState("#ffcf33");
+  const [useRandomColor1, setUseRandomColor1] = useState(false);
+  const [useRandomColor2, setUseRandomColor2] = useState(false);
+  const [useRandomColor3, setUseRandomColor3] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isLogo = type === "logo";
-  const acceptedFormats = isLogo ? ".jpg,.jpeg,.gif,.svg,.png" : ".jpg,.jpeg,.png";
+  const acceptedFormats = isLogo ? ".jpg,.jpeg,.gif,.svg,.png" : ".jpg,.jpeg,.svg,.png";
   const acceptedMimeTypes = isLogo
     ? ["image/jpeg", "image/jpg", "image/gif", "image/svg+xml", "image/png"]
-    : ["image/jpeg", "image/jpg", "image/png"];
+    : ["image/jpeg", "image/jpg", "image/svg+xml", "image/png"];
   const maxWidth = isLogo ? 500 : 2000;
   const maxHeight = isLogo ? 500 : 2000;
   const recommendedFormat = isLogo ? "PNG" : "PNG or JPG";
@@ -184,6 +192,60 @@ export function GraphicsUpload({
     setPreview(null);
   };
 
+  /**
+   * Converts a data URL to a File object
+   */
+  const dataURLtoFile = (dataUrl: string, filename: string, mimeType: string): File => {
+    // Handle SVG data URLs (they use URI encoding, not base64)
+    if (dataUrl.startsWith('data:image/svg+xml')) {
+      const svgContent = decodeURIComponent(dataUrl.split(',')[1] || '');
+      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+      return new File([blob], filename, { type: 'image/svg+xml' });
+    }
+    
+    // Handle base64 encoded images (PNG, JPEG, etc.)
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || mimeType;
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
+
+  /**
+   * Handles random banner generation
+   */
+  const handleGenerateBanner = async () => {
+    if (isLogo) return; // Only for banners
+    
+    setError("");
+    setGenerating(true);
+    
+    try {
+      const finalColor1 = useRandomColor1 ? null : color1;
+      const finalColor2 = useRandomColor2 ? null : color2;
+      const finalColor3 = useRandomColor3 ? null : color3;
+      
+      // Generate as PNG so it can go through cropping flow
+      const dataUrl = await generateRandomBanner(finalColor1, finalColor2, finalColor3, maxWidth, maxHeight, 'png');
+      
+      // Create a synthetic File object for the generated banner
+      const generatedFile = dataURLtoFile(dataUrl, `banner-${Date.now()}.png`, "image/png");
+      
+      // Set file and preview, then show cropper (same as uploaded PNG files)
+      setFile(generatedFile);
+      setPreview(dataUrl);
+      setShowCropper(true);
+    } catch (err: any) {
+      setError(err.message || "Failed to generate banner");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm(`Are you sure you want to delete the ${type}?`)) {
       return;
@@ -255,6 +317,123 @@ export function GraphicsUpload({
   // Show upload container
   return (
     <div className="space-y-4">
+      {/* Random Banner Generator - Only for banners */}
+      {!isLogo && (
+        <div className="border border-border-primary rounded-lg p-4 bg-background-secondary">
+          <div className="space-y-4">
+            <div className="text-sm font-medium text-text-primary">
+              Create Random Abstract Banner
+            </div>
+            <div className="text-xs text-text-secondary mb-3">
+              Generate a unique abstract banner with flowing curves and organic shapes
+            </div>
+            
+            {/* Color Pickers */}
+            <div className="grid grid-cols-3 gap-4">
+              {/* Color 1 */}
+              <div className="space-y-2">
+                <label className="text-xs text-text-secondary">Color 1</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={useRandomColor1}
+                    onChange={(e) => setUseRandomColor1(e.target.checked)}
+                    className="w-4 h-4 accent-primary-600"
+                  />
+                  <span className="text-xs text-text-secondary">Random</span>
+                </div>
+                {!useRandomColor1 && (
+                  <input
+                    type="color"
+                    value={color1}
+                    onChange={(e) => setColor1(e.target.value)}
+                    className="w-full h-10 rounded border border-border-primary cursor-pointer"
+                    disabled={useRandomColor1}
+                  />
+                )}
+                {useRandomColor1 && (
+                  <div className="w-full h-10 rounded border border-border-primary bg-background-tertiary flex items-center justify-center">
+                    <span className="text-xs text-text-tertiary">Random</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Color 2 */}
+              <div className="space-y-2">
+                <label className="text-xs text-text-secondary">Color 2</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={useRandomColor2}
+                    onChange={(e) => setUseRandomColor2(e.target.checked)}
+                    className="w-4 h-4 accent-primary-600"
+                  />
+                  <span className="text-xs text-text-secondary">Random</span>
+                </div>
+                {!useRandomColor2 && (
+                  <input
+                    type="color"
+                    value={color2}
+                    onChange={(e) => setColor2(e.target.value)}
+                    className="w-full h-10 rounded border border-border-primary cursor-pointer"
+                    disabled={useRandomColor2}
+                  />
+                )}
+                {useRandomColor2 && (
+                  <div className="w-full h-10 rounded border border-border-primary bg-background-tertiary flex items-center justify-center">
+                    <span className="text-xs text-text-tertiary">Random</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Color 3 */}
+              <div className="space-y-2">
+                <label className="text-xs text-text-secondary">Color 3</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={useRandomColor3}
+                    onChange={(e) => setUseRandomColor3(e.target.checked)}
+                    className="w-4 h-4 accent-primary-600"
+                  />
+                  <span className="text-xs text-text-secondary">Random</span>
+                </div>
+                {!useRandomColor3 && (
+                  <input
+                    type="color"
+                    value={color3}
+                    onChange={(e) => setColor3(e.target.value)}
+                    className="w-full h-10 rounded border border-border-primary cursor-pointer"
+                    disabled={useRandomColor3}
+                  />
+                )}
+                {useRandomColor3 && (
+                  <div className="w-full h-10 rounded border border-border-primary bg-background-tertiary flex items-center justify-center">
+                    <span className="text-xs text-text-tertiary">Random</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Generate Button */}
+            <button
+              onClick={handleGenerateBanner}
+              disabled={generating}
+              className="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+            >
+              {generating ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Generating...
+                </span>
+              ) : (
+                "Create Random Banner"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div
         className="relative border-2 border-dashed border-border-primary rounded-lg p-6 text-center hover:border-primary-500 transition-colors cursor-pointer"
         onMouseDown={(e) => {
@@ -316,6 +495,7 @@ export function GraphicsUpload({
     </div>
   );
 }
+
 
 
 

@@ -82,7 +82,6 @@ export default function ProjectDashboardPage() {
 
   const breadcrumbItems = [
     { label: "Home", href: "/dashboard?noAutoRedirect=true" },
-    { label: "Projects", href: "/projects" },
     { label: project.name },
   ];
 

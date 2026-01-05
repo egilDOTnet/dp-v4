@@ -19,9 +19,45 @@ export default function RFPChangelog({ projectId, rfp }: RFPChangelogProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const descriptionTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
 
   useEffect(() => {
-    loadChangelog();
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `changelog-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
+    api.rfp.changelog
+      .list(projectId)
+      .then((data) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setEntries(data);
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          console.error("Error loading changelog:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
   }, [projectId]);
 
   // Initialize form data for all entries when they change
@@ -37,14 +73,35 @@ export default function RFPChangelog({ projectId, rfp }: RFPChangelogProps) {
   }, [entries]);
 
   const loadChangelog = async () => {
+    // Create a unique key for this load
+    const loadKey = `changelog-${projectId}`;
+    
+    // Prevent duplicate calls
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
     try {
-      setLoading(true);
       const data = await api.rfp.changelog.list(projectId);
-      setEntries(data);
+      // Only update if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setEntries(data);
+      }
     } catch (err: any) {
-      console.error("Error loading changelog:", err);
+      // Only log error if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        console.error("Error loading changelog:", err);
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   };
 

@@ -59,8 +59,12 @@ export default function ProjectLayout({
     prevPathnameRef.current = pathname || null;
   }, [pathname, closeMobileMenu]);
 
-  const isAdmin =
-    user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
+  // Check if user is a project admin for THIS specific project
+  // Global Admins are always project admins
+  // Company Admins are only project admins if their tenant matches the project's tenant
+  const isProjectAdmin =
+    user?.role === "GlobalAdministrator" ||
+    (user?.role === "CompanyAdministrator" && user?.tenantId === project?.tenantId);
 
   if (loading) {
     return (
@@ -158,25 +162,26 @@ export default function ProjectLayout({
             })}
           </nav>
 
-          {/* Full-width divider before Manage Project */}
-          <div className="border-t border-border-primary"></div>
-
           {/* Project Actions */}
-          <div className="p-4">
-            {isAdmin && (
-              <Link
-                href={`/projects/${projectId}/manage`}
-                className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isManagePage
-                    ? "bg-primary-50 text-primary-700 border-l-4 border-primary-600"
-                    : "text-text-primary hover:bg-background-primary"
-                }`}
-                onClick={closeMobileMenu}
-              >
-                Manage Project
-              </Link>
-            )}
-          </div>
+          {isProjectAdmin && (
+            <>
+              {/* Full-width divider before Manage Project */}
+              <div className="border-t border-border-primary"></div>
+              <div className="p-4">
+                <Link
+                  href={`/projects/${projectId}/manage`}
+                  className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isManagePage
+                      ? "bg-primary-50 text-primary-700 border-l-4 border-primary-600"
+                      : "text-text-primary hover:bg-background-primary"
+                  }`}
+                  onClick={closeMobileMenu}
+                >
+                  Manage Project
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 

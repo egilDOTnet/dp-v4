@@ -81,6 +81,8 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
   const docRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const editFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const descriptionInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -88,7 +90,41 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
   );
 
   useEffect(() => {
-    loadDocuments();
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `documents-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
+    api.rfp.documents
+      .list(projectId)
+      .then((data) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setDocuments(data);
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          console.error("Error loading documents:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
   }, [projectId]);
 
   // Initialize form data for all documents when they change
@@ -175,14 +211,35 @@ export default function RFPDocuments({ projectId, rfp: _rfp }: RFPDocumentsProps
   }, [isCreatingNew, editingFields, formData, documents]);
 
   const loadDocuments = async () => {
+    // Create a unique key for this load
+    const loadKey = `documents-${projectId}`;
+    
+    // Prevent duplicate calls
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
     try {
-      setLoading(true);
       const data = await api.rfp.documents.list(projectId);
-      setDocuments(data);
+      // Only update if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setDocuments(data);
+      }
     } catch (err: any) {
-      console.error("Error loading documents:", err);
+      // Only log error if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        console.error("Error loading documents:", err);
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   };
 

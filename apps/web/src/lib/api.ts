@@ -147,6 +147,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     getCompanyUsers: () => apiRequest<User[]>("/api/users/company"),
+    lookupByEmail: (email: string) => apiRequest<User | null>(`/api/users/lookup?email=${encodeURIComponent(email)}`),
     create: (data: { email: string; firstName: string; lastName: string }) =>
       apiRequest<User>("/api/users", {
         method: "POST",
@@ -1573,6 +1574,68 @@ export const api = {
         }),
     },
   },
+  company: {
+    getSettings: () =>
+      apiRequest<{
+        id: string;
+        name: string;
+        organizationNumber?: string | null;
+        emailDomain?: string | null;
+        subscriptionStatus: "Trial" | "Active" | "Expired";
+        subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null;
+        subscriptionExpiresAt?: string | null;
+        trialStartedAt?: string | null;
+        logoData?: string | null;
+        logoFileName?: string | null;
+        logoFileType?: string | null;
+        logoShape?: string | null;
+        logoPlacement?: string | null;
+        logoBorder?: string | null;
+        bannerData?: string | null;
+        bannerFileName?: string | null;
+        bannerFileType?: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>("/api/company/settings"),
+    updateSettings: (data: {
+      name?: string;
+      organizationNumber?: string | null;
+      emailDomain?: string | null;
+      logoData?: string | null;
+      logoFileName?: string | null;
+      logoFileType?: string | null;
+      logoShape?: string | null;
+      logoPlacement?: string | null;
+      logoBorder?: string | null;
+      bannerData?: string | null;
+      bannerFileName?: string | null;
+      bannerFileType?: string | null;
+    }) =>
+      apiRequest<{
+        id: string;
+        name: string;
+        organizationNumber?: string | null;
+        emailDomain?: string | null;
+        subscriptionStatus: "Trial" | "Active" | "Expired";
+        subscriptionTier?: "Projects1" | "Projects2" | "Projects5" | "Unlimited" | null;
+        subscriptionExpiresAt?: string | null;
+        trialStartedAt?: string | null;
+        logoData?: string | null;
+        logoFileName?: string | null;
+        logoFileType?: string | null;
+        logoShape?: string | null;
+        logoPlacement?: string | null;
+        logoBorder?: string | null;
+        bannerData?: string | null;
+        bannerFileName?: string | null;
+        bannerFileType?: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>("/api/company/settings", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
   admin: {
     referenceCheckTemplate: {
       get: () => apiRequest<ReferenceCheckTemplate>("/api/admin/reference-check-template"),
@@ -1780,8 +1843,10 @@ export interface Project {
   bannerFileName: string | null;
   bannerFileType: string | null;
   tenantId: string;
+  tenant?: { id: string; name: string };
   createdAt: string;
   updatedAt: string;
+  warning?: string | null;
   members?: Array<{
     id: string;
     email: string;

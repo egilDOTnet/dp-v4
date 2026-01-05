@@ -68,7 +68,7 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
 
   // Load phases when dataType is "tasks" (only for projects)
   useEffect(() => {
-    if (dataType === "tasks" && open && target.type === "project") {
+    if (dataType === "tasks" && open && target?.type === "project") {
       api.projects.phases.list(target.id)
         .then(setPhases)
         .catch((err) => {
@@ -79,7 +79,7 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
 
   // Reset state when dialog closes, or auto-set for templates
   useEffect(() => {
-    if (!open) {
+    if (!open || !target) {
       setStep("select-type");
       setDataType(null);
       setFile(null);
@@ -95,7 +95,7 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({
       setDataType("requirements");
       setStep("select-file");
     }
-  }, [open, target.type]);
+  }, [open, target?.type]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];

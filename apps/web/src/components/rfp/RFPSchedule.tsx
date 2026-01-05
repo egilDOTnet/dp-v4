@@ -28,22 +28,77 @@ export default function RFPSchedule({ projectId, rfp, onRfpUpdate }: RFPSchedule
     type: "CustomDate" as RFPScheduleItem["type"],
   });
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
 
   useEffect(() => {
-    if (rfp) {
-      loadSchedule();
+    if (!projectId || !rfp) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `schedule-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
     }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
+    api.rfp.schedule
+      .list(projectId)
+      .then((data) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setItems(data);
+        }
+      })
+      .catch((err: any) => {
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          console.error("Error loading schedule:", err);
+        }
+      })
+      .finally(() => {
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      });
   }, [projectId, rfp]);
 
   const loadSchedule = async () => {
+    // Create a unique key for this load
+    const loadKey = `schedule-${projectId}`;
+    
+    // Prevent duplicate calls
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+
     try {
-      setLoading(true);
       const data = await api.rfp.schedule.list(projectId);
-      setItems(data);
+      // Only update if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setItems(data);
+      }
     } catch (err: any) {
-      console.error("Error loading schedule:", err);
+      // Only log error if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        console.error("Error loading schedule:", err);
+      }
     } finally {
-      setLoading(false);
+      // Only update loading state if this is still the current load
+      if (lastLoadKeyRef.current === loadKey) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     }
   };
 

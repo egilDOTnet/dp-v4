@@ -1143,6 +1143,230 @@ describe("Project Routes", () => {
     });
   });
 
+  describe("Cross-tenant admin permissions", () => {
+    it("should deny Company Admin from Tenant A performing admin operations on Tenant B project", async () => {
+      const tenantA = await createTestTenant();
+      const tenantB = await createTestTenant();
+      
+      const adminA = await createTestUser({
+        email: "adminA@example.com",
+        tenantId: tenantA.id,
+        role: "CompanyAdministrator",
+      });
+      
+      const projectB = await createTestProject({
+        name: "Tenant B Project",
+        tenantId: tenantB.id,
+      });
+
+      const token = generateTestToken(app, {
+        userId: adminA.id,
+        email: adminA.email,
+        tenantId: tenantA.id,
+        role: "CompanyAdministrator",
+      });
+
+      // Try to update project
+      const updateResponse = await app.inject({
+        method: "PUT",
+        url: `/api/projects/${projectB.id}`,
+        headers: createAuthHeader(token),
+        payload: {
+          name: "Updated Name",
+        },
+      });
+      expect(updateResponse.statusCode).toBe(403);
+
+      // Try to delete project
+      const deleteResponse = await app.inject({
+        method: "DELETE",
+        url: `/api/projects/${projectB.id}`,
+        headers: createAuthHeader(token),
+      });
+      expect(deleteResponse.statusCode).toBe(403);
+
+      // Try to add members
+      const memberB = await createTestUser({
+        email: "memberB@example.com",
+        tenantId: tenantB.id,
+        role: "User",
+      });
+      const addMemberResponse = await app.inject({
+        method: "POST",
+        url: `/api/projects/${projectB.id}/members`,
+        headers: createAuthHeader(token),
+        payload: {
+          memberIds: [memberB.id],
+        },
+      });
+      expect(addMemberResponse.statusCode).toBe(403);
+    });
+
+    it("should allow Company Admin from Tenant A performing admin operations on Tenant A project", async () => {
+      const tenantA = await createTestTenant();
+      
+      const adminA = await createTestUser({
+        email: "adminA@example.com",
+        tenantId: tenantA.id,
+        role: "CompanyAdministrator",
+      });
+      
+      const projectA = await createTestProject({
+        name: "Tenant A Project",
+        tenantId: tenantA.id,
+      });
+
+      const token = generateTestToken(app, {
+        userId: adminA.id,
+        email: adminA.email,
+        tenantId: tenantA.id,
+        role: "CompanyAdministrator",
+      });
+
+      // Update project should succeed
+      const updateResponse = await app.inject({
+        method: "PUT",
+        url: `/api/projects/${projectA.id}`,
+        headers: createAuthHeader(token),
+        payload: {
+          name: "Updated Name",
+        },
+      });
+      expect(updateResponse.statusCode).toBe(200);
+      const updateBody = JSON.parse(updateResponse.body);
+      expect(updateBody.name).toBe("Updated Name");
+    });
+
+    it("should allow Global Admin performing admin operations on any tenant project", async () => {
+      const tenantA = await createTestTenant();
+      const tenantB = await createTestTenant();
+      
+      const globalAdmin = await createTestUser({
+        email: "global@example.com",
+        tenantId: null,
+        role: "GlobalAdministrator",
+      });
+      
+      const projectB = await createTestProject({
+        name: "Tenant B Project",
+        tenantId: tenantB.id,
+      });
+
+      const token = generateTestToken(app, {
+        userId: globalAdmin.id,
+        email: globalAdmin.email,
+        tenantId: null,
+        role: "GlobalAdministrator",
+      });
+
+      // Update project should succeed
+      const updateResponse = await app.inject({
+        method: "PUT",
+        url: `/api/projects/${projectB.id}`,
+        headers: createAuthHeader(token),
+        payload: {
+          name: "Updated by Global Admin",
+        },
+      });
+      expect(updateResponse.statusCode).toBe(200);
+      const updateBody = JSON.parse(updateResponse.body);
+      expect(updateBody.name).toBe("Updated by Global Admin");
+
+      // Delete project should succeed
+      const deleteResponse = await app.inject({
+        method: "DELETE",
+        url: `/api/projects/${projectB.id}`,
+        headers: createAuthHeader(token),
+      });
+      expect(deleteResponse.statusCode).toBe(200);
+    });
+
+    it("should deny Company Admin from Tenant A adding cross-tenant members to Tenant A project", async () => {
+      const tenantA = await createTestTenant();
+      const tenantB = await createTestTenant();
+      
+      const adminA = await createTestUser({
+        email: "adminA@example.com",
+        tenantId: tenantA.id,
+        role: "CompanyAdministrator",
+      });
+      
+      const memberB = await createTestUser({
+        email: "memberB@example.com",
+        tenantId: tenantB.id,
+        role: "User",
+      });
+      
+      const projectA = await createTestProject({
+        name: "Tenant A Project",
+        tenantId: tenantA.id,
+      });
+
+      const token = generateTestToken(app, {
+        userId: adminA.id,
+        email: adminA.email,
+        tenantId: tenantA.id,
+        role: "CompanyAdministrator",
+      });
+
+      // Try to add member from different tenant
+      const addMemberResponse = await app.inject({
+        method: "POST",
+        url: `/api/projects/${projectA.id}/members`,
+        headers: createAuthHeader(token),
+        payload: {
+          memberIds: [memberB.id],
+        },
+      });
+      expect(addMemberResponse.statusCode).toBe(400);
+      const body = JSON.parse(addMemberResponse.body);
+      expect(body.error).toContain("different tenant");
+    });
+
+    it("should allow Global Admin adding cross-tenant members to any project", async () => {
+      const tenantA = await createTestTenant();
+      const tenantB = await createTestTenant();
+      
+      const globalAdmin = await createTestUser({
+        email: "global@example.com",
+        tenantId: null,
+        role: "GlobalAdministrator",
+      });
+      
+      const memberB = await createTestUser({
+        email: "memberB@example.com",
+        tenantId: tenantB.id,
+        role: "User",
+      });
+      
+      const projectA = await createTestProject({
+        name: "Tenant A Project",
+        tenantId: tenantA.id,
+      });
+
+      const token = generateTestToken(app, {
+        userId: globalAdmin.id,
+        email: globalAdmin.email,
+        tenantId: null,
+        role: "GlobalAdministrator",
+      });
+
+      // Add member from different tenant should succeed with warning
+      const addMemberResponse = await app.inject({
+        method: "POST",
+        url: `/api/projects/${projectA.id}/members`,
+        headers: createAuthHeader(token),
+        payload: {
+          memberIds: [memberB.id],
+        },
+      });
+      expect(addMemberResponse.statusCode).toBe(200);
+      const body = JSON.parse(addMemberResponse.body);
+      expect(body.warning).toContain("different tenant");
+      expect(body.members.some((m: any) => m.id === memberB.id)).toBe(true);
+    });
+  });
+
   describe("POST /api/projects/:id/phases/:phaseId/tasks", () => {
     it("should create task for project member", async () => {
       const tenant = await createTestTenant();

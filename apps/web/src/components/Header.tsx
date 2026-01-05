@@ -23,22 +23,39 @@ export function Header() {
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const loadingNotificationsRef = useRef(false);
+  const notificationsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasInitializedRef = useRef(false);
 
   // Check if we're on a project page
   const isProjectPage = pathname?.startsWith("/projects/");
 
   // Load notifications
   useEffect(() => {
-    if (user) {
-      loadNotifications();
-      
-      // Poll for new notifications every 30 seconds
-      const interval = setInterval(() => {
-        loadNotifications();
-      }, 30000);
-      
-      return () => clearInterval(interval);
+    if (!user) return;
+
+    // Prevent duplicate calls (React Strict Mode protection)
+    if (hasInitializedRef.current) {
+      return;
     }
+
+    hasInitializedRef.current = true;
+    loadingNotificationsRef.current = true;
+    loadNotifications();
+    
+    // Poll for new notifications every 30 seconds
+    notificationsIntervalRef.current = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+    
+    return () => {
+      if (notificationsIntervalRef.current) {
+        clearInterval(notificationsIntervalRef.current);
+        notificationsIntervalRef.current = null;
+      }
+      hasInitializedRef.current = false;
+      loadingNotificationsRef.current = false;
+    };
   }, [user]);
 
   // Check for new notifications and trigger animation
@@ -66,6 +83,12 @@ export function Header() {
       // Set empty array on error to prevent stale data
       setNotifications([]);
       setUnreadCount(0);
+    } finally {
+      // Clear the loading flag after initial load completes
+      // Polling interval calls can proceed without the guard
+      if (loadingNotificationsRef.current) {
+        loadingNotificationsRef.current = false;
+      }
     }
   };
 
@@ -338,7 +361,7 @@ export function Header() {
                           d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                         />
                       </svg>
-                      Company Home
+                      Home
                     </button>
 
                     <button

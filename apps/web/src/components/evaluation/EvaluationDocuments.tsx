@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, VendorResponseWithFiles, Project } from "@/lib/api";
 import { Card, CardHeader, CardBody, Button, LoadingSpinner, EmptyState } from "@/components/ui";
 
@@ -15,16 +15,45 @@ export function EvaluationDocuments({ projectId, project }: EvaluationDocumentsP
   const [error, setError] = useState<string | null>(null);
   const [downloadingVendor, setDownloadingVendor] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const loadingRef = useRef(false);
+  const lastLoadKeyRef = useRef<string>("");
 
   useEffect(() => {
+    if (!projectId) return;
+
+    // Create a unique key for this load based on dependencies
+    const loadKey = `documents-${projectId}`;
+
+    // Prevent duplicate calls with the same dependencies (React Strict Mode protection)
+    if (loadingRef.current && lastLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    loadingRef.current = true;
+    lastLoadKeyRef.current = loadKey;
+    setLoading(true);
+    setError(null);
+
     api.rfp.vendorResponses
       .list(projectId)
-      .then(setVendorResponses)
+      .then((data) => {
+        // Only update if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setVendorResponses(data);
+        }
+      })
       .catch((err) => {
-        setError(err.message || "Failed to load vendor documents");
+        // Only log error if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setError(err.message || "Failed to load vendor documents");
+        }
       })
       .finally(() => {
-        setLoading(false);
+        // Only update loading state if this is still the current load
+        if (lastLoadKeyRef.current === loadKey) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
       });
   }, [projectId]);
 

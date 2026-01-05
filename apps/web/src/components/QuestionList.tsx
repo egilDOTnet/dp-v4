@@ -26,6 +26,7 @@ interface QuestionListProps {
   projectId: string;
   rfiId: string;
   onQuestionsChange?: () => void;
+  initialQuestions?: RFIQuestion[];
 }
 
 interface SortableQuestionItemProps {
@@ -61,9 +62,9 @@ function SortableQuestionItem({
   );
 }
 
-export default function QuestionList({ projectId, rfiId, onQuestionsChange }: QuestionListProps) {
-  const [questions, setQuestions] = useState<RFIQuestion[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function QuestionList({ projectId, rfiId, onQuestionsChange, initialQuestions }: QuestionListProps) {
+  const [questions, setQuestions] = useState<RFIQuestion[]>(initialQuestions || []);
+  const [loading, setLoading] = useState(!initialQuestions || initialQuestions.length === 0);
   const [error, setError] = useState("");
   const [editingFields, setEditingFields] = useState<Record<string, Set<string>>>({});
   const [formData, setFormData] = useState<Record<string, { title: string; description: string; type: RFIQuestionType; required: boolean }>>({});
@@ -72,6 +73,7 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
   const [savingFields, setSavingFields] = useState<Set<string>>(new Set());
   const scrollPositionRef = React.useRef<number>(0);
   const lastFocusedFieldRef = React.useRef<Record<string, string | null>>({});
+  const hasLoadedRef = React.useRef<boolean>(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -84,14 +86,43 @@ export default function QuestionList({ projectId, rfiId, onQuestionsChange }: Qu
     })
   );
 
+  // Reset load tracking when rfiId changes
   useEffect(() => {
-    if (rfiId) {
-      loadQuestions();
-    } else {
+    hasLoadedRef.current = false;
+  }, [rfiId]);
+
+  // Sync initialQuestions to state when they change (this runs first)
+  useEffect(() => {
+    if (initialQuestions !== undefined) {
+      setQuestions(initialQuestions);
+      setLoading(false);
+      hasLoadedRef.current = true; // Mark as loaded so we don't load again
+    }
+  }, [initialQuestions]);
+
+  // Only load questions if initialQuestions were not provided
+  // This effect runs after the sync effect, so if initialQuestions exist, hasLoadedRef is already true
+  useEffect(() => {
+    if (!rfiId) {
       setLoading(false);
       setQuestions([]);
+      hasLoadedRef.current = false;
+      return;
     }
-  }, [rfiId, projectId]);
+
+    // Skip if we've already loaded (prevents duplicate calls in React Strict Mode)
+    if (hasLoadedRef.current) {
+      return;
+    }
+
+    // Only load if initialQuestions were not provided (undefined)
+    // If initialQuestions is an empty array [], that means we already loaded from RFI
+    // and there are no questions, so we shouldn't load again
+    if (initialQuestions === undefined) {
+      hasLoadedRef.current = true;
+      loadQuestions();
+    }
+  }, [rfiId, projectId, initialQuestions]);
 
   // Handle clicks outside of editing questions to exit edit mode
   useEffect(() => {

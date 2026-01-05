@@ -32,7 +32,13 @@ export default function ManageProjectPage() {
   });
   const [addingMember, setAddingMember] = useState(false);
   const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [addByEmail, setAddByEmail] = useState(false);
+  const [existingUser, setExistingUser] = useState<User | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
   const [logoConfig, setLogoConfig] = useState({
     logoShape: "rounded-rect" as string,
     logoPlacement: "overlay-bottom-left" as string,
@@ -40,9 +46,6 @@ export default function ManageProjectPage() {
   });
   const [savingLogoConfig, setSavingLogoConfig] = useState(false);
   const loadingProjectIdRef = useRef<string | null>(null);
-
-  const isAdmin =
-    user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
 
   // Prepopulate start date with current date
   const getCurrentDate = () => {
@@ -67,9 +70,35 @@ export default function ManageProjectPage() {
 
   const displayMembers = isSearching ? filteredMembers : (project?.members || []);
 
+  // Check if user is a project admin for THIS specific project
+  // Global Admins are always project admins
+  // Company Admins are only project admins if their tenant matches the project's tenant
+  const isProjectAdmin =
+    user?.role === "GlobalAdministrator" ||
+    (user?.role === "CompanyAdministrator" && user?.tenantId === project?.tenantId);
+
+  // Redirect non-admins after project loads
   useEffect(() => {
-    if (!isAdmin) {
-      router.push(`/projects/${projectId}`);
+    if (user && project && !isProjectAdmin) {
+      router.replace(`/projects/${projectId}`);
+    }
+  }, [user, project, isProjectAdmin, router, projectId]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    // Check if user is at least a potential admin (GlobalAdmin or CompanyAdmin)
+    // We'll verify tenant match after loading the project
+    const isPotentialAdmin = 
+      user.role === "GlobalAdministrator" || 
+      user.role === "CompanyAdministrator";
+    
+    // If not a potential admin, don't even try to load
+    if (!isPotentialAdmin) {
+      setLoading(false);
+      setError("You do not have permission to manage this project");
       return;
     }
 
@@ -88,6 +117,18 @@ export default function ManageProjectPage() {
       .then(async ([projectData, users]) => {
         // Only update state if we're still loading the same projectId
         if (loadingProjectIdRef.current === projectId) {
+          // Verify admin access now that we have the project
+          const userIsAdmin = 
+            user?.role === "GlobalAdministrator" ||
+            (user?.role === "CompanyAdministrator" && user?.tenantId === projectData.tenantId);
+          
+          if (!userIsAdmin) {
+            setError("You do not have permission to manage this project");
+            setLoading(false);
+            loadingProjectIdRef.current = null;
+            return;
+          }
+          
           setProject(projectData);
           setAvailableUsers(users);
           setFormData({
@@ -144,7 +185,7 @@ export default function ManageProjectPage() {
       });
     // No cleanup needed - the ref check at the start handles projectId changes
     // and the finally block clears it when load completes
-  }, [projectId, isAdmin, router]);
+  }, [projectId, user, router]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,6 +237,33 @@ export default function ManageProjectPage() {
       setAvailableUsers(updatedUsers);
     } catch (err: any) {
       setFormError(err.message || "Failed to remove member");
+    }
+  };
+
+  const handleAddMember = async (memberId: string) => {
+    setAddingMember(true);
+    setFormError("");
+    try {
+      await api.projects.addMembers(projectId, [memberId]);
+      
+      // Reload project and available users
+      const [updatedProject, updatedUsers] = await Promise.all([
+        api.projects.get(projectId),
+        api.users.getCompanyUsers(),
+      ]);
+      setProject(updatedProject);
+      setAvailableUsers(updatedUsers);
+      
+      setShowAddMemberForm(false);
+      setSelectedUserForAdd(null);
+      setAddByEmail(false);
+      setNewMemberForm({ email: "", firstName: "", lastName: "" });
+      setExistingUser(null);
+      setFormError("");
+    } catch (err: any) {
+      setFormError(err.message || "Failed to add member");
+    } finally {
+      setAddingMember(false);
     }
   };
 
@@ -273,9 +341,13 @@ export default function ManageProjectPage() {
     );
   }
 
+  // Don't render if user is not a project admin (redirect is in progress)
+  if (user && project && !isProjectAdmin) {
+    return null;
+  }
+
   const breadcrumbItems = [
     { label: "Home", href: "/dashboard?noAutoRedirect=true" },
-    { label: "Projects", href: "/projects" },
     { label: project.name, href: `/projects/${projectId}` },
     { label: "Manage" },
   ];
@@ -453,7 +525,13 @@ export default function ManageProjectPage() {
                 </span>
               )}
               <button
-                onClick={() => setShowAddMemberForm(true)}
+                onClick={() => {
+                  setShowAddMemberForm(true);
+                  setAddByEmail(false);
+                  setSelectedUserForAdd(null);
+                  setNewMemberForm({ email: "", firstName: "", lastName: "" });
+                  setExistingUser(null);
+                }}
                 disabled={showAddMemberForm}
                 className="ml-auto px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
               >
@@ -483,53 +561,137 @@ export default function ManageProjectPage() {
                 <div className="space-y-2">
                   {/* Inline Add Member Form */}
                   {showAddMemberForm && (
-                    <div className="border-2 border-primary-500 rounded-lg bg-background-secondary animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="border-2 border-primary-500 rounded-lg bg-background-secondary animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
                       <div className="px-4 py-3 bg-background-tertiary">
-                        <form
-                          onSubmit={async (e) => {
-                            e.preventDefault();
-                            if (!newMemberForm.email || !newMemberForm.firstName || !newMemberForm.lastName) {
-                              setFormError("All fields are required");
-                              return;
-                            }
-                            setAddingMember(true);
-                            setFormError("");
-                            try {
-                              // Check if user exists, if not create
-                              let userToAdd: User;
-                              const existingUser = availableUsers.find(u => u.email === newMemberForm.email);
-                              if (existingUser) {
-                                userToAdd = existingUser;
-                              } else {
-                                userToAdd = await api.users.create({
-                                  email: newMemberForm.email,
-                                  firstName: newMemberForm.firstName,
-                                  lastName: newMemberForm.lastName,
-                                });
+                        {!addByEmail ? (
+                          // Dropdown selection form
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!selectedUserForAdd) {
+                                setFormError("Please select a user");
+                                return;
                               }
                               
-                              await api.projects.addMembers(projectId, [userToAdd.id]);
+                              // Check if user belongs to different tenant
+                              const selectedUser = availableUsers.find(u => u.id === selectedUserForAdd.id);
+                              if (selectedUser && user?.tenantId && selectedUser.tenantId && selectedUser.tenantId !== user.tenantId) {
+                                // Show confirmation dialog
+                                setConfirmMessage(`This user belongs to a different tenant. Do you want to add them to this project?`);
+                                setPendingMemberId(selectedUserForAdd.id);
+                                setShowConfirmModal(true);
+                                return;
+                              }
                               
-                              // Reload project and available users
-                              const [updatedProject, updatedUsers] = await Promise.all([
-                                api.projects.get(projectId),
-                                api.users.getCompanyUsers(),
-                              ]);
-                              setProject(updatedProject);
-                              setAvailableUsers(updatedUsers);
-                              
-                              setNewMemberForm({ email: "", firstName: "", lastName: "" });
-                              setShowAddMemberForm(false);
+                              // Same tenant, proceed directly
+                              handleAddMember(selectedUserForAdd.id);
+                            }}
+                            className="space-y-3"
+                          >
+                            <div>
+                              <ContactPersonSelector
+                                value={selectedUserForAdd}
+                                options={availableUsers
+                                  .filter(u => !project.members?.some(m => m.id === u.id))
+                                  .map((user) => ({
+                                    id: user.id,
+                                    email: user.email,
+                                    firstName: user.firstName || null,
+                                    lastName: user.lastName || null,
+                                    name: user.name || null,
+                                  }))}
+                                onChange={(person) => setSelectedUserForAdd(person)}
+                                placeholder="Select a user..."
+                                label="Select from Company Users"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="submit"
+                                disabled={addingMember || !selectedUserForAdd}
+                                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 text-sm"
+                              >
+                                {addingMember ? "Adding..." : "Add"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAddMemberForm(false);
+                                  setSelectedUserForAdd(null);
+                                  setAddByEmail(false);
+                                  setFormError("");
+                                }}
+                                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAddByEmail(true);
+                                  setSelectedUserForAdd(null);
+                                  setFormError("");
+                                }}
+                                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
+                              >
+                                Invite New User
+                              </button>
+                              {formError && (
+                                <span className="text-sm text-red-600">{formError}</span>
+                              )}
+                            </div>
+                          </form>
+                        ) : (
+                          // Email entry form
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              if (!newMemberForm.email) {
+                                setFormError("Email is required");
+                                return;
+                              }
+                              setAddingMember(true);
                               setFormError("");
-                            } catch (err: any) {
-                              setFormError(err.message || "Failed to add member");
-                            } finally {
-                              setAddingMember(false);
-                            }
-                          }}
-                          className="space-y-3"
-                        >
-                          <div className="grid grid-cols-3 gap-3">
+                              try {
+                                let userToAdd: User;
+                                
+                                if (existingUser) {
+                                  // User exists in system, just attach them to the project
+                                  userToAdd = existingUser;
+                                } else {
+                                  // User doesn't exist, check if we have name fields filled
+                                  if (!newMemberForm.firstName || !newMemberForm.lastName) {
+                                    setFormError("First name and last name are required for new users");
+                                    setAddingMember(false);
+                                    return;
+                                  }
+                                  // Create new user (will automatically be connected to current tenant/company)
+                                  userToAdd = await api.users.create({
+                                    email: newMemberForm.email,
+                                    firstName: newMemberForm.firstName,
+                                    lastName: newMemberForm.lastName,
+                                  });
+                                }
+                                
+                                // Check if user belongs to different tenant
+                                if (userToAdd.tenantId && user?.tenantId && userToAdd.tenantId !== user.tenantId) {
+                                  // Show confirmation dialog
+                                  setConfirmMessage(`This user belongs to a different tenant. Do you want to add them to this project?`);
+                                  setPendingMemberId(userToAdd.id);
+                                  setShowConfirmModal(true);
+                                  setAddingMember(false);
+                                  return;
+                                }
+                                
+                                // Same tenant or new user, proceed directly
+                                await handleAddMember(userToAdd.id);
+                              } catch (err: any) {
+                                setFormError(err.message || "Failed to add member");
+                                setAddingMember(false);
+                              }
+                            }}
+                            className="space-y-3"
+                          >
                             <div>
                               <label className="block text-sm font-medium text-text-primary mb-1">
                                 Email *
@@ -537,144 +699,144 @@ export default function ManageProjectPage() {
                               <input
                                 type="email"
                                 value={newMemberForm.email}
-                                onChange={(e) => setNewMemberForm({ ...newMemberForm, email: e.target.value })}
+                                onChange={async (e) => {
+                                  const email = e.target.value;
+                                  setNewMemberForm({ ...newMemberForm, email });
+                                  setExistingUser(null);
+                                  
+                                  // Check if email is valid format before looking up
+                                  if (email && email.includes("@")) {
+                                    setCheckingEmail(true);
+                                    try {
+                                      // First check company users (faster)
+                                      const companyUser = availableUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+                                      if (companyUser) {
+                                        setExistingUser(companyUser);
+                                        setNewMemberForm({
+                                          email,
+                                          firstName: companyUser.firstName || "",
+                                          lastName: companyUser.lastName || "",
+                                        });
+                                      } else {
+                                        // Look up user in entire system
+                                        const foundUser = await api.users.lookupByEmail(email);
+                                        if (foundUser) {
+                                          setExistingUser(foundUser);
+                                          setNewMemberForm({
+                                            email,
+                                            firstName: foundUser.firstName || "",
+                                            lastName: foundUser.lastName || "",
+                                          });
+                                        } else {
+                                          // User doesn't exist, clear name fields
+                                          setNewMemberForm({
+                                            email,
+                                            firstName: "",
+                                            lastName: "",
+                                          });
+                                        }
+                                      }
+                                    } catch (err) {
+                                      // If lookup fails, assume user doesn't exist
+                                      setExistingUser(null);
+                                      setNewMemberForm({
+                                        email,
+                                        firstName: "",
+                                        lastName: "",
+                                      });
+                                    } finally {
+                                      setCheckingEmail(false);
+                                    }
+                                  } else {
+                                    // Invalid email format, clear existing user
+                                    setExistingUser(null);
+                                    setNewMemberForm({
+                                      email,
+                                      firstName: "",
+                                      lastName: "",
+                                    });
+                                  }
+                                }}
                                 required
                                 className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                                 placeholder="email@example.com"
                               />
+                              {checkingEmail && (
+                                <p className="text-xs text-text-secondary mt-1">Checking...</p>
+                              )}
                             </div>
-                            <div>
-                              <label className="block text-sm font-medium text-text-primary mb-1">
-                                First Name *
-                              </label>
-                              <input
-                                type="text"
-                                value={newMemberForm.firstName}
-                                onChange={(e) => setNewMemberForm({ ...newMemberForm, firstName: e.target.value })}
-                                required
-                                className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                              />
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-text-primary mb-1">
+                                  First Name {existingUser ? "" : "*"}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newMemberForm.firstName}
+                                  onChange={(e) => setNewMemberForm({ ...newMemberForm, firstName: e.target.value })}
+                                  required={!existingUser}
+                                  disabled={!!existingUser}
+                                  className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm disabled:bg-background-tertiary disabled:text-text-secondary"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-text-primary mb-1">
+                                  Last Name {existingUser ? "" : "*"}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newMemberForm.lastName}
+                                  onChange={(e) => setNewMemberForm({ ...newMemberForm, lastName: e.target.value })}
+                                  required={!existingUser}
+                                  disabled={!!existingUser}
+                                  className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm disabled:bg-background-tertiary disabled:text-text-secondary"
+                                />
+                              </div>
                             </div>
-                            <div>
-                              <label className="block text-sm font-medium text-text-primary mb-1">
-                                Last Name *
-                              </label>
-                              <input
-                                type="text"
-                                value={newMemberForm.lastName}
-                                onChange={(e) => setNewMemberForm({ ...newMemberForm, lastName: e.target.value })}
-                                required
-                                className="w-full px-3 py-2 border border-border-primary rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="submit"
-                              disabled={addingMember}
-                              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 text-sm"
-                            >
-                              {addingMember ? "Adding..." : "Add"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddMemberForm(false);
-                                setNewMemberForm({ email: "", firstName: "", lastName: "" });
-                                setFormError("");
-                              }}
-                              className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
-                            >
-                              Cancel
-                            </button>
-                            {formError && (
-                              <span className="text-sm text-red-600">{formError}</span>
+                            {existingUser && (
+                              <p className="text-sm text-text-secondary">
+                                This email matches an existing user account. They will be added to the project.
+                              </p>
                             )}
-                          </div>
-                        </form>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Add Member from Company Users */}
-                  {showAddMemberForm && (() => {
-                    const availableCompanyUsers = availableUsers.filter(u => !project.members?.some(m => m.id === u.id));
-                    return availableCompanyUsers.length > 0;
-                  })() && (
-                    <div className="border-2 border-primary-500 rounded-lg bg-background-secondary animate-in fade-in slide-in-from-top-2 duration-200">
-                      <div className="px-4 py-3 bg-background-tertiary">
-                        <form
-                          onSubmit={async (e) => {
-                            e.preventDefault();
-                            if (!selectedUserForAdd) {
-                              setFormError("Please select a user");
-                              return;
-                            }
-                            setAddingMember(true);
-                            setFormError("");
-                            try {
-                              await api.projects.addMembers(projectId, [selectedUserForAdd.id]);
-                              
-                              // Reload project and available users
-                              const [updatedProject, updatedUsers] = await Promise.all([
-                                api.projects.get(projectId),
-                                api.users.getCompanyUsers(),
-                              ]);
-                              setProject(updatedProject);
-                              setAvailableUsers(updatedUsers);
-                              
-                              setShowAddMemberForm(false);
-                              setSelectedUserForAdd(null);
-                              setFormError("");
-                            } catch (err: any) {
-                              setFormError(err.message || "Failed to add member");
-                            } finally {
-                              setAddingMember(false);
-                            }
-                          }}
-                          className="space-y-3"
-                        >
-                          <div>
-                            <ContactPersonSelector
-                              value={selectedUserForAdd}
-                              options={availableUsers
-                                .filter(u => !project.members?.some(m => m.id === u.id))
-                                .map((user) => ({
-                                  id: user.id,
-                                  email: user.email,
-                                  firstName: user.firstName || null,
-                                  lastName: user.lastName || null,
-                                  name: user.name || null,
-                                }))}
-                              onChange={(person) => setSelectedUserForAdd(person)}
-                              placeholder="Select a user..."
-                              label="Select from Company Users"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="submit"
-                              disabled={addingMember}
-                              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 text-sm"
-                            >
-                              {addingMember ? "Adding..." : "Add"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddMemberForm(false);
-                                setSelectedUserForAdd(null);
-                                setFormError("");
-                              }}
-                              className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
-                            >
-                              Cancel
-                            </button>
-                            {formError && (
-                              <span className="text-sm text-red-600">{formError}</span>
-                            )}
-                          </div>
-                        </form>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="submit"
+                                disabled={addingMember}
+                                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 text-sm"
+                              >
+                                {addingMember ? "Adding..." : "Add"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowAddMemberForm(false);
+                                  setAddByEmail(false);
+                                  setNewMemberForm({ email: "", firstName: "", lastName: "" });
+                                  setExistingUser(null);
+                                  setFormError("");
+                                }}
+                                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAddByEmail(false);
+                                  setNewMemberForm({ email: "", firstName: "", lastName: "" });
+                                  setExistingUser(null);
+                                  setFormError("");
+                                }}
+                                className="px-4 py-2 border border-border-primary rounded-md hover:bg-background-primary text-sm"
+                              >
+                                Select From Members
+                              </button>
+                              {formError && (
+                                <span className="text-sm text-red-600">{formError}</span>
+                              )}
+                            </div>
+                          </form>
+                        )}
                       </div>
                     </div>
                   )}
@@ -688,10 +850,26 @@ export default function ManageProjectPage() {
                     // Find full user object to get role
                     const fullUser = availableUsers.find(u => u.id === member.id);
                     const role = fullUser?.role || "User";
+                    
+                    // Check if this is the current user
+                    const isCurrentUser = member.id === user?.id;
+                    
+                    // Check if current user is an admin
+                    const currentUserIsAdmin = user?.role === "CompanyAdministrator" || user?.role === "GlobalAdministrator";
+                    
+                    // Count admin members
+                    const adminMembers = displayMembers.filter(m => {
+                      const mUser = availableUsers.find(u => u.id === m.id);
+                      return mUser?.role === "CompanyAdministrator" || mUser?.role === "GlobalAdministrator";
+                    });
+                    
+                    // Check if removing self would leave no admins
+                    const isLastAdminRemovingSelf = isCurrentUser && currentUserIsAdmin && adminMembers.length === 1;
+                    
                     return (
                       <div
                         key={member.id}
-                        className="border-2 border-primary-500 rounded-lg bg-background-secondary"
+                        className="rounded-lg bg-background-secondary"
                       >
                         <div className="flex items-center justify-between px-4 py-3 bg-background-tertiary">
                           <div className="flex items-center space-x-3">
@@ -704,7 +882,9 @@ export default function ManageProjectPage() {
                           </div>
                           <button
                             onClick={() => handleRemoveMember(member.id)}
-                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                            disabled={isLastAdminRemovingSelf}
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={isLastAdminRemovingSelf ? "You cannot remove yourself. You are the last remaining administrator." : "Remove member"}
                           >
                             Remove
                           </button>
@@ -1229,10 +1409,47 @@ export default function ManageProjectPage() {
 
       {/* Import Wizard */}
       <ImportWizard
-        projectId={projectId}
+        target={{ type: "project", id: projectId }}
         open={showImportWizard}
         onOpenChange={setShowImportWizard}
       />
+
+      {/* Confirmation Modal */}
+      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Add Member</DialogTitle>
+            <DialogDescription>
+              {confirmMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowConfirmModal(false);
+                setPendingMemberId(null);
+                setConfirmMessage("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={async () => {
+                if (pendingMemberId) {
+                  setShowConfirmModal(false);
+                  await handleAddMember(pendingMemberId);
+                  setPendingMemberId(null);
+                  setConfirmMessage("");
+                }
+              }}
+            >
+              Proceed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
