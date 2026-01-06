@@ -5,3 +5,4 @@ ALTER TABLE "Project" ADD COLUMN "logoBorder" TEXT;
 
 
 
+

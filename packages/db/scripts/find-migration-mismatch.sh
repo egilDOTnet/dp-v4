@@ -34,3 +34,4 @@ echo "   Database migrations (not rolled back): $DB_COUNT"
 echo "   Migration files on disk: $FILE_COUNT"
 
 
+

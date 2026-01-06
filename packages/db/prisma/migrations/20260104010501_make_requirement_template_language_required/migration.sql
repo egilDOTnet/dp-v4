@@ -10,3 +10,4 @@ ALTER TABLE "RequirementTemplate" ALTER COLUMN "languageCode" SET NOT NULL;
 -- Create composite unique constraint on shortName and languageCode
 CREATE UNIQUE INDEX "RequirementTemplate_shortName_languageCode_key" ON "RequirementTemplate"("shortName", "languageCode");
 
+

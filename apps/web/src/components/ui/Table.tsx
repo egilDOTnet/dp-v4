@@ -85,7 +85,7 @@ export const TableHead: React.FC<TableHeadProps> = ({
 }) => {
   return (
     <th
-      className={`px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider ${className}`}
+      className={`px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider align-top ${className}`}
     >
       {children}
     </th>
@@ -96,17 +96,20 @@ export interface TableCellProps {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
+  colSpan?: number;
 }
 
 export const TableCell: React.FC<TableCellProps> = ({
   children,
   className = "",
   onClick,
+  colSpan,
 }) => {
   return (
     <td
-      className={`px-4 py-4 text-sm text-text-primary ${onClick ? "cursor-pointer" : ""} ${className}`}
+      className={`px-4 py-4 text-sm text-text-primary align-top ${onClick ? "cursor-pointer" : ""} ${className}`}
       onClick={onClick}
+      colSpan={colSpan}
     >
       {children}
     </td>

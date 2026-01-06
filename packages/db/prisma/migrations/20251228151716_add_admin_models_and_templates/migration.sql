@@ -55,3 +55,4 @@ ALTER TABLE "RequirementHierarchy" ADD CONSTRAINT "RequirementHierarchy_template
 -- AddForeignKey
 ALTER TABLE "EmailTemplateLanguage" ADD CONSTRAINT "EmailTemplateLanguage_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "Template"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+

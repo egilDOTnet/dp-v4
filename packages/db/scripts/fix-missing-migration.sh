@@ -29,3 +29,4 @@ echo "Current migration directories:"
 ls -1 prisma/migrations/ | grep -E '^[0-9]' | sort
 
 
+

@@ -41,3 +41,4 @@ echo "   c) To recreate the missing migration:"
 echo "      pnpm prisma migrate dev --name <migration_name> --create-only"
 
 
+

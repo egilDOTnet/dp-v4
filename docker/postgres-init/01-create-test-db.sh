@@ -12,3 +12,4 @@ EOSQL
 
 echo "✅ Test database 'app_test' created (or already exists)"
 
+

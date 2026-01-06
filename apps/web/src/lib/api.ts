@@ -1588,12 +1588,14 @@ export const api = {
         hierarchyId?: string;
         evaluatorId?: string;
         vendorId?: string;
+        vendorIds?: string[];
       }
     ) => {
       const queryParams = new URLSearchParams();
       if (filters?.hierarchyId) queryParams.append("hierarchyId", filters.hierarchyId);
       if (filters?.evaluatorId) queryParams.append("evaluatorId", filters.evaluatorId);
-      if (filters?.vendorId) queryParams.append("vendorId", filters.vendorId);
+      // Note: vendorId filtering is done on frontend, so we don't send it to API
+      // This allows multiple vendor selections to work properly
       const query = queryParams.toString();
       return apiRequest<EvaluationComparison[]>(
         `/api/projects/${projectId}/rfp/evaluation/comparison${query ? `?${query}` : ""}`

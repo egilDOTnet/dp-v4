@@ -17,3 +17,4 @@ CREATE INDEX "Tenant_organizationNumber_idx" ON "Tenant"("organizationNumber");
 
 -- CreateIndex
 CREATE INDEX "Tenant_subscriptionStatus_idx" ON "Tenant"("subscriptionStatus");
+

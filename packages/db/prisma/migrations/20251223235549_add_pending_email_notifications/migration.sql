@@ -30,3 +30,4 @@ ALTER TABLE "PendingEmailNotification" ADD CONSTRAINT "PendingEmailNotification_
 ALTER TABLE "PendingEmailNotification" ADD CONSTRAINT "PendingEmailNotification_rfpQuestionId_fkey" FOREIGN KEY ("rfpQuestionId") REFERENCES "RFPQuestion"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 
+

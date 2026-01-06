@@ -836,40 +836,119 @@ export default async function evaluationRoutes(fastify: FastifyInstance) {
               throw new Error(`Hierarchy ${w.hierarchyId} does not belong to this project`);
             }
 
-            // If level1HierarchyId is provided, verify it
-            if (w.level1HierarchyId) {
+            // Determine if this is a level 1 hierarchy (no parent) or level 2 (has parent)
+            // Always trust the database structure, not the client-provided level1HierarchyId
+            const isLevel1 = hierarchy.parentId === null || hierarchy.parentId === undefined;
+            
+            // Normalize level1HierarchyId: convert null/undefined/empty string to null
+            const normalizedLevel1HierarchyId = (
+              w.level1HierarchyId === null || 
+              w.level1HierarchyId === undefined || 
+              w.level1HierarchyId === ""
+            ) ? null : String(w.level1HierarchyId);
+
+            // For level 1 hierarchies: level1HierarchyId MUST be null
+            // For level 2 hierarchies: level1HierarchyId MUST be the parent ID
+            if (isLevel1) {
+              // Level 1 hierarchy - level1HierarchyId must be null
+              if (normalizedLevel1HierarchyId !== null) {
+                throw new Error(`Hierarchy ${w.hierarchyId} is a level 1 hierarchy but level1HierarchyId was provided`);
+              }
+              
+              // Handle level 1 hierarchies differently because Prisma can't use null 
+              // in compound unique constraint where clause
+              // For level 1 hierarchies, find existing record first
+              const existing = await db.evaluationHierarchyWeight.findFirst({
+                where: {
+                  rfpId: rfp.id,
+                  hierarchyId: w.hierarchyId,
+                  level1HierarchyId: null,
+                },
+                include: {
+                  hierarchy: true,
+                },
+              });
+
+              if (existing) {
+                // Update existing record
+                return db.evaluationHierarchyWeight.update({
+                  where: { id: existing.id },
+                  data: {
+                    weight: new Prisma.Decimal(w.weight),
+                    updatedAt: new Date(),
+                  },
+                  include: {
+                    hierarchy: true,
+                  },
+                });
+              } else {
+                // Create new record
+                return db.evaluationHierarchyWeight.create({
+                  data: {
+                    rfpId: rfp.id,
+                    hierarchyId: w.hierarchyId,
+                    level1HierarchyId: null,
+                    weight: new Prisma.Decimal(w.weight),
+                    createdById: user.userId,
+                  },
+                  include: {
+                    hierarchy: true,
+                  },
+                });
+              }
+            } else {
+              // Level 2 hierarchy - level1HierarchyId must be provided or match parentId
+              if (normalizedLevel1HierarchyId === null) {
+                throw new Error(`Hierarchy ${w.hierarchyId} is a level 2 hierarchy but level1HierarchyId was not provided`);
+              }
+              
+              // Use provided level1HierarchyId or fall back to hierarchy.parentId
+              const level1HierarchyId = normalizedLevel1HierarchyId || hierarchy.parentId;
+              
+              // Validate it matches the hierarchy structure
+              if (level1HierarchyId !== hierarchy.parentId) {
+                throw new Error(`Hierarchy ${w.hierarchyId} has parent ${hierarchy.parentId} but level1HierarchyId is ${level1HierarchyId}`);
+              }
+              
+              // Validate the level 1 hierarchy exists
               const level1Hierarchy = await db.requirementHierarchy.findUnique({
-                where: { id: w.level1HierarchyId },
+                where: { id: level1HierarchyId },
               });
 
               if (!level1Hierarchy || level1Hierarchy.projectId !== projectId) {
-                throw new Error(`Level 1 hierarchy ${w.level1HierarchyId} does not belong to this project`);
+                throw new Error(`Level 1 hierarchy ${level1HierarchyId} does not belong to this project`);
               }
-            }
+              
+              // Absolute safeguard: never allow null/undefined/empty in upsert
+              if (!level1HierarchyId || level1HierarchyId === null || level1HierarchyId === undefined || level1HierarchyId === "") {
+                throw new Error(`Level 2 hierarchy ${w.hierarchyId} must have a valid level1HierarchyId`);
+              }
 
-            return db.evaluationHierarchyWeight.upsert({
-              where: {
-                rfpId_hierarchyId_level1HierarchyId: {
+              // For level 2 hierarchies, we can use normal upsert
+              return db.evaluationHierarchyWeight.upsert({
+                where: {
+                  rfpId_hierarchyId_level1HierarchyId: {
+                    rfpId: rfp.id,
+                    hierarchyId: w.hierarchyId,
+                    level1HierarchyId: level1HierarchyId,
+                  },
+                },
+                create: {
                   rfpId: rfp.id,
                   hierarchyId: w.hierarchyId,
-                  level1HierarchyId: w.level1HierarchyId ?? null,
+                  level1HierarchyId: level1HierarchyId,
+                  weight: new Prisma.Decimal(w.weight),
+                  createdById: user.userId,
                 },
-              },
-              create: {
-                rfpId: rfp.id,
-                hierarchyId: w.hierarchyId,
-                level1HierarchyId: w.level1HierarchyId ?? null,
-                weight: new Prisma.Decimal(w.weight),
-                createdById: user.userId,
-              },
-              update: {
-                weight: new Prisma.Decimal(w.weight),
-                updatedAt: new Date(),
-              },
-              include: {
-                hierarchy: true,
-              },
-            });
+                update: {
+                  weight: new Prisma.Decimal(w.weight),
+                  updatedAt: new Date(),
+                },
+                include: {
+                  hierarchy: true,
+                },
+              });
+            }
           })
         );
 

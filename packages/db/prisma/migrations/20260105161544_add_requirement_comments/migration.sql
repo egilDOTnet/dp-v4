@@ -42,3 +42,4 @@ ALTER TABLE "RequirementComment" ADD CONSTRAINT "RequirementComment_createdById_
 -- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_requirementCommentId_fkey" FOREIGN KEY ("requirementCommentId") REFERENCES "RequirementComment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+

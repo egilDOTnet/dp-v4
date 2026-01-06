@@ -9,3 +9,4 @@ ALTER TABLE "Tenant" ADD COLUMN "bannerData" TEXT;
 ALTER TABLE "Tenant" ADD COLUMN "bannerFileName" TEXT;
 ALTER TABLE "Tenant" ADD COLUMN "bannerFileType" TEXT;
 
+
