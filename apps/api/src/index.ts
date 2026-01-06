@@ -5,6 +5,9 @@ import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import projectRoutes from "./routes/projects";
 import templateRoutes from "./routes/templates";
+import requirementRoutes from "./routes/requirements";
+import vendorRoutes from "./routes/vendors";
+import rfiRoutes from "./routes/rfi";
 import { errorHandler } from "./middleware/error-handler";
 
 const fastify = Fastify({
@@ -19,10 +22,13 @@ const start = async () => {
   try {
     // Register plugins
     await fastify.register(cors, {
-      origin: process.env.NEXT_PUBLIC_API_URL
-        ? [process.env.NEXT_PUBLIC_API_URL, "http://localhost:3000"]
-        : ["http://localhost:3000"],
+      origin: [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+      ],
       credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+      allowedHeaders: ["Content-Type", "Authorization"],
     });
 
     await fastify.register(jwt, {
@@ -39,6 +45,9 @@ const start = async () => {
     await fastify.register(userRoutes, { prefix: "/api/users" });
     await fastify.register(projectRoutes, { prefix: "/api/projects" });
     await fastify.register(templateRoutes, { prefix: "/api/templates" });
+    await fastify.register(requirementRoutes, { prefix: "/api/projects" });
+    await fastify.register(vendorRoutes, { prefix: "/api/vendors" });
+    await fastify.register(rfiRoutes, { prefix: "/api/projects" });
 
     const port = Number(process.env.PORT) || 3001;
     await fastify.listen({ port, host: "0.0.0.0" });

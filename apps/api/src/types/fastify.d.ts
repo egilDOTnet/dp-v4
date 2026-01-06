@@ -1,4 +1,3 @@
-import { FastifyRequest } from "fastify";
 import { JWTPayload } from "@dp/lib";
 
 declare module "@fastify/jwt" {
@@ -10,7 +9,7 @@ declare module "@fastify/jwt" {
 
 declare module "fastify" {
   interface FastifyRequest {
-    user?: JWTPayload;
+    user?: JWTPayload | undefined;
   }
 }
 

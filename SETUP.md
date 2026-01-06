@@ -7,14 +7,67 @@
 - Docker and Docker Compose
 - PostgreSQL (via Docker)
 
-## Initial Setup
+## Setup Options
+
+### Option 1: Full Docker Setup (Recommended)
+
+This setup runs everything in Docker containers, including the development servers. The entire monorepo workspace is mounted, so all workspace dependencies are properly resolved.
+
+1. **Install dependencies locally (for tooling like Prisma CLI):**
+   ```bash
+   pnpm install
+   ```
+
+2. **Start all services:**
+   ```bash
+   docker-compose up --build
+   ```
+
+   This will:
+   - Start PostgreSQL database
+   - Start Fastify API on port 3001
+   - Start Next.js app on port 3000
+   - Automatically install all workspace dependencies
+   - Generate Prisma client
+
+3. **Set up database:**
+   ```bash
+   # Run migrations
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:migrate"
+   
+   # Optional: Seed database
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:seed"
+   ```
+
+4. **Environment variables:**
+   
+   The Docker setup uses environment variables from `docker-compose.yml`. For local development, you may want to create `.env` files:
+   
+   `apps/api/.env`:
+   ```
+   DATABASE_URL="postgresql://postgres:postgres@postgres:5432/app"
+   JWT_SECRET="your-secret-key-change-in-production"
+   PORT=3001
+   NODE_ENV=development
+   ```
+   
+   `apps/web/.env`:
+   ```
+   NEXT_PUBLIC_API_URL="http://localhost:3001"
+   ```
+
+**Note:** The Docker setup mounts the entire workspace to `/workspace` in the containers, which allows pnpm to properly resolve all workspace dependencies (`@dp/config`, `@dp/db`, `@dp/lib`, `@dp/ui`).
+
+### Option 2: Local Development
+
+For local development without Docker (except for PostgreSQL):
 
 1. **Install dependencies:**
    ```bash
    pnpm install
    ```
 
-2. **Start Docker services:**
+2. **Start PostgreSQL with Docker:**
    ```bash
    docker-compose up -d postgres
    ```
@@ -29,7 +82,7 @@
 
 4. **Environment variables:**
    
-   Create `.env` files in `apps/api` and `apps/web` (see `.env.example` files for reference):
+   Create `.env` files in `apps/api` and `apps/web`:
    
    `apps/api/.env`:
    ```
@@ -69,6 +122,31 @@
 
 ## Troubleshooting
 
+### Docker Issues
+
+#### Containers won't start or dependencies not found
+
+If you see errors about workspace packages not being found (`@dp/config`, etc.):
+
+1. **Ensure the entire workspace is mounted:**
+   The `docker-compose.yml` should mount the root directory (`.`), not individual app directories.
+
+2. **Rebuild containers:**
+   ```bash
+   docker-compose down
+   docker-compose up --build
+   ```
+
+3. **Check Prisma client generation:**
+   If the API fails with Prisma errors, regenerate the client:
+   ```bash
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm prisma generate"
+   ```
+
+#### Prisma OpenSSL errors
+
+If you see OpenSSL-related errors with Prisma, the Docker images include OpenSSL. If issues persist, ensure the Prisma schema includes the correct binary targets for Alpine Linux (already configured in `packages/db/prisma/schema.prisma`).
+
 ### Port Already in Use
 
 If you get an error that port 3001 (or 3000) is already in use:
@@ -82,6 +160,22 @@ If you get an error that port 3001 (or 3000) is already in use:
 
 # Or manually:
 lsof -ti:3001 | xargs kill -9
+```
+
+### Docker Container Logs
+
+To view logs for debugging:
+
+```bash
+# All services
+docker-compose logs
+
+# Specific service
+docker-compose logs api
+docker-compose logs web
+
+# Follow logs
+docker-compose logs -f api
 ```
 
 ## Test User (if seeded)

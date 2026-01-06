@@ -4,13 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "password" | "magic-link">("email");
   const [magicLink, setMagicLink] = useState("");
-  const [userExists, setUserExists] = useState<boolean | null>(null);
+  const [_userExists, setUserExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -91,8 +92,11 @@ export default function LoginPage() {
 
   if (step === "magic-link" && magicLink) {
     return (
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-4">Magic Link</h1>
+      <div className="w-full max-w-md p-8 bg-background-tertiary rounded-lg shadow-md">
+        <div className="flex justify-center mb-4">
+          <Logo height={48} />
+        </div>
+        <h1 className="text-2xl font-bold mb-4 text-center">Magic Link</h1>
         <p className="text-gray-600 mb-4">
           Click the link below to set your password and log in:
         </p>
@@ -121,8 +125,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-6">Login</h1>
+    <div className="w-full max-w-md p-8 bg-background-tertiary rounded-lg shadow-md">
+      <div className="flex justify-center mb-6">
+        <Logo height={48} />
+      </div>
+      <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
       <form onSubmit={handleEmailSubmit} className="space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">

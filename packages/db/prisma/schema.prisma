@@ -1,13 +1,202 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model Phase {
+  id        String   @id
+  projectId String
+  name      String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  Task      Task[]
+
+  @@index([projectId])
+  @@index([projectId, order])
+}
+
+model Project {
+  id            String          @id
+  name          String
+  type          String?
+  startDate     DateTime?
+  endDate       DateTime?
+  tenantId      String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  Phase         Phase[]
+  Tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ProjectMember ProjectMember[]
+  requirementHierarchies RequirementHierarchy[]
+  ProjectVendor ProjectVendor[]
+  RFI           RFI?
+
+  @@index([tenantId])
+}
+
+model ProjectMember {
+  id        String   @id
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
+  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+model Task {
+  id                   String    @id @default(cuid())
+  phaseId              String
+  name                 String
+  description          String?
+  link                 String?
+  ownerId              String?
+  startDate            DateTime?
+  plannedCompletionDate DateTime?
+  actualCompletionDate DateTime?
+  order                Int
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  phase Phase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  owner User?  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([phaseId])
+  @@index([phaseId, order])
+  @@index([ownerId])
+}
+
+model Template {
+  id        String   @id
+  name      String
+  content   String?  @default("")
+  isGlobal  Boolean  @default(false)
+  tenantId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  RFIEmailTemplates RFI[] @relation("RFIEmailTemplate")
+  RFIInformationTemplates RFI[] @relation("RFIInformationTemplate")
+
+  @@index([isGlobal])
+  @@index([tenantId])
+}
+
+model Tenant {
+  id        String     @id
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime
+  Project   Project[]
+  Template  Template[]
+  User      User[]
+  Vendor    Vendor[]
+
+  @@index([name])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  firstName    String?
+  lastName     String?
+  passwordHash String?
+  tenantId     String?
+  role         Role     @default(User)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant                Tenant?                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectMembers        ProjectMember[]
+  ownedTasks            Task[]
+  createdRequirements   Requirement[]           @relation("RequirementCreator")
+  modifiedRequirements  Requirement[]            @relation("RequirementModifier")
+  requirementHistories  RequirementHistory[]
+
+  @@index([email])
+  @@index([tenantId])
+}
+
+model RequirementHierarchy {
+  id          String   @id @default(cuid())
+  projectId   String
+  parentId    String?
+  number      String
+  title       String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent      RequirementHierarchy? @relation("HierarchyParent", fields: [parentId], references: [id], onDelete: Cascade)
+  children    RequirementHierarchy[] @relation("HierarchyParent")
+  requirements Requirement[]
+
+  @@index([projectId])
+  @@index([parentId])
+  @@index([projectId, parentId, order])
+}
+
+model Requirement {
+  id              String              @id @default(cuid())
+  hierarchyId     String
+  number          String
+  description     String
+  type            RequirementType
+  status          RequirementStatus?
+  order           Int
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdById     String
+  lastModifiedById String
+
+  hierarchy       RequirementHierarchy @relation(fields: [hierarchyId], references: [id], onDelete: Cascade)
+  createdBy       User                 @relation("RequirementCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  lastModifiedBy  User                 @relation("RequirementModifier", fields: [lastModifiedById], references: [id], onDelete: Restrict)
+  history         RequirementHistory[]
+
+  @@index([hierarchyId])
+  @@index([hierarchyId, order])
+}
+
+model RequirementHistory {
+  id            String          @id @default(cuid())
+  requirementId String
+  description   String
+  type          RequirementType
+  status        RequirementStatus?
+  modifiedById  String
+  createdAt     DateTime         @default(now())
+
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  modifiedBy    User        @relation(fields: [modifiedById], references: [id], onDelete: Restrict)
+
+  @@index([requirementId])
+}
+
+enum RequirementType {
+  Information
+  Mandatory
+  Important
+  Wish
+}
+
+enum RequirementStatus {
+  Approved
+  ForReview
+  New
 }
 
 enum Role {
@@ -17,78 +206,187 @@ enum Role {
   Vendor
 }
 
-model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  users    User[]
-  projects Project[]
-  templates Template[]
-
-  @@index([name])
+enum VendorStatus {
+  Pending
+  RFI_Received
+  RFI_Rejected
+  RFI_Answered
+  RFP_Received
+  RFP_Answered
+  RFP_Rejected
+  Shortlisted
+  Lost
+  Won
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  passwordHash String?
-  tenantId     String?
-  role         Role     @default(User)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model Vendor {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  name               String
+  organizationNumber String?
+  emailDomain        String?
+  additionalData     Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
-  tenant        Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  projectMembers ProjectMember[]
-
-  @@index([email])
-  @@index([tenantId])
-}
-
-model Project {
-  id        String   @id @default(cuid())
-  name      String
-  type      String?
-  startDate DateTime?
-  endDate   DateTime?
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  members  ProjectMember[]
+  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ProjectVendor      ProjectVendor[]
+  VendorContactPerson VendorContactPerson[]
 
   @@index([tenantId])
+  @@index([organizationNumber])
 }
 
-model ProjectMember {
-  id        String   @id @default(cuid())
+model ProjectVendor {
+  id        String       @id @default(cuid())
   projectId String
-  userId    String
-  createdAt DateTime @default(now())
+  vendorId  String
+  status    VendorStatus @default(Pending)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vendor    Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  RFIVendorResponses RFIVendorResponse[] @relation("ProjectVendorRFIResponses")
 
-  @@unique([projectId, userId])
+  @@unique([projectId, vendorId])
   @@index([projectId])
-  @@index([userId])
+  @@index([vendorId])
 }
 
-model Template {
-  id        String   @id @default(cuid())
-  name      String
-  content   String?  @default("")
-  isGlobal  Boolean  @default(false)
-  tenantId  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model VendorContactPerson {
+  id            String   @id @default(cuid())
+  vendorId      String
+  firstName     String
+  lastName      String
+  email         String
+  phone         String?
+  isMainContact Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  RFIVendorResponses RFIVendorResponse[] @relation("ContactPersonRFIResponses")
 
-  @@index([isGlobal])
-  @@index([tenantId])
+  @@index([vendorId])
+  @@index([email])
 }
 
+enum RFIQuestionType {
+  YesNo
+  Dropdown
+  MultipleChoice
+  Scale
+  ContactDetails
+  SingleText
+  MultilineText
+}
+
+enum RFIVendorResponseStatus {
+  Sent
+  Received
+  Answered
+  Rejected
+}
+
+model RFI {
+  id               String            @id @default(cuid())
+  projectId        String            @unique
+  emailSubject     String?           @default("")
+  emailText        String?           @default("")
+  rfiInformation   String?           @default("")
+  emailTemplateId  String?
+  rfiInformationTemplateId String?
+  deadline         DateTime?
+  autoPublishDate  DateTime?
+  isPublished      Boolean           @default(false)
+  publishedAt      DateTime?
+  unpublishedAt    DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  emailTemplate    Template?         @relation("RFIEmailTemplate", fields: [emailTemplateId], references: [id], onDelete: SetNull)
+  rfiInformationTemplate Template?   @relation("RFIInformationTemplate", fields: [rfiInformationTemplateId], references: [id], onDelete: SetNull)
+  questions        RFIQuestion[]
+  vendorResponses  RFIVendorResponse[]
+
+  @@index([projectId])
+  @@index([emailTemplateId])
+  @@index([rfiInformationTemplateId])
+}
+
+model RFIQuestion {
+  id          String            @id @default(cuid())
+  rfiId       String
+  title       String
+  description String?
+  type        RFIQuestionType
+  order       Int
+  required    Boolean           @default(true)
+  scaleLabels Json?             // For Scale type: { "1": "Poor", "2": "Fair", ... }
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  rfi         RFI               @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  options     RFIQuestionOption[]
+  responses   RFIResponse[]
+
+  @@index([rfiId])
+  @@index([rfiId, order])
+}
+
+model RFIQuestionOption {
+  id         String       @id @default(cuid())
+  questionId String
+  label      String
+  value      String?
+  xAxis      Boolean      @default(false)
+  yAxis      Boolean      @default(false)
+  order      Int
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  question   RFIQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@index([questionId, order])
+}
+
+model RFIVendorResponse {
+  id              String                @id @default(cuid())
+  rfiId           String
+  projectVendorId String
+  contactPersonId String
+  status          RFIVendorResponseStatus @default(Sent)
+  sentAt          DateTime?
+  answeredAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  rfi             RFI                   @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  projectVendor   ProjectVendor         @relation("ProjectVendorRFIResponses", fields: [projectVendorId], references: [id], onDelete: Cascade)
+  contactPerson   VendorContactPerson   @relation("ContactPersonRFIResponses", fields: [contactPersonId], references: [id], onDelete: Restrict)
+  responses       RFIResponse[]
+
+  @@unique([rfiId, projectVendorId])
+  @@index([rfiId])
+  @@index([projectVendorId])
+  @@index([contactPersonId])
+}
+
+model RFIResponse {
+  id                 String            @id @default(cuid())
+  vendorResponseId   String
+  questionId         String
+  answer             Json              // Flexible JSON to store different answer types
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  vendorResponse     RFIVendorResponse @relation(fields: [vendorResponseId], references: [id], onDelete: Cascade)
+  question           RFIQuestion       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorResponseId, questionId])
+  @@index([vendorResponseId])
+  @@index([questionId])
+}

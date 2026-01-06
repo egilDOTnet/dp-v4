@@ -33,6 +33,8 @@ This README outlines the tech stack, goals, structure, and setup steps.
 ### DevOps & Infrastructure
 - Docker for local development
 - docker-compose (web + api + postgres)
+  - Monorepo-aware: entire workspace mounted for proper pnpm workspace resolution
+  - Automatic dependency installation and Prisma client generation
 - AWS (ECS Fargate or EKS)
 - AWS Secrets Manager for secrets
 - Terraform or AWS CDK (TypeScript)
@@ -66,22 +68,64 @@ docker/           # Docker configs
 
 ## Initial Setup
 
-### 1. Install dependencies
-pnpm install
+### Option 1: Docker (Recommended)
 
-### 2. Start local dev
-docker-compose up --build
+1. **Install dependencies locally (for tooling):**
+   ```bash
+   pnpm install
+   ```
 
-This runs:
-	•	Next.js app
-	•	Fastify API
-	•	PostgreSQL
+2. **Start all services with Docker:**
+   ```bash
+   docker-compose up --build
+   ```
 
-### 3. Run database migrations
-pnpm prisma migrate dev
+   This will:
+   - Start PostgreSQL database
+   - Start Fastify API on port 3001
+   - Start Next.js app on port 3000
+   - Automatically install all workspace dependencies
+   - Generate Prisma client
 
-### 4. Lint
+3. **Run database migrations:**
+   ```bash
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:migrate"
+   ```
+
+4. **Optional: Seed database:**
+   ```bash
+   docker-compose exec api sh -c "cd /workspace/packages/db && pnpm db:seed"
+   ```
+
+### Option 2: Local Development
+
+1. **Install dependencies:**
+   ```bash
+   pnpm install
+   ```
+
+2. **Start PostgreSQL with Docker:**
+   ```bash
+   docker-compose up -d postgres
+   ```
+
+3. **Set up database:**
+   ```bash
+   cd packages/db
+   pnpm db:generate
+   pnpm db:migrate
+   pnpm db:seed  # Optional
+   ```
+
+4. **Start development servers:**
+   ```bash
+   pnpm dev
+   ```
+
+### Lint
+```bash
 pnpm lint
+```
 
 ## Core Principles
 	•	Keep the codebase lean

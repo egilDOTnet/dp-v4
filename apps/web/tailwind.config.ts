@@ -1,31 +1,54 @@
+/**
+ * Tailwind CSS v4.1 Configuration
+ * 
+ * Note: Tailwind v4 uses CSS-first configuration via @theme directive in globals.css.
+ * This config file is kept minimal for compatibility with tooling (shadcn/ui, etc.).
+ * 
+ * Most configuration is done in src/app/globals.css using:
+ * - @theme directive for custom properties
+ * - @custom-variant for dark mode
+ * - @plugin for plugins
+ * 
+ * Content paths are auto-detected in v4, but we specify them here for explicit control.
+ */
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  // Dark mode is configured in CSS via @custom-variant dark in globals.css
+  // Keeping this for tooling compatibility, but CSS takes precedence
+  darkMode: "class",
+  
+  // Content paths - Tailwind v4 auto-detects, but we specify for explicit control
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  
+  // Theme configuration is primarily in globals.css via @theme directive
+  // This minimal config ensures TypeScript types work correctly
   theme: {
     extend: {
+      // Semantic color tokens reference CSS custom properties defined in @theme
+      // This allows nested access like background.primary in TypeScript
       colors: {
-        // Dynamic.as color scheme - will need to be updated with actual colors
-        primary: {
-          50: "#f0f9ff",
-          100: "#e0f2fe",
-          200: "#bae6fd",
-          300: "#7dd3fc",
-          400: "#38bdf8",
-          500: "#0ea5e9",
-          600: "#0284c7",
-          700: "#0369a1",
-          800: "#075985",
-          900: "#0c4a6e",
+        background: {
+          primary: "var(--color-background-primary)",
+          secondary: "var(--color-background-secondary)",
+          tertiary: "var(--color-background-tertiary)",
+        },
+        text: {
+          primary: "var(--color-text-primary)",
+          secondary: "var(--color-text-secondary)",
+          tertiary: "var(--color-text-tertiary)",
+        },
+        border: {
+          primary: "var(--color-border-primary)",
+          secondary: "var(--color-border-secondary)",
         },
       },
     },
   },
-  plugins: [],
 };
+
 export default config;
 
